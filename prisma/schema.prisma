@@ -32,6 +32,7 @@ model Project {
   nextAction           String?
   completionPercentage Float    @default(0.0)
 
+  lastSyncedAt         DateTime?
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 }
