@@ -12,6 +12,7 @@ import { DailyCommandWidget } from "../widgets/DailyCommandWidget";
 import { TasksWidget } from "../widgets/TasksWidget";
 import { UrlManagerWidget } from "../widgets/UrlManagerWidget";
 import { DeploymentHealthWidget } from "../widgets/DeploymentHealthWidget";
+import { MissionControlWidget } from "../widgets/MissionControlWidget";
 import { X, GripHorizontal } from "lucide-react";
 import { Button } from "../ui/button";
 
@@ -44,6 +45,8 @@ export function GridWorkspace() {
 
   const renderWidgetContent = (type: WidgetType) => {
     switch (type) {
+      case "mission":
+        return <MissionControlWidget />;
       case "projects":
         return <ProjectsWidget />;
       case "github":
