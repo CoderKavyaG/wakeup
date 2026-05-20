@@ -26,7 +26,6 @@ import {
   Award,
   Lock,
   Unlock,
-  Lightbulb
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
@@ -105,14 +104,14 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       if (timelineData.weeklyReview?.staleProjects > 0) {
         newNotifs.push({
           id: "stale-notif",
-          text: `⚠️ Stale Projects: ${timelineData.weeklyReview.staleProjects} repositories need immediate update focus!`,
+          text: `${timelineData.weeklyReview.staleProjects} stale repositories need attention`,
           type: "warning"
         });
       }
       if (timelineData.weeklyReview?.commitsPushed === 0) {
         newNotifs.push({
           id: "streak-notif",
-          text: "🔥 Streak Warning: No commits pushed in the last 7 days! Ship a code changes to keep momentum.",
+          text: "No commits in 7 days. Keep momentum with consistent shipping.",
           type: "warning"
         });
       }
@@ -132,8 +131,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     // System logs
     logs.push({
       id: "sys-init",
-      icon: <Server className="w-3.5 h-3.5 text-primary" />,
-      text: "DevOS environment initialized.",
+      icon: <Server className="w-3 h-3 text-muted-foreground" />,
+      text: "System initialized.",
       time: "Just now"
     });
 
@@ -141,8 +140,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     projects.slice(0, 2).forEach((p, idx) => {
       logs.push({
         id: `log-proj-${p.id}`,
-        icon: <FolderPlus className="w-3.5 h-3.5 text-green-400" />,
-        text: `Registered project: ${p.name}`,
+        icon: <FolderPlus className="w-3 h-3 text-muted-foreground" />,
+        text: `Project: ${p.name}`,
         time: idx === 0 ? "10m ago" : "1h ago"
       });
     });
@@ -151,8 +150,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     tasks.slice(0, 3).forEach((t, idx) => {
       logs.push({
         id: `log-task-${t.id}`,
-        icon: <CheckSquare className="w-3.5 h-3.5 text-yellow-400" />,
-        text: `${t.completed ? "Completed" : "Created"} task: ${t.title}`,
+        icon: <CheckSquare className="w-3 h-3 text-muted-foreground" />,
+        text: `${t.completed ? "Done" : "New"}: ${t.title}`,
         time: idx === 0 ? "30m ago" : "2h ago"
       });
     });
@@ -161,8 +160,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     notes.slice(0, 2).forEach((n, idx) => {
       logs.push({
         id: `log-note-${n.id}`,
-        icon: <FileText className="w-3.5 h-3.5 text-purple-400" />,
-        text: `Logged a developer thought in Brain Dump.`,
+        icon: <FileText className="w-3 h-3 text-muted-foreground" />,
+        text: `Note captured`,
         time: idx === 0 ? "45m ago" : "3h ago"
       });
     });
@@ -344,49 +343,48 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         <main className="flex-1 flex overflow-hidden h-full">
           {/* Dynamic Workspace Container */}
           <div className="flex-1 overflow-y-auto relative p-6 pb-24">
-            {/* Premium Workspace Controls Header */}
-            <div className="mb-6 p-4 rounded-2xl bg-card/65 backdrop-blur-md border border-border/80 shadow-md flex items-center justify-between gap-4 select-none">
-              <div className="flex items-center space-x-3">
-                <div className="w-2.5 h-2.5 rounded-full bg-primary animate-pulse" />
+            {/* Workspace Controls Header */}
+            <div className="mb-6 p-3.5 rounded-lg bg-card border border-border flex items-center justify-between gap-4 select-none">
+              <div className="flex items-center space-x-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-primary" />
                 <div>
-                  <h1 className="text-sm font-bold tracking-tight text-foreground">DevOS Workspace Cockpit</h1>
-                  <p className="text-[10px] text-muted-foreground mt-0.5 font-medium uppercase font-mono">
-                    {isLocked ? "🔒 Layout Locked (Static Grid)" : "🔓 Layout Unlocked (Draggable & Resizable)"}
+                  <h1 className="text-sm font-semibold tracking-tight text-foreground">Mission Control</h1>
+                  <p className="text-[9px] text-muted-foreground mt-0.5 font-medium uppercase font-mono">
+                    {isLocked ? "Locked" : "Edit mode"}
                   </p>
                 </div>
               </div>
 
               <div className="flex items-center space-x-2 shrink-0">
-                {/* Visual Profile Dropdown Switcher */}
-                <div className="flex items-center space-x-1.5 border border-border bg-popover/40 rounded-lg px-2.5 h-8">
-                  <span className="text-[10px] uppercase font-bold text-muted-foreground select-none">Profile:</span>
+                {/* Profile Dropdown Switcher */}
+                <div className="flex items-center space-x-1 border border-border bg-card rounded px-2 h-7">
+                  <span className="text-[9px] uppercase font-bold text-muted-foreground select-none">View:</span>
                   <select 
                     onChange={(e) => switchProfile(e.target.value as any)}
-                    className="bg-transparent border-0 outline-none text-xs text-foreground font-semibold cursor-pointer pr-1 focus:ring-0 focus:outline-none"
+                    className="bg-transparent border-0 outline-none text-xs text-foreground font-medium cursor-pointer pr-1 focus:ring-0 focus:outline-none"
                     defaultValue="standard"
                   >
-                    <option value="standard" className="bg-card text-foreground">Standard Layout</option>
-                    <option value="deep" className="bg-card text-foreground">🧠 Deep Work</option>
-                    <option value="dsa" className="bg-card text-foreground">💻 DSA Coding</option>
-                    <option value="interview" className="bg-card text-foreground">👔 Interview Prep</option>
-                    <option value="shipping" className="bg-card text-foreground">🚀 Shipping Mode</option>
+                    <option value="standard" className="bg-card text-foreground">Standard</option>
+                    <option value="deep" className="bg-card text-foreground">Deep Work</option>
+                    <option value="dsa" className="bg-card text-foreground">Coding</option>
+                    <option value="interview" className="bg-card text-foreground">Interview</option>
+                    <option value="shipping" className="bg-card text-foreground">Shipping</option>
                   </select>
                 </div>
 
-                {/* Onboarding tips toggle */}
+                {/* DevTools toggle - subtle */}
                 <Button
                   onClick={toggleTips}
                   variant="ghost"
                   size="sm"
-                  className={`h-8 text-[11px] font-semibold gap-1.5 px-3 rounded-lg border ${
+                  className={`h-7 text-[9px] font-medium gap-1 px-2.5 rounded border ${
                     showTips 
-                      ? "bg-amber-500/10 text-amber-400 border-amber-500/20" 
-                      : "text-muted-foreground border-border hover:bg-muted"
+                      ? "bg-primary/10 text-primary border-primary/20" 
+                      : "text-muted-foreground border-border hover:bg-popover"
                   }`}
-                  title="Toggle helper tutorials / on-screen guides"
                 >
-                  <Lightbulb className={`w-3.5 h-3.5 ${showTips ? "fill-amber-400 text-amber-400" : ""}`} />
-                  <span>DevTools Tips: {showTips ? "ON" : "OFF"}</span>
+                  <HelpCircle className="w-3 h-3" />
+                  <span>{showTips ? "Tips" : "Help"}</span>
                 </Button>
 
                 {/* Lock/Unlock Toggle */}

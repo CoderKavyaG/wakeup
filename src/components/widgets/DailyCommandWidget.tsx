@@ -4,7 +4,7 @@ import React from "react";
 import { useProjectStore } from "@/store/useProjectStore";
 import { useTaskStore } from "@/store/useTaskStore";
 import { useLayoutStore } from "@/store/useLayoutStore";
-import { Terminal, Flame, AlertCircle, CheckCircle2, TrendingUp } from "lucide-react";
+import { Terminal, AlertCircle, CheckCircle2, TrendingUp } from "lucide-react";
 
 export function DailyCommandWidget() {
   const { projects } = useProjectStore();
@@ -25,73 +25,59 @@ export function DailyCommandWidget() {
   return (
     <div className="flex flex-col h-full justify-between">
       {/* Header */}
-      <div className="flex items-center space-x-2 mb-2 shrink-0">
+      <div className="flex items-center space-x-2 mb-3 shrink-0">
         <Terminal className="w-4 h-4 text-primary" />
-        <h2 className="text-sm font-semibold tracking-wider uppercase text-secondary-foreground">Daily Command</h2>
+        <h2 className="text-xs font-semibold tracking-wide uppercase text-foreground">System Status</h2>
       </div>
 
-      {showTips && (
-        <div className="mb-2 p-2 bg-amber-500/10 border border-amber-500/20 text-[9px] text-amber-400 rounded-lg select-none leading-relaxed shrink-0">
-          ⚡ **Daily Command DevTools Tips**: Visualizes high-level statistics across all active projects and todo task checklist ratios. Keeps track of your active focus.
-        </div>
-      )}
-
       {/* Grid of Command stats */}
-      <div className="grid grid-cols-2 gap-3 my-auto py-1">
+      <div className="grid grid-cols-2 gap-2 my-auto py-1">
         {/* Streak */}
-        <div className="p-3 bg-popover/40 border border-border/80 rounded-lg flex items-center space-x-3">
-          <div className="p-2 bg-amber-500/10 rounded text-amber-400">
-            <Flame className="w-4 h-4 fill-amber-500/15" />
-          </div>
+        <div className="p-2.5 bg-card border border-border rounded flex items-center justify-between">
           <div>
-            <div className="text-[10px] text-muted-foreground uppercase font-semibold">Commit Streak</div>
-            <div className="text-sm font-bold text-foreground">{commitStreak} Days</div>
+            <div className="text-[9px] text-muted-foreground uppercase font-semibold">Streak</div>
+            <div className="text-sm font-mono text-foreground">{commitStreak}d</div>
           </div>
+          <Terminal className="w-3.5 h-3.5 text-primary opacity-40" />
         </div>
 
         {/* Stale Projects Alert */}
-        <div className="p-3 bg-popover/40 border border-border/80 rounded-lg flex items-center space-x-3">
-          <div className={`p-2 rounded ${staleProjects.length > 0 ? "bg-red-500/10 text-red-400" : "bg-green-500/10 text-green-400"}`}>
-            <AlertCircle className="w-4 h-4" />
-          </div>
+        <div className="p-2.5 bg-card border border-border rounded flex items-center justify-between">
           <div>
-            <div className="text-[10px] text-muted-foreground uppercase font-semibold">Stale Projects</div>
-            <div className="text-sm font-bold text-foreground">{staleProjects.length} Pending</div>
+            <div className="text-[9px] text-muted-foreground uppercase font-semibold">Stale</div>
+            <div className="text-sm font-mono text-foreground">{staleProjects.length}</div>
           </div>
+          <AlertCircle className={`w-3.5 h-3.5 ${staleProjects.length > 0 ? 'text-red-400' : 'text-muted-foreground'} opacity-40`} />
         </div>
 
         {/* Pending Tasks */}
-        <div className="p-3 bg-popover/40 border border-border/80 rounded-lg flex items-center space-x-3">
-          <div className="p-2 bg-blue-500/10 rounded text-blue-400">
-            <CheckCircle2 className="w-4 h-4" />
-          </div>
+        <div className="p-2.5 bg-card border border-border rounded flex items-center justify-between">
           <div>
-            <div className="text-[10px] text-muted-foreground uppercase font-semibold">Pending Tasks</div>
-            <div className="text-sm font-bold text-foreground">{pendingTasks.length} Active</div>
+            <div className="text-[9px] text-muted-foreground uppercase font-semibold">Tasks</div>
+            <div className="text-sm font-mono text-foreground">{pendingTasks.length}</div>
           </div>
+          <CheckCircle2 className="w-3.5 h-3.5 text-primary opacity-40" />
         </div>
 
         {/* Momentum */}
-        <div className="p-3 bg-popover/40 border border-border/80 rounded-lg flex items-center space-x-3">
-          <div className="p-2 bg-green-500/10 rounded text-green-400">
-            <TrendingUp className="w-4 h-4" />
-          </div>
+        <div className="p-2.5 bg-card border border-border rounded flex items-center justify-between">
           <div>
-            <div className="text-[10px] text-muted-foreground uppercase font-semibold">Momentum</div>
-            <div className="text-sm font-bold text-foreground">{taskCompletionRate}% Done</div>
+            <div className="text-[9px] text-muted-foreground uppercase font-semibold">Progress</div>
+            <div className="text-sm font-mono text-foreground">{taskCompletionRate}%</div>
           </div>
+          <TrendingUp className="w-3.5 h-3.5 text-primary opacity-40" />
         </div>
       </div>
 
-      {/* Momentum Progress Bar */}
-      <div className="space-y-1.5 shrink-0">
-        <div className="flex items-center justify-between text-[10px]">
-          <span className="font-semibold text-muted-foreground uppercase">Daily Velocity</span>
-          <span className="font-mono text-foreground font-bold">{taskCompletionRate}%</span>
+      {/* Progress Bar */}
+      <div className="space-y-1 shrink-0 mt-auto pt-2 border-t border-border">
+        <div className="flex items-center justify-between text-[9px]">
+          <span className="font-semibold text-muted-foreground uppercase">Progress</span>
+          <span className="font-mono text-foreground">{taskCompletionRate}%</span>
         </div>
-        <div className="h-2 bg-popover rounded-full overflow-hidden border border-border/50">
+        <div className="h-1.5 bg-popover rounded overflow-hidden border border-border">
           <div 
-            className="h-full bg-primary transition-all duration-500 rounded-full" 
+            className="h-full bg-primary transition-all duration-500" 
             style={{ width: `${taskCompletionRate}%` }}
           />
         </div>

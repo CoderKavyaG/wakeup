@@ -35,11 +35,11 @@ export function TasksWidget() {
   const getPriorityColor = (p: string) => {
     switch (p) {
       case "high":
-        return "bg-red-500/10 text-red-400 border-red-500/20";
+        return "bg-popover text-foreground border-red-500/20";
       case "medium":
-        return "bg-yellow-500/10 text-yellow-400 border-yellow-500/20";
+        return "bg-popover text-foreground border-yellow-500/20";
       default:
-        return "bg-blue-500/10 text-blue-400 border-blue-500/20";
+        return "bg-popover text-foreground border-blue-500/20";
     }
   };
 
@@ -106,13 +106,13 @@ export function TasksWidget() {
       {/* Header */}
       <div className="flex items-center justify-between mb-3 shrink-0">
         <div className="flex items-center space-x-2">
-          <CheckSquare className="w-4 h-4 text-primary animate-pulse" />
+          <CheckSquare className="w-4 h-4 text-primary " />
           <h2 className="text-sm font-semibold tracking-wider uppercase text-secondary-foreground">Tasks & Milestones</h2>
         </div>
       </div>
 
       {showTips && (
-        <div className="mb-3 p-3 bg-amber-500/10 border border-amber-500/20 text-[10px] text-amber-400 rounded-lg select-none leading-relaxed shrink-0">
+        <div className="mb-3 p-3 bg-popover border border-amber-500/20 text-[10px] text-foreground rounded-lg select-none leading-relaxed shrink-0">
           ⚡ **Task DevTools Tips**: Use this dashboard to organize your checklist. Set priorities (`High`, `Medium`, `Low`) to auto-sync momentum points to your Daily Command Widget. Tasks are saved persistently inside PostgreSQL.
         </div>
       )}
@@ -203,8 +203,8 @@ export function TasksWidget() {
                           {task.priority}
                         </Badge>
                         {task.dueDate && (
-                          <span className={`text-[9px] font-medium flex items-center space-x-1 ${overdue ? "text-red-400 font-bold" : "text-muted-foreground"}`}>
-                            {overdue ? <AlertTriangle className="w-2.5 h-2.5 text-red-400 shrink-0" /> : <Clock className="w-2.5 h-2.5 shrink-0" />}
+                          <span className={`text-[9px] font-medium flex items-center space-x-1 ${overdue ? "text-foreground font-bold" : "text-muted-foreground"}`}>
+                            {overdue ? <AlertTriangle className="w-2.5 h-2.5 text-foreground shrink-0" /> : <Clock className="w-2.5 h-2.5 shrink-0" />}
                             <span>{getFriendlyCountdown(task.dueDate)} ({task.dueDate})</span>
                           </span>
                         )}
@@ -229,3 +229,4 @@ export function TasksWidget() {
     </div>
   );
 }
+

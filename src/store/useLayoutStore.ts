@@ -59,9 +59,9 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
   widgets: defaultWidgets,
   loading: false,
   error: null,
-  isLocked: false,
+  isLocked: true,
   toggleLock: () => set((state) => ({ isLocked: !state.isLocked })),
-  showTips: true,
+  showTips: false,
   toggleTips: () => set((state) => ({ showTips: !state.showTips })),
 
   fetchLayout: async () => {

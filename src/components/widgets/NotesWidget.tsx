@@ -2,7 +2,6 @@
 
 import React, { useState } from "react";
 import { useNoteStore } from "@/store/useNoteStore";
-import { useLayoutStore } from "@/store/useLayoutStore";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -10,7 +9,6 @@ import { FileText, Plus, Trash2, Calendar } from "lucide-react";
 
 export function NotesWidget() {
   const { notes, addNote, deleteNote } = useNoteStore();
-  const { showTips } = useLayoutStore();
   const [content, setContent] = useState("");
 
   const handleSave = () => {
@@ -29,21 +27,15 @@ export function NotesWidget() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4 shrink-0">
+      <div className="flex items-center justify-between mb-3 shrink-0">
         <div className="flex items-center space-x-2">
           <FileText className="w-4 h-4 text-primary" />
-          <h2 className="text-sm font-semibold tracking-wider uppercase text-secondary-foreground">Brain Dump / Notes</h2>
+          <h2 className="text-sm font-semibold tracking-tight text-foreground">Brain Dump</h2>
         </div>
       </div>
 
-      {showTips && (
-        <div className="mb-3 p-3 bg-amber-500/10 border border-amber-500/20 text-[10px] text-amber-400 rounded-lg select-none leading-relaxed shrink-0">
-          ⚡ **Notes DevTools Tips**: Brain-dump thoughts, commands, architectural updates, or snippet code drafts. Use `Ctrl+Enter` to quickly capture note logs. Notes are synced and readable inside your Spotlight Command Palette (`Ctrl+K`).
-        </div>
-      )}
-
       {/* Input / Fast Capture Flow */}
-      <div className="relative mb-4 shrink-0">
+      <div className="relative mb-3 shrink-0">
         <Textarea
           value={content}
           onChange={(e) => setContent(e.target.value)}
@@ -98,3 +90,4 @@ export function NotesWidget() {
     </div>
   );
 }
+

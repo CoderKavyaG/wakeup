@@ -2,7 +2,6 @@
 
 import React, { useState } from "react";
 import { useUrlStore, ResourceUrl } from "@/store/useUrlStore";
-import { useLayoutStore } from "@/store/useLayoutStore";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +10,6 @@ import { Link, Clipboard, Check, Plus, Trash2, ExternalLink } from "lucide-react
 
 export function UrlManagerWidget() {
   const { urls, addUrl, deleteUrl } = useUrlStore();
-  const { showTips } = useLayoutStore();
   const [label, setLabel] = useState("");
   const [url, setUrl] = useState("");
   const [category, setCategory] = useState<ResourceUrl["category"]>("docs");
@@ -50,42 +48,36 @@ export function UrlManagerWidget() {
 
   const getCategoryColor = (cat: string) => {
     switch (cat) {
-      case "docs": return "bg-blue-500/10 text-blue-400 border-blue-500/20";
-      case "deployment": return "bg-green-500/10 text-green-400 border-green-500/20";
-      case "github": return "bg-purple-500/10 text-purple-400 border-purple-500/20";
-      default: return "bg-zinc-500/10 text-zinc-400 border-zinc-500/20";
+      case "docs": return "bg-primary/10 text-primary border-primary/20";
+      case "deployment": return "bg-primary/5 text-primary border-border";
+      case "github": return "bg-primary/5 text-primary border-border";
+      default: return "bg-border text-foreground border-border";
     }
   };
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4 shrink-0">
+      <div className="flex items-center justify-between mb-3 shrink-0">
         <div className="flex items-center space-x-2">
           <Link className="w-4 h-4 text-primary" />
-          <h2 className="text-sm font-semibold tracking-wider uppercase text-secondary-foreground">Resource Links</h2>
+          <h2 className="text-sm font-semibold tracking-tight text-foreground">Resource Links</h2>
         </div>
       </div>
 
-      {showTips && (
-        <div className="mb-3 p-3 bg-amber-500/10 border border-amber-500/20 text-[10px] text-amber-400 rounded-lg select-none leading-relaxed shrink-0">
-          ⚡ **Bookmarks DevTools Tips**: Bookmark active tools, local servers, and architecture references (`docs`, `tools`, `prod`). Resource labels are fully indexed inside spotlight search (`Ctrl+K`).
-        </div>
-      )}
-
       {/* Quick Add Form */}
-      <form onSubmit={handleAdd} className="grid grid-cols-1 gap-2 mb-4 shrink-0 bg-popover/20 border border-border/50 rounded-lg p-2.5">
-        <div className="flex gap-2">
+      <form onSubmit={handleAdd} className="grid grid-cols-1 gap-1.5 mb-3 shrink-0 bg-card border border-border rounded p-2">
+        <div className="flex gap-1.5">
           <Input
             placeholder="Label..."
             value={label}
             onChange={(e) => setLabel(e.target.value)}
-            className="h-8 text-xs bg-popover border-border text-foreground placeholder:text-muted-foreground flex-1"
+            className="h-7 text-xs bg-popover border-border text-foreground placeholder:text-muted-foreground flex-1"
           />
           <select
             value={category}
             onChange={(e) => setCategory(e.target.value as any)}
-            className="h-8 px-2 rounded-md bg-popover border border-border text-foreground text-[11px] focus:outline-none w-24 shrink-0"
+            className="h-7 px-2 rounded text-xs text-foreground bg-popover border border-border focus:outline-none w-20 shrink-0"
           >
             <option value="docs">Docs</option>
             <option value="deployment">Deploy</option>
@@ -93,7 +85,7 @@ export function UrlManagerWidget() {
             <option value="other">Other</option>
           </select>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-1.5">
           <Input
             placeholder="URL (e.g. google.com)"
             value={url}

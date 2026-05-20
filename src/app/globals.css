@@ -49,15 +49,15 @@
 }
 
 :root, .dark {
-  --background: #0F1115;
-  --foreground: #F5F7FA;
-  --card: #171A21;
-  --card-foreground: #F5F7FA;
-  --popover: #202531;
-  --popover-foreground: #F5F7FA;
-  --primary: #7C5CFF;
-  --primary-foreground: #F5F7FA;
-  --secondary: #202531;
+  --background: #0A0E14;
+  --foreground: #E8E9EB;
+  --card: #131820;
+  --card-foreground: #E8E9EB;
+  --popover: #1A1F2E;
+  --popover-foreground: #E8E9EB;
+  --primary: #5B8DEF;
+  --primary-foreground: #E8E9EB;
+  --secondary: #1A1F2E;
   --secondary-foreground: #F5F7FA;
   --muted: #171A21;
   --muted-foreground: #B0BACB;

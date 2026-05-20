@@ -62,13 +62,13 @@ export function ProjectsWidget() {
   const getStatusColor = (status: ProjectStatus) => {
     switch (status) {
       case "active":
-        return "bg-green-500/10 text-green-400 border-green-500/20";
+        return "bg-popover text-foreground border-green-500/20";
       case "planning":
-        return "bg-yellow-500/10 text-yellow-400 border-yellow-500/20";
+        return "bg-popover text-foreground border-yellow-500/20";
       case "completed":
-        return "bg-purple-500/10 text-purple-400 border-purple-500/20";
+        return "bg-popover text-foreground border-purple-500/20";
       case "stale":
-        return "bg-red-500/10 text-red-400 border-red-500/20";
+        return "bg-popover text-foreground border-red-500/20";
       default:
         return "bg-zinc-500/10 text-zinc-400 border-zinc-500/20";
     }
@@ -132,7 +132,7 @@ export function ProjectsWidget() {
         </div>
 
         {showTips && (
-          <div className="mb-3 p-3 bg-amber-500/10 border border-amber-500/20 text-[10px] text-amber-400 rounded-lg select-none leading-relaxed shrink-0">
+          <div className="mb-3 p-3 bg-popover border border-amber-500/20 text-[10px] text-foreground rounded-lg select-none leading-relaxed shrink-0">
             ⚡ **Projects DevTools Tips**: Centralize your active repository list here. Clicking a project opens detail sheets that automatically generate resume bullet summaries, compute velocity health, and compile custom interview prep cards.
           </div>
         )}
@@ -284,7 +284,7 @@ export function ProjectsWidget() {
                     {/* Health & Momentum Micro Badges */}
                     <div className="flex items-center space-x-4 mb-2 text-[10px]">
                       <div className="flex items-center space-x-1 text-muted-foreground">
-                        <Heart className="w-3 h-3 text-red-400 fill-red-400/20" />
+                        <Heart className="w-3 h-3 text-foreground " />
                         <span>Health: <strong className="text-foreground">{health}%</strong></span>
                       </div>
                       <div className="flex items-center space-x-1 text-muted-foreground">
@@ -319,7 +319,7 @@ export function ProjectsWidget() {
         <div className="w-1/2 flex flex-col h-full overflow-hidden pl-4">
           <div className="flex items-center justify-between mb-3 shrink-0">
             <div className="flex items-center space-x-2">
-              <Brain className="w-4 h-4 text-primary animate-pulse" />
+              <Brain className="w-4 h-4 text-primary " />
               <h3 className="text-sm font-bold text-foreground truncate">{selectedProject.name} Explorer</h3>
             </div>
             <Button size="icon" variant="ghost" className="w-7 h-7" onClick={() => setSelectedProject(null)}>
@@ -352,7 +352,7 @@ export function ProjectsWidget() {
               className="text-[10px] h-7 px-2 font-semibold uppercase tracking-wider flex items-center space-x-1"
               onClick={() => setActiveTab("resume")}
             >
-              <Sparkles className="w-3 h-3 text-yellow-400" />
+              <Sparkles className="w-3 h-3 text-foreground" />
               <span>Resume</span>
             </Button>
             <Button 
@@ -375,8 +375,8 @@ export function ProjectsWidget() {
                   <div className="p-3 border border-border/80 bg-popover/30 rounded-xl flex flex-col justify-between">
                     <span className="text-[10px] uppercase text-muted-foreground font-semibold">Project Health</span>
                     <div className="flex items-baseline space-x-2 mt-2">
-                      <span className="text-xl font-black font-mono text-green-400">{calculateHealth(selectedProject)}%</span>
-                      <Heart className="w-4 h-4 text-green-400 animate-pulse fill-green-400/20" />
+                      <span className="text-xl font-black font-mono text-foreground">{calculateHealth(selectedProject)}%</span>
+                      <Heart className="w-4 h-4 text-foreground  " />
                     </div>
                     <p className="text-[9px] text-muted-foreground mt-1">Based on repositories link and active status.</p>
                   </div>
@@ -384,7 +384,7 @@ export function ProjectsWidget() {
                     <span className="text-[10px] uppercase text-muted-foreground font-semibold">Momentum Score</span>
                     <div className="flex items-baseline space-x-2 mt-2">
                       <span className="text-xl font-black font-mono text-primary">{calculateMomentum(selectedProject)}%</span>
-                      <Activity className="w-4 h-4 text-primary animate-pulse" />
+                      <Activity className="w-4 h-4 text-primary " />
                     </div>
                     <p className="text-[9px] text-muted-foreground mt-1">Calculated using next actions and links health.</p>
                   </div>
@@ -457,7 +457,7 @@ export function ProjectsWidget() {
 
             {activeTab === "arch" && (
               <div className="space-y-4 pb-4">
-                <div className="p-3 border border-yellow-500/10 bg-yellow-500/5 rounded-lg text-[10px] text-yellow-400 flex items-start space-x-1.5">
+                <div className="p-3 border border-yellow-500/10 bg-yellow-500/5 rounded-lg text-[10px] text-foreground flex items-start space-x-1.5">
                   <Code2 className="w-4 h-4 flex-shrink-0" />
                   <p><strong>Architecture Workspace:</strong> Draft comprehensive markdown diagrams, design details, caching mechanisms, or pipeline details for your systems.</p>
                 </div>
@@ -483,7 +483,7 @@ export function ProjectsWidget() {
                     onClick={() => handleGenerateResumeBullet(selectedProject)}
                     className="h-7 text-[10px] border border-primary/20 hover:border-primary/40 bg-primary/5 hover:bg-primary/10 text-primary font-bold flex items-center space-x-1"
                   >
-                    <Sparkles className="w-3 h-3 text-yellow-400" />
+                    <Sparkles className="w-3 h-3 text-foreground" />
                     <span>Auto-Generate Bullet</span>
                   </Button>
                 </div>
@@ -521,7 +521,7 @@ export function ProjectsWidget() {
                     onClick={() => handleGenerateInterviewPrep(selectedProject)}
                     className="h-7 text-[10px] border border-primary/20 hover:border-primary/40 bg-primary/5 hover:bg-primary/10 text-primary font-bold flex items-center space-x-1"
                   >
-                    <Sparkles className="w-3 h-3 text-yellow-400" />
+                    <Sparkles className="w-3 h-3 text-foreground" />
                     <span>Generate Prep Prep Q&A</span>
                   </Button>
                 </div>
@@ -558,3 +558,4 @@ export function ProjectsWidget() {
     </div>
   );
 }
+
