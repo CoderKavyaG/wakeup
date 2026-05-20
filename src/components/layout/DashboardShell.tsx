@@ -178,6 +178,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   const widgetTypesList: { type: WidgetType; label: string; icon: React.ReactNode; desc: string }[] = [
     { type: "mission", label: "Intelligence Hub", icon: <Activity className="w-4 h-4" />, desc: "Central insights & recommendations." },
+    { type: "project-intel", label: "Project Intelligence", icon: <TrendingUp className="w-4 h-4" />, desc: "Smart project prioritization & grouping." },
     { type: "projects", label: "Projects Registry", icon: <FolderPlus className="w-4 h-4" />, desc: "Track code repositories and status." },
     { type: "github", label: "GitHub Monitor", icon: <GitBranch className="w-4 h-4" />, desc: "Track commits and stale repos." },
     { type: "daily", label: "Daily Command", icon: <TerminalIcon className="w-4 h-4" />, desc: "Momentum tracking & metrics." },
