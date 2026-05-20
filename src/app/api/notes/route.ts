@@ -7,8 +7,9 @@ export async function GET() {
       orderBy: { createdAt: "desc" },
     });
     return NextResponse.json(notes);
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'An error occurred';
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
 
@@ -26,8 +27,9 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json(note);
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'An error occurred';
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
 
@@ -45,7 +47,8 @@ export async function DELETE(request: Request) {
     });
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'An error occurred';
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

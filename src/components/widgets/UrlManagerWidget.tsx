@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useUrlStore, ResourceUrl } from "@/store/useUrlStore";
+import { useLayoutStore } from "@/store/useLayoutStore";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +11,7 @@ import { Link, Clipboard, Check, Plus, Trash2, ExternalLink } from "lucide-react
 
 export function UrlManagerWidget() {
   const { urls, addUrl, deleteUrl } = useUrlStore();
+  const { showTips } = useLayoutStore();
   const [label, setLabel] = useState("");
   const [url, setUrl] = useState("");
   const [category, setCategory] = useState<ResourceUrl["category"]>("docs");
@@ -64,6 +66,12 @@ export function UrlManagerWidget() {
           <h2 className="text-sm font-semibold tracking-wider uppercase text-secondary-foreground">Resource Links</h2>
         </div>
       </div>
+
+      {showTips && (
+        <div className="mb-3 p-3 bg-amber-500/10 border border-amber-500/20 text-[10px] text-amber-400 rounded-lg select-none leading-relaxed shrink-0">
+          ⚡ **Bookmarks DevTools Tips**: Bookmark active tools, local servers, and architecture references (`docs`, `tools`, `prod`). Resource labels are fully indexed inside spotlight search (`Ctrl+K`).
+        </div>
+      )}
 
       {/* Quick Add Form */}
       <form onSubmit={handleAdd} className="grid grid-cols-1 gap-2 mb-4 shrink-0 bg-popover/20 border border-border/50 rounded-lg p-2.5">

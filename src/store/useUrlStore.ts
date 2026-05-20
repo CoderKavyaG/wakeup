@@ -28,8 +28,9 @@ export const useUrlStore = create<UrlState>((set, get) => ({
       if (!res.ok) throw new Error("Failed to fetch URLs");
       const data = await res.json();
       set({ urls: data, loading: false });
-    } catch (err: any) {
-      set({ error: err.message, loading: false });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+      set({ error: errorMessage, loading: false });
     }
   },
 
@@ -58,9 +59,10 @@ export const useUrlStore = create<UrlState>((set, get) => ({
       set((state) => ({
         urls: state.urls.map((u) => (u.id === tempId ? savedUrl : u)),
       }));
-    } catch (err: any) {
+    } catch (err) {
       // Revert optimistic update
-      set({ urls: previousUrls, error: err.message });
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+      set({ urls: previousUrls, error: errorMessage });
     }
   },
 
@@ -76,9 +78,10 @@ export const useUrlStore = create<UrlState>((set, get) => ({
       });
 
       if (!res.ok) throw new Error("Failed to delete URL");
-    } catch (err: any) {
+    } catch (err) {
       // Revert
-      set({ urls: previousUrls, error: err.message });
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+      set({ urls: previousUrls, error: errorMessage });
     }
   },
 }));

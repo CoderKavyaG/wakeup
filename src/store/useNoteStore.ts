@@ -27,8 +27,9 @@ export const useNoteStore = create<NoteState>((set, get) => ({
       if (!res.ok) throw new Error("Failed to fetch notes");
       const data = await res.json();
       set({ notes: data, loading: false });
-    } catch (err: any) {
-      set({ error: err.message, loading: false });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+      set({ error: errorMessage, loading: false });
     }
   },
 
@@ -58,9 +59,10 @@ export const useNoteStore = create<NoteState>((set, get) => ({
       set((state) => ({
         notes: state.notes.map((n) => (n.id === tempId ? savedNote : n)),
       }));
-    } catch (err: any) {
+    } catch (err) {
       // Revert optimistic update
-      set({ notes: previousNotes, error: err.message });
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+      set({ notes: previousNotes, error: errorMessage });
     }
   },
 
@@ -76,9 +78,10 @@ export const useNoteStore = create<NoteState>((set, get) => ({
       });
 
       if (!res.ok) throw new Error("Failed to delete note");
-    } catch (err: any) {
+    } catch (err) {
       // Revert
-      set({ notes: previousNotes, error: err.message });
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+      set({ notes: previousNotes, error: errorMessage });
     }
   },
 }));

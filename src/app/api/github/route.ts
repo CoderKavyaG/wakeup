@@ -6,7 +6,7 @@ const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes cache TTL
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const username = searchParams.get("username") || "TPAteeq";
+    const username = searchParams.get("username") || "coderkavyag";
 
     // 1. Check cache first
     const cacheId = `github-cache-${username}`;
@@ -127,11 +127,11 @@ export async function GET(request: Request) {
     const yesterdayStr = new Date(Date.now() - 24 * 3600 * 1000).toISOString().split("T")[0];
 
     // Check if committed today or yesterday to continue streak
-    let hasActivity = commitDates.has(todayStr) || commitDates.has(yesterdayStr);
+    const hasActivity = commitDates.has(todayStr) || commitDates.has(yesterdayStr);
     
     if (hasActivity) {
       currentStreak = 0;
-      let checkDate = new Date();
+      const checkDate = new Date();
       // Start checking backwards from today
       while (true) {
         const checkStr = checkDate.toISOString().split("T")[0];
@@ -176,7 +176,8 @@ export async function GET(request: Request) {
     });
 
     return NextResponse.json(payload);
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'An error occurred';
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

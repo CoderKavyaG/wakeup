@@ -3,11 +3,13 @@
 import React from "react";
 import { useProjectStore } from "@/store/useProjectStore";
 import { useTaskStore } from "@/store/useTaskStore";
+import { useLayoutStore } from "@/store/useLayoutStore";
 import { Terminal, Flame, AlertCircle, CheckCircle2, TrendingUp } from "lucide-react";
 
 export function DailyCommandWidget() {
   const { projects } = useProjectStore();
   const { tasks } = useTaskStore();
+  const { showTips } = useLayoutStore();
 
   const staleProjects = projects.filter((p) => p.status === "stale");
   const pendingTasks = tasks.filter((t) => !t.completed);
@@ -27,6 +29,12 @@ export function DailyCommandWidget() {
         <Terminal className="w-4 h-4 text-primary" />
         <h2 className="text-sm font-semibold tracking-wider uppercase text-secondary-foreground">Daily Command</h2>
       </div>
+
+      {showTips && (
+        <div className="mb-2 p-2 bg-amber-500/10 border border-amber-500/20 text-[9px] text-amber-400 rounded-lg select-none leading-relaxed shrink-0">
+          ⚡ **Daily Command DevTools Tips**: Visualizes high-level statistics across all active projects and todo task checklist ratios. Keeps track of your active focus.
+        </div>
+      )}
 
       {/* Grid of Command stats */}
       <div className="grid grid-cols-2 gap-3 my-auto py-1">

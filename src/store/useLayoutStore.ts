@@ -20,11 +20,16 @@ interface LayoutState {
   widgets: WidgetInstance[];
   loading: boolean;
   error: string | null;
+  isLocked: boolean;
+  toggleLock: () => void;
+  showTips: boolean;
+  toggleTips: () => void;
   fetchLayout: () => Promise<void>;
   setLayouts: (layouts: { [key: string]: Layout }) => Promise<void>;
   addWidget: (type: WidgetType) => Promise<void>;
   removeWidget: (id: string) => Promise<void>;
   resetLayout: () => Promise<void>;
+  clearLayout: () => Promise<void>;
 }
 
 const defaultLayouts: { [key: string]: Layout } = {
@@ -54,6 +59,10 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
   widgets: defaultWidgets,
   loading: false,
   error: null,
+  isLocked: false,
+  toggleLock: () => set((state) => ({ isLocked: !state.isLocked })),
+  showTips: true,
+  toggleTips: () => set((state) => ({ showTips: !state.showTips })),
 
   fetchLayout: async () => {
     set({ loading: true, error: null });
@@ -77,8 +86,9 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
         });
         set({ loading: false });
       }
-    } catch (err: any) {
-      set({ error: err.message, loading: false });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+      set({ error: errorMessage, loading: false });
     }
   },
 
@@ -93,8 +103,9 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
       });
 
       if (!res.ok) throw new Error("Failed to save layout");
-    } catch (err: any) {
-      set({ error: err.message });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+      set({ error: errorMessage });
     }
   },
 
@@ -157,8 +168,9 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
       });
 
       if (!res.ok) throw new Error("Failed to remove widget");
-    } catch (err: any) {
-      set({ widgets: previousWidgets, layouts: previousLayouts, error: err.message });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+      set({ widgets: previousWidgets, layouts: previousLayouts, error: errorMessage });
     }
   },
 
@@ -174,8 +186,27 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ layouts: defaultLayouts, widgets: defaultWidgets }),
       });
-    } catch (err: any) {
-      set({ error: err.message });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+      set({ error: errorMessage });
+    }
+  },
+
+  clearLayout: async () => {
+    set({
+      layouts: { lg: [] },
+      widgets: []
+    });
+
+    try {
+      await fetch("/api/layouts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ layouts: { lg: [] }, widgets: [] }),
+      });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+      set({ error: errorMessage });
     }
   }
 }));

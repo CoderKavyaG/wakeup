@@ -30,8 +30,9 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       if (!res.ok) throw new Error("Failed to fetch tasks");
       const data = await res.json();
       set({ tasks: data, loading: false });
-    } catch (err: any) {
-      set({ error: err.message, loading: false });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+      set({ error: errorMessage, loading: false });
     }
   },
 
@@ -61,9 +62,10 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       set((state) => ({
         tasks: state.tasks.map((t) => (t.id === tempId ? savedTask : t)),
       }));
-    } catch (err: any) {
+    } catch (err) {
       // Revert optimistic update
-      set({ tasks: previousTasks, error: err.message });
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+      set({ tasks: previousTasks, error: errorMessage });
     }
   },
 
@@ -89,9 +91,10 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       });
 
       if (!res.ok) throw new Error("Failed to toggle task");
-    } catch (err: any) {
+    } catch (err) {
       // Revert
-      set({ tasks: previousTasks, error: err.message });
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+      set({ tasks: previousTasks, error: errorMessage });
     }
   },
 
@@ -107,9 +110,10 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       });
 
       if (!res.ok) throw new Error("Failed to delete task");
-    } catch (err: any) {
+    } catch (err) {
       // Revert
-      set({ tasks: previousTasks, error: err.message });
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+      set({ tasks: previousTasks, error: errorMessage });
     }
   },
 }));

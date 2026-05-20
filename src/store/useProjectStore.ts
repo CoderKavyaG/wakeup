@@ -49,8 +49,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       if (!res.ok) throw new Error("Failed to fetch projects");
       const data = await res.json();
       set({ projects: data, loading: false });
-    } catch (err: any) {
-      set({ error: err.message, loading: false });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+      set({ error: errorMessage, loading: false });
     }
   },
 
@@ -83,9 +84,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       set((state) => ({
         projects: state.projects.map((p) => (p.id === tempId ? savedProject : p)),
       }));
-    } catch (err: any) {
+    } catch (err) {
       // Revert optimistic update
-      set({ projects: previousProjects, error: err.message });
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+      set({ projects: previousProjects, error: errorMessage });
     }
   },
 
@@ -113,9 +115,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       set((state) => ({
         projects: state.projects.map((p) => (p.id === id ? savedProject : p)),
       }));
-    } catch (err: any) {
+    } catch (err) {
       // Revert
-      set({ projects: previousProjects, error: err.message });
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+      set({ projects: previousProjects, error: errorMessage });
     }
   },
 
@@ -131,9 +134,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       });
 
       if (!res.ok) throw new Error("Failed to delete project");
-    } catch (err: any) {
+    } catch (err) {
       // Revert
-      set({ projects: previousProjects, error: err.message });
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred';
+      set({ projects: previousProjects, error: errorMessage });
     }
   },
 }));

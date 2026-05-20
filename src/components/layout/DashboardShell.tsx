@@ -23,14 +23,17 @@ import {
   Clock,
   TrendingUp,
   Sparkles,
-  Award
+  Award,
+  Lock,
+  Unlock,
+  Lightbulb
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { Badge } from "../ui/badge";
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
-  const { addWidget, widgets } = useLayoutStore();
+  const { addWidget, widgets, isLocked, toggleLock, showTips, toggleTips, clearLayout, resetLayout, setLayouts } = useLayoutStore();
   const { tasks } = useTaskStore();
   const { projects } = useProjectStore();
   const { notes } = useNoteStore();
@@ -51,6 +54,45 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     } catch (e) {
       console.warn("Failed to fetch timeline:", e);
     }
+  };
+
+  const switchProfile = (profile: "standard" | "deep" | "dsa" | "interview" | "shipping") => {
+    const currentLayouts = { ...useLayoutStore.getState().layouts };
+    if (!currentLayouts.lg) return;
+    
+    if (profile === "standard") {
+      resetLayout();
+      return;
+    }
+
+    let newLg = [...currentLayouts.lg];
+    if (profile === "deep") {
+      newLg = newLg.map(l => {
+        if (l.i.includes("tasks")) return { ...l, x: 0, y: 0, w: 6, h: 4 };
+        if (l.i.includes("notes")) return { ...l, x: 6, y: 0, w: 6, h: 4 };
+        return { ...l, y: l.y + 4 };
+      });
+    } else if (profile === "dsa") {
+      newLg = newLg.map(l => {
+        if (l.i.includes("urls")) return { ...l, x: 0, y: 0, w: 8, h: 4 };
+        if (l.i.includes("health")) return { ...l, x: 8, y: 0, w: 4, h: 4 };
+        return { ...l, y: l.y + 4 };
+      });
+    } else if (profile === "interview") {
+      newLg = newLg.map(l => {
+        if (l.i.includes("projects")) return { ...l, x: 0, y: 0, w: 7, h: 4 };
+        if (l.i.includes("notes")) return { ...l, x: 7, y: 0, w: 5, h: 4 };
+        return { ...l, y: l.y + 4 };
+      });
+    } else if (profile === "shipping") {
+      newLg = newLg.map(l => {
+        if (l.i.includes("github")) return { ...l, x: 0, y: 0, w: 6, h: 4 };
+        if (l.i.includes("health")) return { ...l, x: 6, y: 0, w: 6, h: 4 };
+        return { ...l, y: l.y + 4 };
+      });
+    }
+
+    setLayouts({ lg: newLg });
   };
 
   React.useEffect(() => {
@@ -302,6 +344,100 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         <main className="flex-1 flex overflow-hidden h-full">
           {/* Dynamic Workspace Container */}
           <div className="flex-1 overflow-y-auto relative p-6 pb-24">
+            {/* Premium Workspace Controls Header */}
+            <div className="mb-6 p-4 rounded-2xl bg-card/65 backdrop-blur-md border border-border/80 shadow-md flex items-center justify-between gap-4 select-none">
+              <div className="flex items-center space-x-3">
+                <div className="w-2.5 h-2.5 rounded-full bg-primary animate-pulse" />
+                <div>
+                  <h1 className="text-sm font-bold tracking-tight text-foreground">DevOS Workspace Cockpit</h1>
+                  <p className="text-[10px] text-muted-foreground mt-0.5 font-medium uppercase font-mono">
+                    {isLocked ? "🔒 Layout Locked (Static Grid)" : "🔓 Layout Unlocked (Draggable & Resizable)"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-2 shrink-0">
+                {/* Visual Profile Dropdown Switcher */}
+                <div className="flex items-center space-x-1.5 border border-border bg-popover/40 rounded-lg px-2.5 h-8">
+                  <span className="text-[10px] uppercase font-bold text-muted-foreground select-none">Profile:</span>
+                  <select 
+                    onChange={(e) => switchProfile(e.target.value as any)}
+                    className="bg-transparent border-0 outline-none text-xs text-foreground font-semibold cursor-pointer pr-1 focus:ring-0 focus:outline-none"
+                    defaultValue="standard"
+                  >
+                    <option value="standard" className="bg-card text-foreground">Standard Layout</option>
+                    <option value="deep" className="bg-card text-foreground">🧠 Deep Work</option>
+                    <option value="dsa" className="bg-card text-foreground">💻 DSA Coding</option>
+                    <option value="interview" className="bg-card text-foreground">👔 Interview Prep</option>
+                    <option value="shipping" className="bg-card text-foreground">🚀 Shipping Mode</option>
+                  </select>
+                </div>
+
+                {/* Onboarding tips toggle */}
+                <Button
+                  onClick={toggleTips}
+                  variant="ghost"
+                  size="sm"
+                  className={`h-8 text-[11px] font-semibold gap-1.5 px-3 rounded-lg border ${
+                    showTips 
+                      ? "bg-amber-500/10 text-amber-400 border-amber-500/20" 
+                      : "text-muted-foreground border-border hover:bg-muted"
+                  }`}
+                  title="Toggle helper tutorials / on-screen guides"
+                >
+                  <Lightbulb className={`w-3.5 h-3.5 ${showTips ? "fill-amber-400 text-amber-400" : ""}`} />
+                  <span>DevTools Tips: {showTips ? "ON" : "OFF"}</span>
+                </Button>
+
+                {/* Lock/Unlock Toggle */}
+                <Button
+                  onClick={toggleLock}
+                  variant="ghost"
+                  size="sm"
+                  className={`h-8 text-[11px] font-semibold gap-1.5 px-3 rounded-lg border ${
+                    isLocked 
+                      ? "bg-rose-500/10 text-rose-400 border-rose-500/20" 
+                      : "bg-green-500/10 text-green-400 border-green-500/20"
+                  }`}
+                  title="Freeze widgets in place to prevent accidental moves"
+                >
+                  {isLocked ? (
+                    <>
+                      <Lock className="w-3.5 h-3.5" />
+                      <span>Lock Dashboard</span>
+                    </>
+                  ) : (
+                    <>
+                      <Unlock className="w-3.5 h-3.5" />
+                      <span>Unlock / Drag Mode</span>
+                    </>
+                  )}
+                </Button>
+
+                {/* Seed Template */}
+                <Button
+                  onClick={resetLayout}
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 text-[11px] font-semibold px-3 rounded-lg border border-border hover:bg-muted text-foreground"
+                  title="Load the standard multi-widget layout demo template"
+                >
+                  Seed Demo Layout
+                </Button>
+
+                {/* Clear Slate */}
+                <Button
+                  onClick={clearLayout}
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 text-[11px] font-semibold px-3 rounded-lg border border-border/80 hover:bg-rose-500/10 hover:text-rose-400 hover:border-rose-500/20 text-muted-foreground"
+                  title="Wipe the dashboard to create a clean, empty workstation"
+                >
+                  Clear Workspace
+                </Button>
+              </div>
+            </div>
+
             {children}
           </div>          {/* Right Live Activity Feed Panel */}
           <AnimatePresence>

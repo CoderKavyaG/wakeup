@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import { useTaskStore, Task } from "@/store/useTaskStore";
+import { useTaskStore } from "@/store/useTaskStore";
+import { useLayoutStore } from "@/store/useLayoutStore";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +11,7 @@ import { CheckSquare, Square, Plus, Trash2, Clock, AlertTriangle } from "lucide-
 
 export function TasksWidget() {
   const { tasks, addTask, toggleTask, deleteTask } = useTaskStore();
+  const { showTips } = useLayoutStore();
   const [title, setTitle] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [priority, setPriority] = useState<"low" | "medium" | "high">("medium");
@@ -109,6 +111,12 @@ export function TasksWidget() {
         </div>
       </div>
 
+      {showTips && (
+        <div className="mb-3 p-3 bg-amber-500/10 border border-amber-500/20 text-[10px] text-amber-400 rounded-lg select-none leading-relaxed shrink-0">
+          ⚡ **Task DevTools Tips**: Use this dashboard to organize your checklist. Set priorities (`High`, `Medium`, `Low`) to auto-sync momentum points to your Daily Command Widget. Tasks are saved persistently inside PostgreSQL.
+        </div>
+      )}
+
       {/* Task Filters */}
       <div className="flex space-x-1.5 mb-3 shrink-0">
         {(["all", "active", "overdue", "completed"] as const).map((f) => (
@@ -141,7 +149,7 @@ export function TasksWidget() {
           />
           <select
             value={priority}
-            onChange={(e) => setPriority(e.target.value as any)}
+            onChange={(e) => setPriority(e.target.value as "low" | "medium" | "high")}
             className="h-8 px-2 rounded-md bg-popover border border-border text-foreground text-[11px] focus:outline-none w-1/3"
           >
             <option value="low">Low</option>

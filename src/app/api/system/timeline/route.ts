@@ -69,7 +69,7 @@ export async function GET() {
     });
 
     // 5. Add Commit pushes from cache if available
-    let allCommits: any[] = [];
+    const allCommits: any[] = [];
     caches.forEach((cache: any) => {
       const data = cache.data as any;
       if (data && Array.isArray(data.commits)) {
@@ -132,7 +132,8 @@ export async function GET() {
       },
       timeline: timelineEvents.slice(0, 30) // Return top 30 events for high fidelity scroll
     });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'An error occurred';
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

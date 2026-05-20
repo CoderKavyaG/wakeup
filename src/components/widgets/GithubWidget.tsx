@@ -6,7 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { GitCommit, GitBranch, AlertTriangle, RefreshCw, Star, ExternalLink, Flame, PieChart } from "lucide-react";
+import { GitCommit, GitBranch, RefreshCw, Star, ExternalLink, Flame, PieChart, AlertTriangle } from "lucide-react";
+import { useLayoutStore } from "@/store/useLayoutStore";
 
 interface Repository {
   id: number;
@@ -42,13 +43,26 @@ interface GithubStats {
 }
 
 export function GithubWidget() {
-  const [username, setUsername] = useState("TPAteeq");
-  const [inputUsername, setInputUsername] = useState("TPAteeq");
+  const { showTips } = useLayoutStore();
+  const [username, setUsername] = useState("coderkavyag");
+  const [inputUsername, setInputUsername] = useState("coderkavyag");
   const [repos, setRepos] = useState<Repository[]>([]);
   const [commits, setCommits] = useState<Commit[]>([]);
   const [stats, setStats] = useState<GithubStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const getRelativeTime = (dateStr: string) => {
+    const elapsed = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(elapsed / 60000);
+    const hours = Math.floor(mins / 60);
+    const days = Math.floor(hours / 24);
+    
+    if (mins < 1) return "Just now";
+    if (mins < 60) return `${mins}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    return `${days}d ago`;
+  };
 
   const fetchGithubData = async (user: string) => {
     if (!user) return;
@@ -76,7 +90,7 @@ export function GithubWidget() {
         id: 1,
         name: "wake-up",
         description: "DevOS Personal developer cockpit dashboard",
-        html_url: "https://github.com/TPAteeq/wake-up",
+        html_url: "https://github.com/coderkavyag/wake-up",
         updated_at: new Date().toISOString(),
         stargazers_count: 14,
         forks_count: 2,
@@ -158,6 +172,12 @@ export function GithubWidget() {
           </Button>
         </form>
       </div>
+
+      {showTips && (
+        <div className="mb-3 p-3 bg-amber-500/10 border border-amber-500/20 text-[10px] text-amber-400 rounded-lg select-none leading-relaxed shrink-0">
+          ⚡ **GitHub DevTools Tips**: Fetches real-time profile highlights, commit events stream, and active/stale state tracking directly from GitHub. Change username input to import and monitor other developer accounts!
+        </div>
+      )}
 
       {/* Highlights & Stats Banner */}
       {stats && (
@@ -247,7 +267,7 @@ export function GithubWidget() {
                         </a>
                       </div>
                       <p className="text-[11px] text-muted-foreground line-clamp-1 mt-0.5">{commit.message}</p>
-                      <span className="text-[9px] text-muted-foreground/60">{new Date(commit.date).toLocaleDateString()}</span>
+                      <span className="text-[9px] text-muted-foreground/60">{getRelativeTime(commit.date)}</span>
                     </div>
                   </div>
                 ))
@@ -310,7 +330,7 @@ export function GithubWidget() {
                             <span>{repo.stargazers_count}</span>
                           </span>
                         </div>
-                        <span>Updated: {new Date(repo.updated_at).toLocaleDateString()}</span>
+                        <span>Last Commit: {getRelativeTime(repo.updated_at)}</span>
                       </div>
                     </div>
                   );

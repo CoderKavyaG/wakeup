@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { Server, Activity, ArrowUpRight, Cpu, Folder, Terminal, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { useLayoutStore } from "@/store/useLayoutStore";
 
 interface LocalPort {
   port: number;
@@ -27,6 +28,7 @@ interface SystemData {
 }
 
 export function DeploymentHealthWidget() {
+  const { showTips } = useLayoutStore();
   const [data, setData] = useState<SystemData>({
     workspace: null,
     activePorts: [],
@@ -72,6 +74,12 @@ export function DeploymentHealthWidget() {
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin text-primary" : ""}`} />
         </button>
       </div>
+
+      {showTips && (
+        <div className="mb-3 p-3 bg-amber-500/10 border border-amber-500/20 text-[10px] text-amber-400 rounded-lg select-none leading-relaxed shrink-0">
+          ⚡ **System Monitor DevTools Tips**: Auto-scans local TCP sockets on your PC to identify active web servers (e.g. Next.js, Vite) and checks `docker ps` to index background database containers instantly. Clicking target port launches it.
+        </div>
+      )}
 
       <div className="flex-1 space-y-4 overflow-y-auto pr-1 -mr-2">
         {/* Workspace */}

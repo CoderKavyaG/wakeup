@@ -7,7 +7,7 @@ const defaultProjects = [
     description: "A customizable, draggable developer cockpit dashboard to centralize workflow and reduce context switching.",
     status: "active",
     tags: ["Next.js", "React Grid Layout", "Tailwind CSS", "Zustand"],
-    githubUrl: "https://github.com/TPAteeq/wake-up",
+    githubUrl: "https://github.com/coderkavyag/wake-up",
     liveUrl: "http://localhost:3000",
     summary: "A next-generation developer spatial operating cockpit that integrates widget layouts, tasks lists, real-time GitHub activity streams, and developer memory systems.",
     architectureNotes: "### Core Architecture\n\n- **Client Layer**: Next.js App Router with Zustand client-side optimistic orchestration.\n- **Spatial Layout**: React-Grid-Layout dragging and resizing persistent coordinates.\n- **Database Layer**: PostgreSQL Neon Serverless pooling singleton via Prisma 7.",
@@ -64,8 +64,9 @@ export async function GET() {
     }
 
     return NextResponse.json(projects);
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'An error occurred';
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
 
@@ -93,8 +94,9 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json(project);
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'An error occurred';
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
 
@@ -113,8 +115,9 @@ export async function PATCH(request: Request) {
     });
 
     return NextResponse.json(updatedProject);
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'An error occurred';
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
 
@@ -132,7 +135,8 @@ export async function DELETE(request: Request) {
     });
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'An error occurred';
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

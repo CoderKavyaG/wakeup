@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 
 export async function POST(request: Request) {
   try {
-    const { repoName, username = "TPAteeq" } = await request.json();
+    const { repoName, username = "coderkavyag" } = await request.json();
 
     if (!repoName) {
       return NextResponse.json({ error: "Missing repository name." }, { status: 400 });
@@ -81,7 +81,8 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json(newProject);
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'An error occurred';
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

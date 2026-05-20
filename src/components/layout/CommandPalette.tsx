@@ -76,7 +76,7 @@ export function CommandPalette() {
       category: "Automation",
       icon: <GitPullRequest className="w-4 h-4 text-green-400" />,
       action: async () => {
-        const username = "TPAteeq";
+        const username = "coderkavyag";
         await fetch(`/api/github?username=${username}&refresh=true`);
         alert("GitHub cache refreshed successfully!");
       }

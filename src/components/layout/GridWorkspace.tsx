@@ -18,16 +18,27 @@ import { Button } from "../ui/button";
 const ResponsiveGridLayout = WidthProvider(Responsive);
 
 export function GridWorkspace() {
-  const { layouts, widgets, setLayouts, removeWidget } = useLayoutStore();
+  const { layouts, widgets, setLayouts, removeWidget, isLocked } = useLayoutStore();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  const onLayoutChange = (layout: Layout, allLayouts: Partial<Record<string, Layout>>) => {
-    if (JSON.stringify(layouts) !== JSON.stringify(allLayouts)) {
-      setLayouts(allLayouts as { [key: string]: Layout });
+  const onLayoutChange = (layout: any, allLayouts: any) => {
+    const simplify = (obj: any) => {
+      if (!obj) return "";
+      return Object.entries(obj)
+        .map(([bp, items]: any) => {
+          if (!Array.isArray(items)) return "";
+          return bp + ":" + items.map((l: any) => `${l.i}:${l.x},${l.y},${l.w},${l.h}`).sort().join(",");
+        })
+        .sort()
+        .join("|");
+    };
+
+    if (simplify(layouts) !== simplify(allLayouts)) {
+      setLayouts(allLayouts);
     }
   };
 
@@ -68,6 +79,8 @@ export function GridWorkspace() {
         draggableHandle=".widget-drag-handle"
         margin={[20, 20]}
         useCSSTransforms={mounted}
+        isDraggable={!isLocked}
+        isResizable={!isLocked}
       >
         {widgets.map((widget) => (
           <div key={widget.id} className="bg-card border border-border/80 rounded-xl shadow-md flex flex-col overflow-hidden hover:border-primary/20 transition-colors duration-200">

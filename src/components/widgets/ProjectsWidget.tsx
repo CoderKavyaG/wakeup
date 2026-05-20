@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useProjectStore, Project, ProjectStatus } from "@/store/useProjectStore";
+import { useLayoutStore } from "@/store/useLayoutStore";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,12 +12,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   Folder, GitBranch, ExternalLink, Plus, Trash2, Code2, 
-  Brain, FileText, CheckCircle2, AlertTriangle, Sparkles, 
-  HelpCircle, Percent, Activity, ChevronRight, X, Heart
+  Brain, CheckCircle2, Sparkles, 
+  HelpCircle, Activity, ChevronRight, X, Heart
 } from "lucide-react";
 
 export function ProjectsWidget() {
   const { projects, addProject, deleteProject, updateProject } = useProjectStore();
+  const { showTips } = useLayoutStore();
   const [isOpen, setIsOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [activeTab, setActiveTab] = useState<"overview" | "arch" | "resume" | "interview">("overview");
@@ -127,6 +129,16 @@ export function ProjectsWidget() {
             <Folder className="w-4 h-4 text-primary" />
             <h2 className="text-sm font-semibold tracking-wider uppercase text-secondary-foreground">Project Intelligence</h2>
           </div>
+        </div>
+
+        {showTips && (
+          <div className="mb-3 p-3 bg-amber-500/10 border border-amber-500/20 text-[10px] text-amber-400 rounded-lg select-none leading-relaxed shrink-0">
+            ⚡ **Projects DevTools Tips**: Centralize your active repository list here. Clicking a project opens detail sheets that automatically generate resume bullet summaries, compute velocity health, and compile custom interview prep cards.
+          </div>
+        )}
+
+        <div className="flex items-center justify-between mb-3 shrink-0">
+          <span className="text-[10px] uppercase font-bold text-muted-foreground select-none">Registry Items</span>
           <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger
               render={
@@ -483,7 +495,7 @@ export function ProjectsWidget() {
                       {selectedProject.resumeBullet}
                     </p>
                   ) : (
-                    <div className="text-center py-6 text-xs text-muted-foreground">Click "Auto-Generate Bullet" to map tech stack to a professional bullet point!</div>
+                    <div className="text-center py-6 text-xs text-muted-foreground">Click &quot;Auto-Generate Bullet&quot; to map tech stack to a professional bullet point!</div>
                   )}
                 </div>
 
@@ -535,7 +547,7 @@ export function ProjectsWidget() {
                       }
                     })()
                   ) : (
-                    <div className="text-center py-8 text-xs text-muted-foreground">Click "Generate Prep Q&A" to build custom mock interview questions based on tags.</div>
+                    <div className="text-center py-8 text-xs text-muted-foreground">Click &quot;Generate Prep Q&A&quot; to build custom mock interview questions based on tags.</div>
                   )}
                 </div>
               </div>
