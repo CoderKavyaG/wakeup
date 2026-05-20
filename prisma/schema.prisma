@@ -3,7 +3,7 @@ datasource db {
 }
 
 generator client {
-  provider   = "prisma-client-js"
+  provider = "prisma-client-js"
 }
 
 // ==========================================
@@ -35,6 +35,10 @@ model Project {
   lastSyncedAt         DateTime?
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
+  
+  // Relations (Phase 5)
+  memories             Memory[]
+  projectMemory        ProjectMemory?
 }
 
 model Task {
@@ -130,4 +134,44 @@ model SavedTrend {
 
   @@index([userId])
   @@index([trendId])
+}
+
+// ==========================================
+// COGNITIVE LAYER (PHASE 5)
+// ==========================================
+
+model Memory {
+  id           String      @id @default(uuid())
+  // Core content
+  content      String      @db.Text
+  sourceType   String      // "note" | "commit" | "readme" | "task" | "timeline"
+  sourceId     String?     // Link to original source
+  // Embeddings & search
+  embedding    Float[]     @default([])  // OpenAI embedding array (1536 dims)
+  // Metadata
+  projectId    String?
+  project      Project?    @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  metadata     Json        // { author, url, commitHash, etc }
+  // Lifecycle
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  
+  @@index([sourceType])
+  @@index([projectId])
+}
+
+model ProjectMemory {
+  id           String      @id @default(uuid())
+  projectId    String      @unique
+  project      Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  // Aggregated insights
+  summary      String      @db.Text @default("")
+  recentEvents String[]    @default([])
+  incidents    String[]    @default([])
+  architecture String      @db.Text @default("")
+  // Stats
+  totalMemories Int        @default(0)
+  lastIndexed  DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
 }
