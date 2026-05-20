@@ -2,10 +2,12 @@
 
 import React, { useEffect, useState } from "react";
 import { useMissionControlStore, WorkflowInsight } from "@/store/useMissionControlStore";
+import { useCognitiveStore } from "@/store/useCognitiveStore";
 import { useProjectStore } from "@/store/useProjectStore";
 import { useTaskStore } from "@/store/useTaskStore";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   AlertCircle,
   Zap,
@@ -18,14 +20,20 @@ import {
   Clock,
   CheckCircle2,
   AlertTriangle,
+  Brain,
+  Send,
 } from "lucide-react";
 
 export function MissionControlWidget() {
   const { insights, context, recommendations, systemHealth, loading, refreshIntelligence } =
     useMissionControlStore();
+  const { briefing, loading: briefingLoading, generateBriefing } = useCognitiveStore();
   const { projects } = useProjectStore();
   const { tasks } = useTaskStore();
   const [mounted, setMounted] = useState(false);
+  const [commandInput, setCommandInput] = useState("");
+  const [commandResult, setCommandResult] = useState("");
+  const [commandLoading, setCommandLoading] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -34,12 +42,33 @@ export function MissionControlWidget() {
   useEffect(() => {
     if (mounted) {
       refreshIntelligence();
+      generateBriefing(); // Generate briefing on load
       const interval = setInterval(refreshIntelligence, 60000); // Refresh every minute
       return () => clearInterval(interval);
     }
-  }, [mounted, refreshIntelligence]);
+  }, [mounted, refreshIntelligence, generateBriefing]);
 
   if (!mounted) return null;
+
+  const handleCommand = async () => {
+    if (!commandInput.trim()) return;
+    
+    setCommandLoading(true);
+    try {
+      const response = await fetch("/api/commands", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: commandInput }),
+      });
+      const data = await response.json();
+      setCommandResult(data.result || "No result");
+      setCommandInput("");
+    } catch (err) {
+      setCommandResult("Command failed");
+    } finally {
+      setCommandLoading(false);
+    }
+  };
 
   const getPhaseIcon = (phase: string) => {
     switch (phase) {
@@ -181,6 +210,39 @@ export function MissionControlWidget() {
           Insights
         </div>
 
+        {/* Daily Briefing */}
+        {briefing && (
+          <div className="space-y-1">
+            {briefing.staleWarnings.length > 0 && (
+              <div className="p-1.5 border border-yellow-500/20 bg-yellow-500/5 rounded text-[7.5px]">
+                <div className="font-semibold text-foreground flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" />
+                  Stale
+                </div>
+                <div className="text-muted-foreground text-[7px] mt-0.5">{briefing.staleWarnings[0]}</div>
+              </div>
+            )}
+            {briefing.momentumInsights.length > 0 && (
+              <div className="p-1.5 border border-green-500/20 bg-green-500/5 rounded text-[7.5px]">
+                <div className="font-semibold text-foreground flex items-center gap-1">
+                  <TrendingUp className="w-3 h-3" />
+                  Momentum
+                </div>
+                <div className="text-muted-foreground text-[7px] mt-0.5">{briefing.momentumInsights[0]}</div>
+              </div>
+            )}
+            {briefing.unfinishedAlerts.length > 0 && (
+              <div className="p-1.5 border border-red-500/20 bg-red-500/5 rounded text-[7.5px]">
+                <div className="font-semibold text-foreground flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" />
+                  Overdue
+                </div>
+                <div className="text-muted-foreground text-[7px] mt-0.5">{briefing.unfinishedAlerts[0]}</div>
+              </div>
+            )}
+          </div>
+        )}
+
         {insights.length === 0 ? (
           <div className="text-center py-6 text-[9px] text-muted-foreground">
             All systems nominal
@@ -211,6 +273,36 @@ export function MissionControlWidget() {
               </div>
             </div>
           ))
+        )}
+      </div>
+
+      {/* Command Input */}
+      <div className="mt-2 pt-2 border-t border-border space-y-1.5">
+        <div className="flex items-center gap-1">
+          <Brain className="w-3 h-3 text-primary" />
+          <span className="text-[7px] font-semibold text-muted-foreground uppercase">Command</span>
+        </div>
+        <div className="flex gap-1">
+          <Input
+            placeholder="What should I work on?"
+            value={commandInput}
+            onChange={(e) => setCommandInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleCommand()}
+            className="h-6 text-[10px] px-2 bg-card border-border text-foreground placeholder:text-muted-foreground/50"
+          />
+          <Button
+            size="sm"
+            onClick={handleCommand}
+            disabled={commandLoading || !commandInput.trim()}
+            className="h-6 w-6 p-0"
+          >
+            <Send className="w-3 h-3" />
+          </Button>
+        </div>
+        {commandResult && (
+          <div className="p-1.5 bg-popover border border-border rounded text-[8px] text-foreground max-h-12 overflow-y-auto">
+            {commandResult}
+          </div>
         )}
       </div>
 
