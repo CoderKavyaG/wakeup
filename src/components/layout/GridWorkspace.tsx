@@ -8,11 +8,9 @@ import { useLayoutStore, WidgetType } from "@/store/useLayoutStore";
 import { ProjectsWidget } from "../widgets/ProjectsWidget";
 import { GithubWidget } from "../widgets/GithubWidget";
 import { NotesWidget } from "../widgets/NotesWidget";
-import { DailyCommandWidget } from "../widgets/DailyCommandWidget";
 import { TasksWidget } from "../widgets/TasksWidget";
 import { UrlManagerWidget } from "../widgets/UrlManagerWidget";
 import { DeploymentHealthWidget } from "../widgets/DeploymentHealthWidget";
-import { MissionControlWidget } from "../widgets/MissionControlWidget";
 import { ProjectIntelligenceWidget } from "../widgets/ProjectIntelligenceWidget";
 import { X, GripHorizontal } from "lucide-react";
 import { Button } from "../ui/button";
@@ -46,8 +44,6 @@ export function GridWorkspace() {
 
   const renderWidgetContent = (type: WidgetType) => {
     switch (type) {
-      case "mission":
-        return <MissionControlWidget />;
       case "project-intel":
         return <ProjectIntelligenceWidget />;
       case "projects":
@@ -56,8 +52,6 @@ export function GridWorkspace() {
         return <GithubWidget />;
       case "notes":
         return <NotesWidget />;
-      case "daily":
-        return <DailyCommandWidget />;
       case "tasks":
         return <TasksWidget />;
       case "urls":

@@ -1,6 +1,4 @@
 import { NextResponse } from "next/server";
-import { generateText } from "ai";
-import { openai } from "@ai-sdk/openai";
 import prisma from "@/lib/prisma";
 import { generateEmbedding, cosineSimilarity } from "@/lib/embeddings";
 
@@ -8,22 +6,22 @@ interface CommandRequest {
   query: string;
 }
 
-// Map commands to system actions
-const COMMAND_PATTERNS = {
-  "what should i work on": "next_action",
-  "show stale projects": "stale_projects",
-  "summarize": "summarize_project",
-  "generate resume": "resume_bullets",
-  "what did i build": "weekly_summary",
-  "why is velocity": "velocity_analysis",
-};
+// Map commands to system actions - with regex patterns for flexibility
+const COMMAND_PATTERNS = [
+  { pattern: /(?:what should|should)\s+i\s+(?:work on|do|focus on)/i, cmd: "next_action" },
+  { pattern: /(?:show|list|find)\s+(?:stale|old|inactive)/i, cmd: "stale_projects" },
+  { pattern: /(?:summarize|summary|recap)\s+(?:this\s+)?(?:week|today|month)?/i, cmd: "weekly_summary" },
+  { pattern: /(?:generate|create|make)\s+(?:resume|bullet|cover)/i, cmd: "resume_bullets" },
+  { pattern: /what\s+(?:did|have)\s+i\s+(?:build|ship|create|make)/i, cmd: "weekly_summary" },
+];
 
 async function identifyCommand(query: string): Promise<string> {
   const lower = query.toLowerCase();
-  for (const [pattern, cmd] of Object.entries(COMMAND_PATTERNS)) {
-    if (lower.includes(pattern)) return cmd;
+  for (const { pattern, cmd } of COMMAND_PATTERNS) {
+    if (pattern.test(lower)) return cmd;
   }
-  return "semantic_search"; // Default fallback
+  // If API key available, try semantic search; otherwise return a helpful message
+  return process.env.OPENAI_API_KEY ? "semantic_search" : "next_action";
 }
 
 async function handleNextAction(): Promise<string> {
@@ -83,23 +81,32 @@ ${completedTasks.map((t) => `✓ ${t.title}`).join("\n")}
 }
 
 async function handleSemanticSearch(query: string): Promise<string> {
-  const embedding = await generateEmbedding(query);
-  const memories = await prisma.memory.findMany({
-    take: 100,
-    orderBy: { createdAt: "desc" },
-  });
+  if (!process.env.OPENAI_API_KEY) {
+    return "Semantic search requires OpenAI API key. Use pattern-based commands instead.";
+  }
 
-  const scored = memories
-    .map((m) => ({
-      memory: m,
-      score: m.embedding && m.embedding.length > 0 ? cosineSimilarity(embedding, m.embedding) : 0,
-    }))
-    .filter((s) => s.score > 0.5)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 3);
+  try {
+    const embedding = await generateEmbedding(query);
+    const memories = await prisma.memory.findMany({
+      take: 100,
+      orderBy: { createdAt: "desc" },
+    });
 
-  if (scored.length === 0) return "No relevant memories found.";
-  return scored.map((s) => s.memory.content).join("\n---\n");
+    const scored = memories
+      .map((m) => ({
+        memory: m,
+        score: m.embedding && m.embedding.length > 0 ? cosineSimilarity(embedding, m.embedding) : 0,
+      }))
+      .filter((s) => s.score > 0.5)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3);
+
+    if (scored.length === 0) return "No relevant memories found.";
+    return scored.map((s) => s.memory.content).join("\n---\n");
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Search failed";
+    return `Semantic search error: ${msg}. Try pattern-based commands.`;
+  }
 }
 
 export async function POST(request: Request) {

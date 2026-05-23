@@ -8,8 +8,6 @@ export type WidgetType =
   | "tasks" 
   | "urls" 
   | "health" 
-  | "daily"
-  | "mission"
   | "project-intel";
 
 export interface WidgetInstance {
@@ -36,23 +34,19 @@ interface LayoutState {
 
 const defaultLayouts: { [key: string]: Layout } = {
   lg: [
-    { i: "mission-1", x: 0, y: 0, w: 12, h: 3, minW: 6, minH: 2 },
-    { i: "project-intel-1", x: 0, y: 3, w: 4, h: 4, minW: 3, minH: 3 },
-    { i: "projects-1", x: 4, y: 3, w: 5, h: 4, minW: 4, minH: 3 },
-    { i: "daily-1", x: 9, y: 3, w: 3, h: 3, minW: 3, minH: 2 },
-    { i: "github-1", x: 0, y: 7, w: 6, h: 4, minW: 4, minH: 3 },
-    { i: "tasks-1", x: 6, y: 7, w: 3, h: 4, minW: 3, minH: 3 },
-    { i: "notes-1", x: 9, y: 7, w: 3, h: 4, minW: 3, minH: 3 },
-    { i: "urls-1", x: 0, y: 11, w: 4, h: 3, minW: 3, minH: 2 },
-    { i: "health-1", x: 4, y: 11, w: 8, h: 3, minW: 6, minH: 2 },
+    { i: "project-intel-1", x: 0, y: 0, w: 4, h: 4, minW: 3, minH: 3 },
+    { i: "projects-1", x: 4, y: 0, w: 5, h: 4, minW: 4, minH: 3 },
+    { i: "github-1", x: 9, y: 0, w: 3, h: 4, minW: 3, minH: 3 },
+    { i: "tasks-1", x: 0, y: 4, w: 4, h: 4, minW: 3, minH: 3 },
+    { i: "notes-1", x: 4, y: 4, w: 4, h: 4, minW: 3, minH: 3 },
+    { i: "urls-1", x: 8, y: 4, w: 2, h: 4, minW: 2, minH: 2 },
+    { i: "health-1", x: 10, y: 4, w: 2, h: 4, minW: 2, minH: 2 },
   ],
 };
 
 const defaultWidgets: WidgetInstance[] = [
-  { id: "mission-1", type: "mission" },
   { id: "project-intel-1", type: "project-intel" },
   { id: "projects-1", type: "projects" },
-  { id: "daily-1", type: "daily" },
   { id: "github-1", type: "github" },
   { id: "tasks-1", type: "tasks" },
   { id: "notes-1", type: "notes" },
