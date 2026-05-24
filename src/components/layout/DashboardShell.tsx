@@ -16,7 +16,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       <CockpitCommand />
 
       {/* Top Controls Bar */}
-      <div className="shrink-0 px-6 py-3 border-b border-border bg-card flex items-center justify-between gap-4 select-none">
+      <div className="shrink-0 px-6 pt-6 pb-2 flex items-center justify-between gap-4 select-none bg-transparent">
         <div className="flex items-center space-x-2">
           <div className="w-6 h-6 rounded-md bg-primary flex items-center justify-center font-bold text-white text-xs shadow-sm shadow-primary/20">
             D
