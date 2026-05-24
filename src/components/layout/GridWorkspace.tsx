@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Responsive, WidthProvider, Layout } from "react-grid-layout";
+import { Responsive, WidthProvider, Layout } from "react-grid-layout/legacy";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 import { useLayoutStore, WidgetType } from "@/store/useLayoutStore";
@@ -25,7 +25,7 @@ export function GridWorkspace() {
     setMounted(true);
   }, []);
 
-  const onLayoutChange = (layout: Layout[], allLayouts: { [key: string]: Layout[] }) => {
+  const onLayoutChange = (layout: Layout, allLayouts: { [key: string]: Layout }) => {
     setLayouts(allLayouts);
   };
 
