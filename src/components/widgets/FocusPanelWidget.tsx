@@ -209,7 +209,7 @@ export function FocusPanelWidget() {
           />
         </div>
 
-        <ScrollArea className="flex-1 px-4 pb-2">
+        <ScrollArea className="flex-1 px-4 pb-2 min-h-0 h-full w-full overflow-y-auto">
           <div className="space-y-1.5">
             {pendingTasks.map(t => (
               <div key={t.id} className="group flex items-start gap-2.5 p-1.5 rounded hover:bg-white/5 transition-colors">
@@ -280,7 +280,7 @@ export function FocusPanelWidget() {
           />
         </div>
 
-        <ScrollArea className="flex-1 px-4 pb-2">
+        <ScrollArea className="flex-1 px-4 pb-2 min-h-0 h-full w-full overflow-y-auto">
           <div className="space-y-2">
             {notes.map(renderNoteCard)}
           </div>
@@ -320,7 +320,7 @@ export function FocusPanelWidget() {
           {urlLoading && <Loader2 className="w-3 h-3 absolute right-7 top-2.5 animate-spin text-muted-foreground" />}
         </div>
 
-        <ScrollArea className="flex-1 px-4 pb-2">
+        <ScrollArea className="flex-1 px-4 pb-2 min-h-0 h-full w-full overflow-y-auto">
           <div className="space-y-1.5">
             {filteredUrls.map(u => {
               let domain = "";

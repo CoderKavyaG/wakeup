@@ -35,6 +35,12 @@ export function MachineControlWidget() {
   const [files, setFiles] = useState<FileItem[]>([]);
   const [ports, setPorts] = useState<number[]>([]);
   
+  const [customLaunchers, setCustomLaunchers] = useState<{name: string, command: string}[]>([
+    { name: "VS Code", command: "code ." },
+    { name: "Terminal", command: "start cmd" }
+  ]);
+  const [isEditingLaunchers, setIsEditingLaunchers] = useState(false);
+  
   const [filesLoading, setFilesLoading] = useState(false);
   const [portsLoading, setPortsLoading] = useState(false);
   
@@ -47,6 +53,12 @@ export function MachineControlWidget() {
       setWorkspacePath(saved);
       fetchFiles(saved);
     }
+    
+    const savedLaunchers = localStorage.getItem("DEVOS_LAUNCHERS");
+    if (savedLaunchers) {
+      try { setCustomLaunchers(JSON.parse(savedLaunchers)); } catch {}
+    }
+
     fetchPorts();
     
     // Auto refresh ports every 10 seconds
@@ -88,7 +100,9 @@ export function MachineControlWidget() {
       }
       const data = await res.json();
       if (Array.isArray(data)) {
-        setPorts(data);
+        // Filter out annoying Windows system ports to keep it clean for dev
+        const filtered = data.filter((p: number) => p >= 3000 && p < 40000);
+        setPorts(filtered);
       }
     } catch {
       // ignore
@@ -116,16 +130,22 @@ export function MachineControlWidget() {
     }
   };
 
-  const handleLaunch = async (app: string) => {
+  const handleLaunch = async (command: string) => {
+    if (!workspacePath) return alert("Please set a workspace path first.");
     try {
       await fetch(`/api/machine/launch`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ app })
+        body: JSON.stringify({ app: command, cwd: workspacePath }) // pass cwd if API supports it
       });
     } catch (e) {
       console.error(e);
     }
+  };
+
+  const saveLaunchers = (launchers: {name: string, command: string}[]) => {
+    setCustomLaunchers(launchers);
+    localStorage.setItem("DEVOS_LAUNCHERS", JSON.stringify(launchers));
   };
 
   return (
@@ -255,24 +275,47 @@ export function MachineControlWidget() {
           </div>
 
           {/* SECTION 3: QUICK LAUNCHERS */}
-          <div className="shrink-0 p-3 bg-popover/10">
-            <div className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider mb-2 flex items-center gap-1.5">
-              <Play className="w-3.5 h-3.5" /> Quick Launch
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <Button variant="outline" size="sm" className="h-8 text-[10px] justify-start bg-card hover:bg-white/5 border-border/60" onClick={() => handleLaunch("VS Code")} disabled={agentOffline}>
-                <Code2 className="w-3 h-3 mr-2 text-blue-400" /> VS Code
-              </Button>
-              <Button variant="outline" size="sm" className="h-8 text-[10px] justify-start bg-card hover:bg-white/5 border-border/60" onClick={() => handleLaunch("Terminal")} disabled={agentOffline}>
-                <Terminal className="w-3 h-3 mr-2 text-green-400" /> Terminal
-              </Button>
-              <Button variant="outline" size="sm" className="h-8 text-[10px] justify-start bg-card hover:bg-white/5 border-border/60" onClick={() => handleLaunch("Claude (main)")} disabled={agentOffline}>
-                <Server className="w-3 h-3 mr-2 text-purple-400" /> Claude Main
-              </Button>
-              <Button variant="outline" size="sm" className="h-8 text-[10px] justify-start bg-card hover:bg-white/5 border-border/60" onClick={() => handleLaunch("Claude (work)")} disabled={agentOffline}>
-                <Server className="w-3 h-3 mr-2 text-orange-400" /> Claude Work
+          <div className="shrink-0 p-3 bg-popover/10 border-t border-border/40">
+            <div className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider mb-2 flex items-center justify-between">
+              <span className="flex items-center gap-1.5"><Play className="w-3.5 h-3.5" /> Quick Launch</span>
+              <Button variant="ghost" size="sm" className="h-5 text-[9px] px-1.5 text-muted-foreground" onClick={() => setIsEditingLaunchers(!isEditingLaunchers)}>
+                {isEditingLaunchers ? "Done" : "Config"}
               </Button>
             </div>
+            
+            {isEditingLaunchers ? (
+              <div className="space-y-2">
+                {customLaunchers.map((l, i) => (
+                  <div key={i} className="flex gap-2">
+                    <Input value={l.name} onChange={(e) => {
+                      const newL = [...customLaunchers];
+                      newL[i].name = e.target.value;
+                      saveLaunchers(newL);
+                    }} placeholder="Name" className="h-7 text-xs w-1/3" />
+                    <Input value={l.command} onChange={(e) => {
+                      const newL = [...customLaunchers];
+                      newL[i].command = e.target.value;
+                      saveLaunchers(newL);
+                    }} placeholder="Terminal command..." className="h-7 text-xs flex-1" />
+                    <Button variant="destructive" size="icon" className="h-7 w-7 shrink-0" onClick={() => {
+                      const newL = customLaunchers.filter((_, idx) => idx !== i);
+                      saveLaunchers(newL);
+                    }}><XCircle className="w-3 h-3" /></Button>
+                  </div>
+                ))}
+                <Button variant="outline" size="sm" className="h-7 w-full text-xs border-dashed" onClick={() => {
+                  saveLaunchers([...customLaunchers, { name: "New App", command: "" }]);
+                }}>+ Add Launcher</Button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                {customLaunchers.map((l, i) => (
+                  <Button key={i} variant="outline" size="sm" className="h-8 text-[10px] justify-start bg-card hover:bg-white/5 border-border/60" onClick={() => handleLaunch(l.command)} disabled={agentOffline}>
+                    <Terminal className="w-3 h-3 mr-2 text-primary" /> {l.name}
+                  </Button>
+                ))}
+              </div>
+            )}
           </div>
 
         </div>

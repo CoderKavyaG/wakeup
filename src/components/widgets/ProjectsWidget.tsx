@@ -1,63 +1,84 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useProjectStore, Project, ProjectStatus } from "@/store/useProjectStore";
-import { useLayoutStore } from "@/store/useLayoutStore";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
-  Folder, GitBranch, ExternalLink, Plus, Trash2, Code2, 
-  Brain, CheckCircle2, Sparkles, 
-  HelpCircle, Activity, ChevronRight, X, Heart
+  Folder, GitBranch, ExternalLink, Trash2, 
+  Brain, CheckCircle2, Sparkles, Plus,
+  HelpCircle, Activity, ChevronRight, X, Heart, 
+  Code2, Play, AlertCircle
 } from "lucide-react";
 
 export function ProjectsWidget() {
-  const { projects, addProject, deleteProject, updateProject } = useProjectStore();
-  const { showTips } = useLayoutStore();
-  const [isOpen, setIsOpen] = useState(false);
+  const { projects, deleteProject, updateProject, addProject } = useProjectStore();
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
-  const [activeTab, setActiveTab] = useState<"overview" | "arch" | "resume" | "interview">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "notes" | "feedback">("overview");
   
-  // Form State for new project
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [status, setStatus] = useState<ProjectStatus>("active");
-  const [tagsString, setTagsString] = useState("");
-  const [githubUrl, setGithubUrl] = useState("");
-  const [liveUrl, setLiveUrl] = useState("");
+  // New Feedback State
+  const [newFeedback, setNewFeedback] = useState("");
+  
+  // Add Project State
+  const [isAddingProject, setIsAddingProject] = useState(false);
+  const [newProjectName, setNewProjectName] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim()) return;
+  // GitHub Stats State
+  const [githubStats, setGithubStats] = useState<Record<string, { lastCommit: string, issues: number, stars: number }>>({});
+  const [staleWarningCount, setStaleWarningCount] = useState(0);
 
-    const tags = tagsString
-      .split(",")
-      .map((t) => t.trim())
-      .filter((t) => t.length > 0);
+  // Fetch GitHub stats on mount
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const res = await fetch("/api/github?username=CoderKavyaG");
+        if (res.ok) {
+          const data = await res.json();
+          const stats: Record<string, any> = {};
+          let staleCount = 0;
+          
+          if (data.repos) {
+            data.repos.forEach((repo: any) => {
+              const url = repo.html_url.toLowerCase();
+              stats[url] = {
+                lastCommit: repo.updated_at,
+                issues: repo.open_issues_count || 0,
+                stars: repo.stargazers_count || 0
+              };
 
-    addProject({
-      name,
-      description,
-      status,
-      tags,
-      githubUrl: githubUrl.trim() || undefined,
-      liveUrl: liveUrl.trim() || undefined,
-    });
-
-    // Reset
-    setName("");
-    setDescription("");
-    setStatus("active");
-    setTagsString("");
-    setGithubUrl("");
-    setLiveUrl("");
-    setIsOpen(false);
-  };
+              // Check staleness (older than 14 days)
+              const updated = new Date(repo.updated_at);
+              const daysAgo = (Date.now() - updated.getTime()) / (1000 * 3600 * 24);
+              if (daysAgo > 14) {
+                staleCount++;
+              }
+            });
+          }
+          setGithubStats(stats);
+          setStaleWarningCount(staleCount);
+          
+          // Auto-update projects based on staleness
+          projects.forEach((proj) => {
+            if (proj.githubUrl && stats[proj.githubUrl.toLowerCase()]) {
+              const repo = stats[proj.githubUrl.toLowerCase()];
+              const updated = new Date(repo.lastCommit);
+              const daysAgo = (Date.now() - updated.getTime()) / (1000 * 3600 * 24);
+              if (daysAgo > 14 && proj.status !== "stale" && proj.status !== "completed") {
+                updateProject(proj.id, { status: "stale" });
+              }
+            }
+          });
+        }
+      } catch (err) {
+        console.error("Failed to fetch github stats", err);
+      }
+    };
+    fetchStats();
+  }, []);
 
   const getStatusColor = (status: ProjectStatus) => {
     switch (status) {
@@ -74,488 +95,356 @@ export function ProjectsWidget() {
     }
   };
 
-  const calculateHealth = (proj: Project) => {
-    let health = 100;
-    if (proj.status === "stale") health -= 30;
-    if (!proj.githubUrl) health -= 10;
-    if (!proj.liveUrl) health -= 10;
-    if (!proj.nextAction) health -= 15;
-    return Math.max(10, health);
+  const saveFeedback = () => {
+    if (!newFeedback.trim() || !selectedProject) return;
+    const currentFeedback = selectedProject.feedback || [];
+    const newEntry = { id: Date.now().toString(), text: newFeedback.trim(), date: new Date().toISOString() };
+    const updatedFeedback = [newEntry, ...currentFeedback];
+    updateProject(selectedProject.id, { feedback: updatedFeedback });
+    setSelectedProject({ ...selectedProject, feedback: updatedFeedback });
+    setNewFeedback("");
   };
 
-  const calculateMomentum = (proj: Project) => {
-    let momentum = 0;
-    if (proj.status === "active") momentum += 40;
-    if (proj.githubUrl) momentum += 20;
-    if (proj.liveUrl) momentum += 15;
-    if (proj.nextAction) momentum += 25;
-    return Math.min(100, momentum);
-  };
 
-  // Generate automated resume bullet
-  const handleGenerateResumeBullet = (proj: Project) => {
-    const tech = proj.tags.slice(0, 3).join(", ") || "modern web stack";
-    const bullet = `Designed and deployed "${proj.name}", a personal developer cockpit application using ${tech}, improving workspace productivity and reducing context switching overhead through automated multi-widget dashboard orchestration.`;
-    updateProject(proj.id, { resumeBullet: bullet });
-    if (selectedProject?.id === proj.id) {
-      setSelectedProject(prev => prev ? { ...prev, resumeBullet: bullet } : null);
-    }
-  };
 
-  // Generate standard interview preparation mock questions based on tags
-  const handleGenerateInterviewPrep = (proj: Project) => {
-    const prepQuestions = [
-      {
-        q: `What was the biggest technical challenge you faced when building "${proj.name}"?`,
-        a: "Optimizing state synchronization and coordination across multiple draggable dashboard widgets while maintaining instantaneous 0ms UI reactivity."
-      },
-      {
-        q: `How did you manage architecture choices and stack selection for ${proj.tags.join(" & ") || "this project"}?`,
-        a: `Selected the current stack to optimize for rapid component loading, strict Type-Safety (TypeScript), and low-latency database queries.`
+  const createGitHubIssue = async (feedbackText: string) => {
+    if (!selectedProject?.githubUrl) return alert("No GitHub URL for this project.");
+    try {
+      const match = selectedProject.githubUrl.match(/github\.com\/([^\/]+\/[^\/]+)/);
+      if (!match) return alert("Invalid GitHub URL");
+      const repo = match[1];
+
+      const res = await fetch("/api/github/issues/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ repo, title: "Feedback Review", body: feedbackText })
+      });
+      if (res.ok) {
+        alert("GitHub Issue created successfully!");
+      } else {
+        alert("Failed to create GitHub Issue.");
       }
-    ];
-    updateProject(proj.id, { interviewNotes: JSON.stringify(prepQuestions) });
-    if (selectedProject?.id === proj.id) {
-      setSelectedProject(prev => prev ? { ...prev, interviewNotes: JSON.stringify(prepQuestions) } : null);
+    } catch (e) {
+      alert("Failed to connect to API.");
     }
   };
+
+  const nextFocusProject = [...projects].filter(p => p.nextAction && p.status === 'active').sort((a, b) => b.projectHealth! - a.projectHealth!)[0];
 
   return (
-    <div className="flex h-full w-full overflow-hidden text-foreground">
-      {/* List Panel */}
-      <div className={`flex flex-col h-full overflow-hidden transition-all duration-300 ${selectedProject ? "w-1/2 border-r border-border/60 pr-4" : "w-full"}`}>
-        <div className="flex items-center justify-between mb-4 shrink-0">
+    <div className="flex h-full w-full overflow-hidden text-foreground bg-background rounded-xl">
+      {/* ── COLLAPSED VIEW (Always visible) ── */}
+      <div className={`flex flex-col h-full overflow-hidden transition-all duration-300 ${selectedProject ? "w-1/3 border-r border-border/60 pr-3" : "w-full"}`}>
+        <div className="flex items-center justify-between mb-4 shrink-0 px-1 pt-1">
           <div className="flex items-center space-x-2">
             <Folder className="w-4 h-4 text-primary" />
-            <h2 className="text-sm font-semibold tracking-wider uppercase text-secondary-foreground">Project Intelligence</h2>
+            <h2 className="text-sm font-semibold tracking-wider uppercase text-secondary-foreground">Projects</h2>
           </div>
+          <Button variant="ghost" size="icon" className="w-6 h-6 hover:bg-white/5" onClick={() => setIsAddingProject(!isAddingProject)}>
+            <Plus className="w-4 h-4 text-muted-foreground" />
+          </Button>
         </div>
-
-        {showTips && (
-          <div className="mb-3 p-3 bg-popover border border-amber-500/20 text-[10px] text-foreground rounded-lg select-none leading-relaxed shrink-0">
-            ⚡ **Projects DevTools Tips**: Centralize your active repository list here. Clicking a project opens detail sheets that automatically generate resume bullet summaries, compute velocity health, and compile custom interview prep cards.
+        
+        {isAddingProject && (
+          <div className="mb-4 px-1 shrink-0">
+            <Input 
+              value={newProjectName}
+              onChange={(e) => setNewProjectName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && newProjectName.trim()) {
+                  addProject({
+                    name: newProjectName.trim(),
+                    description: "New Project",
+                    status: "planning",
+                    tags: [],
+                  });
+                  setNewProjectName("");
+                  setIsAddingProject(false);
+                }
+              }}
+              placeholder="Project Name & Enter..."
+              className="h-8 text-xs bg-card border-border/80"
+              autoFocus
+            />
           </div>
         )}
 
-        <div className="flex items-center justify-between mb-3 shrink-0">
-          <span className="text-[10px] uppercase font-bold text-muted-foreground select-none">Registry Items</span>
-          <Dialog open={isOpen} onOpenChange={setIsOpen}>
-            <DialogTrigger
-              render={
-                <Button size="icon" variant="ghost" className="w-8 h-8 rounded-lg border border-border bg-popover/30">
-                  <Plus className="w-4 h-4 text-muted-foreground hover:text-foreground" />
-                </Button>
-              }
-            />
-            <DialogContent className="bg-popover border border-border text-foreground">
-              <DialogHeader>
-                <DialogTitle className="text-lg font-bold text-foreground">Register New Project</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4 mt-2">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-muted-foreground uppercase">Project Name</label>
-                  <Input
-                    required
-                    placeholder="e.g. Arc Clone"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="bg-card border-border text-foreground placeholder:text-muted-foreground"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-muted-foreground uppercase">Description</label>
-                  <Textarea
-                    placeholder="What are you building?"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    className="bg-card border-border text-foreground placeholder:text-muted-foreground min-h-[80px]"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-muted-foreground uppercase">Status</label>
-                    <select
-                      value={status}
-                      onChange={(e) => setStatus(e.target.value as ProjectStatus)}
-                      className="w-full h-10 px-3 rounded-md bg-card border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-                    >
-                      <option value="planning">Planning</option>
-                      <option value="active">Active</option>
-                      <option value="completed">Completed</option>
-                      <option value="stale">Stale</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-muted-foreground uppercase">Tags (comma separated)</label>
-                    <Input
-                      placeholder="Next.js, Tailwind, Rust"
-                      value={tagsString}
-                      onChange={(e) => setTagsString(e.target.value)}
-                      className="bg-card border-border text-foreground placeholder:text-muted-foreground"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-muted-foreground uppercase">GitHub Repository URL</label>
-                    <Input
-                      placeholder="https://github.com/..."
-                      value={githubUrl}
-                      onChange={(e) => setGithubUrl(e.target.value)}
-                      className="bg-card border-border text-foreground placeholder:text-muted-foreground"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-muted-foreground uppercase">Live Deployment URL</label>
-                    <Input
-                      placeholder="https://..."
-                      value={liveUrl}
-                      onChange={(e) => setLiveUrl(e.target.value)}
-                      className="bg-card border-border text-foreground placeholder:text-muted-foreground"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex justify-end pt-2">
-                  <Button type="submit" className="bg-primary hover:bg-primary/90 text-white font-semibold">
-                    Register Project
-                  </Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
-        </div>
-
         <ScrollArea className="flex-1 -mx-2 px-2">
-          <div className="space-y-3 pb-4">
-            {projects.map((project) => {
-              const health = calculateHealth(project);
-              const momentum = calculateMomentum(project);
-              return (
-                <Card 
-                  key={project.id} 
-                  className={`bg-popover border flex flex-col justify-between hover:border-primary/40 transition-all duration-300 cursor-pointer ${selectedProject?.id === project.id ? "border-primary/60 shadow-lg" : "border-border/80"}`}
-                  onClick={() => {
-                    setSelectedProject(project);
-                    setActiveTab("overview");
-                  }}
-                >
-                  <CardHeader className="p-3 pb-1.5 flex flex-row items-center justify-between">
-                    <div className="space-y-1 min-w-0 flex-1 pr-2">
-                      <div className="flex items-center space-x-1.5">
-                        <CardTitle className="text-[13px] font-bold text-foreground truncate">{project.name}</CardTitle>
-                        <Badge variant="outline" className={`text-[8px] font-semibold py-0 uppercase border ${getStatusColor(project.status)}`}>
+          {!selectedProject && nextFocusProject && (
+            <div className="mb-4 p-3 bg-primary/10 border border-primary/20 rounded-xl relative overflow-hidden group">
+              <div className="absolute top-0 right-0 p-2 opacity-20"><Play className="w-12 h-12 text-primary" /></div>
+              <h3 className="text-[10px] font-bold text-primary uppercase tracking-widest mb-1 relative z-10">Next Focus</h3>
+              <p className="text-sm font-bold text-foreground relative z-10">{nextFocusProject.name}</p>
+              <p className="text-[11px] text-muted-foreground mt-1 relative z-10 line-clamp-2">{nextFocusProject.nextAction}</p>
+              <Button size="sm" variant="ghost" className="h-6 px-2 mt-2 text-[10px] text-primary bg-primary/10 hover:bg-primary/20 relative z-10" onClick={() => setSelectedProject(nextFocusProject)}>
+                Open Project
+              </Button>
+            </div>
+          )}
+
+          {!selectedProject && staleWarningCount > 0 && (
+            <div className="mb-4 p-2 bg-orange-500/10 border border-orange-500/20 rounded-lg flex items-center space-x-2">
+              <AlertCircle className="w-4 h-4 text-orange-400 shrink-0" />
+              <p className="text-[11px] text-orange-400 font-medium">You have {staleWarningCount} stale projects with no commits in 14 days.</p>
+            </div>
+          )}
+
+          <div className="space-y-4 pb-4">
+            
+            {/* GitHub Repositories Section */}
+            {projects.filter(p => p.githubUrl).length > 0 && (
+              <div className="space-y-2">
+                <h3 className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest px-1 flex items-center gap-1.5"><GitBranch className="w-3 h-3" /> GitHub Repositories</h3>
+                {projects.filter(p => p.githubUrl).map((project) => {
+                  const stats = githubStats[project.githubUrl!.toLowerCase()];
+                  const isSelected = selectedProject?.id === project.id;
+                  
+                  return (
+                    <div 
+                      key={project.id} 
+                      className={`p-2.5 rounded-lg border flex flex-col gap-2 cursor-pointer transition-all duration-200 
+                        ${isSelected ? "bg-primary/5 border-primary/40 shadow-sm" : "bg-card border-border/60 hover:border-primary/30"}`}
+                      onClick={() => {
+                        setSelectedProject(project);
+                        if (!activeTab) setActiveTab("overview");
+                      }}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 overflow-hidden">
+                          <span className="text-xs font-bold text-foreground truncate">{project.name}</span>
+                          {stats && stats.stars > 0 && (
+                            <Badge variant="secondary" className="text-[8px] px-1 py-0 bg-yellow-500/10 text-yellow-500 border-yellow-500/20">
+                              ★ {stats.stars}
+                            </Badge>
+                          )}
+                        </div>
+                        <Badge variant="outline" className={`text-[8px] font-semibold py-0 px-1 uppercase border ${getStatusColor(project.status)} shrink-0`}>
                           {project.status}
                         </Badge>
                       </div>
-                    </div>
-                    <div className="flex items-center space-x-0.5 shrink-0">
-                      {project.githubUrl && (
-                        <a href={project.githubUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
-                          <Button size="icon" variant="ghost" className="w-6 h-6">
-                            <GitBranch className="w-3.5 h-3.5 text-muted-foreground" />
-                          </Button>
-                        </a>
+                      
+                      {!selectedProject && stats && (
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className={`w-1.5 h-1.5 rounded-full ${new Date().getTime() - new Date(stats.lastCommit).getTime() > 14*24*3600*1000 ? "bg-orange-500" : "bg-green-500"}`} />
+                          <span className="text-[9px] text-muted-foreground font-mono">Last commit: {new Date(stats.lastCommit).toLocaleDateString()}</span>
+                        </div>
                       )}
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="w-6 h-6 hover:text-destructive text-muted-foreground"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          deleteProject(project.id);
-                          if (selectedProject?.id === project.id) setSelectedProject(null);
-                        }}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
                     </div>
-                  </CardHeader>
-                  <CardContent className="p-3 pt-0">
-                    <p className="text-[11px] text-muted-foreground line-clamp-1 mb-2">
-                      {project.description || "No description provided."}
-                    </p>
-                    
-                    {/* Health & Momentum Micro Badges */}
-                    <div className="flex items-center space-x-4 mb-2 text-[10px]">
-                      <div className="flex items-center space-x-1 text-muted-foreground">
-                        <Heart className="w-3 h-3 text-foreground " />
-                        <span>Health: <strong className="text-foreground">{health}%</strong></span>
-                      </div>
-                      <div className="flex items-center space-x-1 text-muted-foreground">
-                        <Activity className="w-3 h-3 text-primary" />
-                        <span>Momentum: <strong className="text-foreground">{momentum}%</strong></span>
-                      </div>
-                    </div>
+                  );
+                })}
+              </div>
+            )}
 
-                    <div className="flex items-center justify-between mt-1">
-                      <div className="flex flex-wrap gap-1">
-                        {project.tags.slice(0, 3).map((tag) => (
-                          <Badge key={tag} variant="secondary" className="text-[8px] px-1 bg-card border border-border text-muted-foreground rounded py-0">
-                            {tag}
-                          </Badge>
-                        ))}
-                        {project.tags.length > 3 && (
-                          <span className="text-[9px] text-muted-foreground">+{project.tags.length - 3}</span>
-                        )}
+            {/* Local Workspaces Section */}
+            {projects.filter(p => !p.githubUrl).length > 0 && (
+              <div className="space-y-2">
+                <h3 className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest px-1 flex items-center gap-1.5"><Folder className="w-3 h-3" /> Local Workspaces</h3>
+                {projects.filter(p => !p.githubUrl).map((project) => {
+                  const isSelected = selectedProject?.id === project.id;
+                  
+                  return (
+                    <div 
+                      key={project.id} 
+                      className={`p-2.5 rounded-lg border flex flex-col gap-2 cursor-pointer transition-all duration-200 
+                        ${isSelected ? "bg-primary/5 border-primary/40 shadow-sm" : "bg-card border-border/60 hover:border-primary/30"}`}
+                      onClick={() => {
+                        setSelectedProject(project);
+                        if (!activeTab) setActiveTab("overview");
+                      }}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 overflow-hidden">
+                          <span className="text-xs font-bold text-foreground truncate">{project.name}</span>
+                        </div>
+                        <Badge variant="outline" className={`text-[8px] font-semibold py-0 px-1 uppercase border ${getStatusColor(project.status)} shrink-0`}>
+                          {project.status}
+                        </Badge>
                       </div>
-                      <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
+                      
+                      {!selectedProject && (
+                        <div className="flex items-center gap-3">
+                          <div className="flex-1 space-y-1">
+                            <div className="flex justify-between text-[8px] uppercase text-muted-foreground font-semibold">
+                              <span>Health</span>
+                              <span>{project.projectHealth}%</span>
+                            </div>
+                            <div className="h-1 bg-muted rounded-full overflow-hidden"><div className="h-full bg-green-500" style={{ width: `${project.projectHealth}%` }} /></div>
+                          </div>
+                          <div className="flex-1 space-y-1">
+                            <div className="flex justify-between text-[8px] uppercase text-muted-foreground font-semibold">
+                              <span>Momentum</span>
+                              <span>{project.momentumScore}%</span>
+                            </div>
+                            <div className="h-1 bg-muted rounded-full overflow-hidden"><div className="h-full bg-primary" style={{ width: `${project.momentumScore}%` }} /></div>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+                  );
+                })}
+              </div>
+            )}
           </div>
         </ScrollArea>
       </div>
 
-      {/* Detail Drawer Panel */}
+      {/* ── DETAIL VIEW (Slides in) ── */}
       {selectedProject && (
-        <div className="w-1/2 flex flex-col h-full overflow-hidden pl-4">
-          <div className="flex items-center justify-between mb-3 shrink-0">
-            <div className="flex items-center space-x-2">
-              <Brain className="w-4 h-4 text-primary " />
-              <h3 className="text-sm font-bold text-foreground truncate">{selectedProject.name} Explorer</h3>
+        <div className="w-2/3 flex flex-col h-full overflow-hidden pl-3">
+          <div className="flex items-center justify-between mb-3 shrink-0 bg-card p-3 rounded-xl border border-border/60">
+            <div className="flex-1 min-w-0 pr-4 space-y-1">
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-bold text-foreground truncate">{selectedProject.name}</h3>
+                <Badge variant="outline" className={`text-[9px] font-semibold py-0 uppercase border ${getStatusColor(selectedProject.status)}`}>
+                  {selectedProject.status}
+                </Badge>
+              </div>
+              <div className="flex items-center gap-3 text-[10px] font-mono text-muted-foreground">
+                <span>Updated: {new Date(selectedProject.updatedAt).toLocaleDateString()}</span>
+                {selectedProject.githubUrl && (
+                  <a href={selectedProject.githubUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 hover:text-foreground">
+                    <GitBranch className="w-3 h-3" /> GitHub
+                  </a>
+                )}
+                {selectedProject.liveUrl && (
+                  <a href={selectedProject.liveUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 hover:text-foreground">
+                    <ExternalLink className="w-3 h-3" /> Live
+                  </a>
+                )}
+              </div>
             </div>
-            <Button size="icon" variant="ghost" className="w-7 h-7" onClick={() => setSelectedProject(null)}>
+            <Button size="icon" variant="ghost" className="w-7 h-7 shrink-0" onClick={() => setSelectedProject(null)}>
               <X className="w-4 h-4 text-muted-foreground hover:text-foreground" />
             </Button>
           </div>
 
           {/* detail navigation tabs */}
-          <div className="flex space-x-1 border-b border-border/60 pb-1.5 mb-3 shrink-0">
-            <Button 
-              size="sm" 
-              variant={activeTab === "overview" ? "secondary" : "ghost"}
-              className="text-[10px] h-7 px-2 font-semibold uppercase tracking-wider"
-              onClick={() => setActiveTab("overview")}
-            >
-              Overview
-            </Button>
-            <Button 
-              size="sm" 
-              variant={activeTab === "arch" ? "secondary" : "ghost"}
-              className="text-[10px] h-7 px-2 font-semibold uppercase tracking-wider flex items-center space-x-1"
-              onClick={() => setActiveTab("arch")}
-            >
-              <Code2 className="w-3 h-3" />
-              <span>Architecture</span>
-            </Button>
-            <Button 
-              size="sm" 
-              variant={activeTab === "resume" ? "secondary" : "ghost"}
-              className="text-[10px] h-7 px-2 font-semibold uppercase tracking-wider flex items-center space-x-1"
-              onClick={() => setActiveTab("resume")}
-            >
-              <Sparkles className="w-3 h-3 text-foreground" />
-              <span>Resume</span>
-            </Button>
-            <Button 
-              size="sm" 
-              variant={activeTab === "interview" ? "secondary" : "ghost"}
-              className="text-[10px] h-7 px-2 font-semibold uppercase tracking-wider flex items-center space-x-1"
-              onClick={() => setActiveTab("interview")}
-            >
-              <HelpCircle className="w-3 h-3" />
-              <span>Prep</span>
-            </Button>
+          <div className="flex space-x-1 border-b border-border/60 pb-1.5 mb-3 shrink-0 overflow-x-auto no-scrollbar">
+            {["overview", "notes", "feedback"].map((tab) => (
+              <Button 
+                key={tab}
+                size="sm" 
+                variant={activeTab === tab ? "secondary" : "ghost"}
+                className="text-[10px] h-7 px-2.5 font-semibold uppercase tracking-wider shrink-0"
+                onClick={() => setActiveTab(tab as any)}
+              >
+                {tab}
+              </Button>
+            ))}
           </div>
 
           {/* Drawer Content */}
-          <ScrollArea className="flex-1 pr-1">
+          <ScrollArea className="flex-1 pr-2">
             {activeTab === "overview" && (
               <div className="space-y-4 pb-4">
-                {/* Stats health circles */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="p-3 border border-border/80 bg-popover/30 rounded-xl flex flex-col justify-between">
-                    <span className="text-[10px] uppercase text-muted-foreground font-semibold">Project Health</span>
-                    <div className="flex items-baseline space-x-2 mt-2">
-                      <span className="text-xl font-black font-mono text-foreground">{calculateHealth(selectedProject)}%</span>
-                      <Heart className="w-4 h-4 text-foreground  " />
-                    </div>
-                    <p className="text-[9px] text-muted-foreground mt-1">Based on repositories link and active status.</p>
+                {/* Folder Path & VS Code */}
+                <div className="p-3 border border-border/80 bg-popover/30 rounded-xl flex items-center gap-3">
+                  <div className="flex-1 space-y-1.5">
+                    <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Local Folder Path</label>
+                    <Input 
+                      value={selectedProject.folderPath || ""}
+                      onChange={(e) => {
+                        updateProject(selectedProject.id, { folderPath: e.target.value });
+                        setSelectedProject({ ...selectedProject, folderPath: e.target.value });
+                      }}
+                      placeholder="C:\Users\Kavya\Projects\..."
+                      className="bg-card border-border text-xs text-foreground h-7"
+                    />
                   </div>
-                  <div className="p-3 border border-border/80 bg-popover/30 rounded-xl flex flex-col justify-between">
-                    <span className="text-[10px] uppercase text-muted-foreground font-semibold">Momentum Score</span>
-                    <div className="flex items-baseline space-x-2 mt-2">
-                      <span className="text-xl font-black font-mono text-primary">{calculateMomentum(selectedProject)}%</span>
-                      <Activity className="w-4 h-4 text-primary " />
-                    </div>
-                    <p className="text-[9px] text-muted-foreground mt-1">Calculated using next actions and links health.</p>
-                  </div>
+                  {selectedProject.folderPath && (
+                    <Button 
+                      size="sm" 
+                      onClick={() => window.open(`vscode://file/${selectedProject.folderPath}`)}
+                      className="h-7 mt-4 text-[10px] bg-[#007acc]/10 text-[#007acc] hover:bg-[#007acc]/20 border border-[#007acc]/20"
+                    >
+                      <Code2 className="w-3.5 h-3.5 mr-1.5" /> VS Code
+                    </Button>
+                  )}
                 </div>
 
-                {/* Progress bar */}
-                <div className="space-y-1.5 p-3 border border-border/80 bg-popover/30 rounded-xl">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] uppercase text-muted-foreground font-semibold">Completion Status</span>
-                    <span className="text-xs font-bold font-mono text-primary">{selectedProject.completionPercentage || 0}%</span>
+                {/* Progress bars */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5 p-3 border border-border/80 bg-popover/30 rounded-xl">
+                    <div className="flex justify-between text-[10px] uppercase font-bold text-muted-foreground"><span>Health</span><span className="text-green-500">{selectedProject.projectHealth}%</span></div>
+                    <input type="range" min="0" max="100" value={selectedProject.projectHealth || 0} onChange={(e) => {
+                      const val = parseInt(e.target.value);
+                      updateProject(selectedProject.id, { projectHealth: val });
+                      setSelectedProject({ ...selectedProject, projectHealth: val });
+                    }} className="w-full h-1 bg-muted rounded-lg appearance-none cursor-pointer accent-green-500" />
                   </div>
-                  <input 
-                    type="range" 
-                    min="0" 
-                    max="100" 
-                    value={selectedProject.completionPercentage || 0}
-                    onChange={(e) => {
+                  <div className="space-y-1.5 p-3 border border-border/80 bg-popover/30 rounded-xl">
+                    <div className="flex justify-between text-[10px] uppercase font-bold text-muted-foreground"><span>Completion</span><span className="text-primary">{selectedProject.completionPercentage || 0}%</span></div>
+                    <input type="range" min="0" max="100" value={selectedProject.completionPercentage || 0} onChange={(e) => {
                       const val = parseInt(e.target.value);
                       updateProject(selectedProject.id, { completionPercentage: val });
-                      setSelectedProject(prev => prev ? { ...prev, completionPercentage: val } : null);
-                    }}
-                    className="w-full h-1 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
-                  />
-                </div>
-
-                {/* Next Action input */}
-                <div className="space-y-1.5">
-                  <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider flex items-center space-x-1">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-primary" />
-                    <span>Next Milestone / Action Item</span>
-                  </label>
-                  <Input 
-                    value={selectedProject.nextAction || ""}
-                    onChange={(e) => {
-                      updateProject(selectedProject.id, { nextAction: e.target.value });
-                      setSelectedProject(prev => prev ? { ...prev, nextAction: e.target.value } : null);
-                    }}
-                    placeholder="e.g. Set up auth middleware or compile bundle..."
-                    className="bg-card border-border text-xs text-foreground placeholder:text-muted-foreground/60 h-8"
-                  />
-                </div>
-
-                {/* Tags breakdown */}
-                <div className="space-y-1">
-                  <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Tech Stack Tags</label>
-                  <div className="flex flex-wrap gap-1.5 mt-1">
-                    {selectedProject.tags.map((tag) => (
-                      <Badge key={tag} variant="outline" className="bg-popover text-foreground/80 border-border text-[9px] font-bold py-0.5 px-2">
-                        {tag}
-                      </Badge>
-                    ))}
+                      setSelectedProject({ ...selectedProject, completionPercentage: val });
+                    }} className="w-full h-1 bg-muted rounded-lg appearance-none cursor-pointer accent-primary" />
                   </div>
                 </div>
 
-                {/* General project summary */}
-                <div className="space-y-1">
-                  <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Project Summary</label>
-                  <Textarea 
-                    value={selectedProject.summary || ""}
-                    onChange={(e) => {
-                      updateProject(selectedProject.id, { summary: e.target.value });
-                      setSelectedProject(prev => prev ? { ...prev, summary: e.target.value } : null);
-                    }}
-                    placeholder="Provide a deep, long-form system overview..."
-                    className="bg-card border-border text-xs text-foreground placeholder:text-muted-foreground/60 min-h-[100px]"
-                  />
+                <div className="space-y-1.5">
+                  <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Next Action</label>
+                  <Input value={selectedProject.nextAction || ""} onChange={(e) => {
+                      updateProject(selectedProject.id, { nextAction: e.target.value });
+                      setSelectedProject({ ...selectedProject, nextAction: e.target.value });
+                    }} placeholder="e.g. Set up auth middleware..." className="bg-card border-border text-xs h-8" />
                 </div>
               </div>
             )}
 
-            {activeTab === "arch" && (
-              <div className="space-y-4 pb-4">
-                <div className="p-3 border border-yellow-500/10 bg-yellow-500/5 rounded-lg text-[10px] text-foreground flex items-start space-x-1.5">
-                  <Code2 className="w-4 h-4 flex-shrink-0" />
-                  <p><strong>Architecture Workspace:</strong> Draft comprehensive markdown diagrams, design details, caching mechanisms, or pipeline details for your systems.</p>
-                </div>
+            {activeTab === "notes" && (
+              <div className="space-y-4 pb-4 h-full flex flex-col">
                 <Textarea 
                   value={selectedProject.architectureNotes || ""}
                   onChange={(e) => {
                     updateProject(selectedProject.id, { architectureNotes: e.target.value });
-                    setSelectedProject(prev => prev ? { ...prev, architectureNotes: e.target.value } : null);
+                    setSelectedProject({ ...selectedProject, architectureNotes: e.target.value });
                   }}
-                  placeholder="### Architecture Overview&#10;&#10;- **Database**: PostgreSQL singleton adapter&#10;- **Caching**: In-Memory & Redis backend cache layers&#10;- **Components**: Event-driven polling queue with BullMQ"
-                  className="bg-card border-border font-mono text-xs text-foreground placeholder:text-muted-foreground/60 min-h-[260px] leading-relaxed p-3"
+                  placeholder="Project-specific notes, architecture, ideas..."
+                  className="bg-card border-border font-mono text-xs text-foreground placeholder:text-muted-foreground/60 min-h-[300px] p-3 flex-1"
                 />
               </div>
             )}
 
-            {activeTab === "resume" && (
+            {activeTab === "feedback" && (
               <div className="space-y-4 pb-4">
-                <div className="flex items-center justify-between shrink-0">
-                  <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Impact & Resume Bullet</span>
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    onClick={() => handleGenerateResumeBullet(selectedProject)}
-                    className="h-7 text-[10px] border border-primary/20 hover:border-primary/40 bg-primary/5 hover:bg-primary/10 text-primary font-bold flex items-center space-x-1"
-                  >
-                    <Sparkles className="w-3 h-3 text-foreground" />
-                    <span>Auto-Generate Bullet</span>
-                  </Button>
-                </div>
-
-                <div className="p-3 border border-border bg-popover/30 rounded-xl space-y-2">
-                  <p className="text-[10px] text-muted-foreground uppercase font-bold">Generated Output</p>
-                  {selectedProject.resumeBullet ? (
-                    <p className="text-xs leading-relaxed text-foreground bg-card border border-border/80 p-3 rounded-lg font-medium selection:bg-primary/20">
-                      {selectedProject.resumeBullet}
-                    </p>
-                  ) : (
-                    <div className="text-center py-6 text-xs text-muted-foreground">Click &quot;Auto-Generate Bullet&quot; to map tech stack to a professional bullet point!</div>
-                  )}
-                </div>
-
-                <Textarea 
-                  value={selectedProject.resumeBullet || ""}
-                  onChange={(e) => {
-                    updateProject(selectedProject.id, { resumeBullet: e.target.value });
-                    setSelectedProject(prev => prev ? { ...prev, resumeBullet: e.target.value } : null);
-                  }}
-                  placeholder="Or draft your own professional resume achievements here..."
-                  className="bg-card border-border text-xs text-foreground placeholder:text-muted-foreground/60 min-h-[100px]"
-                />
-              </div>
-            )}
-
-            {activeTab === "interview" && (
-              <div className="space-y-4 pb-4">
-                <div className="flex items-center justify-between shrink-0">
-                  <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Mock Technical Q&A</span>
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    onClick={() => handleGenerateInterviewPrep(selectedProject)}
-                    className="h-7 text-[10px] border border-primary/20 hover:border-primary/40 bg-primary/5 hover:bg-primary/10 text-primary font-bold flex items-center space-x-1"
-                  >
-                    <Sparkles className="w-3 h-3 text-foreground" />
-                    <span>Generate Prep Prep Q&A</span>
-                  </Button>
+                <div className="p-3 border border-border/80 bg-popover/30 rounded-xl space-y-3">
+                  <Textarea 
+                    value={newFeedback}
+                    onChange={(e) => setNewFeedback(e.target.value)}
+                    placeholder="Paste received feedback here..."
+                    className="bg-card border-border text-xs min-h-[80px]"
+                  />
+                  <div className="flex justify-end">
+                    <Button size="sm" onClick={saveFeedback} className="h-7 text-[10px]">Save Feedback</Button>
+                  </div>
                 </div>
 
                 <div className="space-y-3">
-                  {selectedProject.interviewNotes ? (
-                    (() => {
-                      try {
-                        const qas = JSON.parse(selectedProject.interviewNotes) as { q: string; a: string }[];
-                        return qas.map((qa, idx) => (
-                          <div key={idx} className="p-3 border border-border bg-card rounded-lg space-y-1.5">
-                            <p className="text-xs font-bold text-primary flex items-start space-x-1.5">
-                              <HelpCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-                              <span>{qa.q}</span>
-                            </p>
-                            <p className="text-[11px] text-muted-foreground leading-relaxed pl-5 border-l border-border/80">
-                              {qa.a}
-                            </p>
-                          </div>
-                        ));
-                      } catch {
-                        return <p className="text-xs text-muted-foreground">{selectedProject.interviewNotes}</p>;
-                      }
-                    })()
-                  ) : (
-                    <div className="text-center py-8 text-xs text-muted-foreground">Click &quot;Generate Prep Q&A&quot; to build custom mock interview questions based on tags.</div>
+                  {selectedProject.feedback?.map((fb) => (
+                    <div key={fb.id} className="p-3 border border-border bg-card rounded-lg flex flex-col gap-2">
+                      <p className="text-[9px] text-muted-foreground font-mono">{new Date(fb.date).toLocaleString()}</p>
+                      <p className="text-xs leading-relaxed text-foreground whitespace-pre-wrap">{fb.text}</p>
+                      {selectedProject.githubUrl && (
+                        <div className="flex justify-end mt-1">
+                          <Button size="sm" variant="outline" className="h-6 text-[9px] px-2" onClick={() => createGitHubIssue(fb.text)}>
+                            <GitBranch className="w-3 h-3 mr-1.5" /> Open as Issue
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {(!selectedProject.feedback || selectedProject.feedback.length === 0) && (
+                    <div className="text-center py-6 text-xs text-muted-foreground">No feedback recorded yet.</div>
                   )}
                 </div>
               </div>
             )}
+
+
           </ScrollArea>
         </div>
       )}
     </div>
   );
 }
-

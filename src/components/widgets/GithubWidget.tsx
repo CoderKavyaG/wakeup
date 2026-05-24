@@ -198,7 +198,7 @@ export function GithubWidget() {
       )}
 
       {/* Main Content Areas */}
-      <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3 overflow-hidden">
+      <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3 overflow-hidden min-h-0">
         {/* Left Column: Commits & Languages */}
         <div className="flex flex-col h-full overflow-hidden space-y-2">
           {/* Language Breakdown */}
@@ -229,7 +229,7 @@ export function GithubWidget() {
           )}
 
           <div className="text-[9px] font-bold uppercase text-muted-foreground tracking-wider shrink-0 mt-2">Latest Commits</div>
-          <ScrollArea className="flex-1 border border-border bg-popover rounded p-2">
+          <ScrollArea className="flex-1 border border-border bg-popover rounded p-2 min-h-0 h-full w-full overflow-y-auto">
             <div className="space-y-2">
               {commits.length === 0 ? (
                 <div className="text-center py-4 text-[9px] text-muted-foreground">No recent activity</div>
@@ -259,7 +259,7 @@ export function GithubWidget() {
         {/* Right Column: Repositories */}
         <div className="flex flex-col h-full overflow-hidden space-y-2">
           <div className="text-[9px] font-bold uppercase text-muted-foreground tracking-wider shrink-0">Repositories</div>
-          <ScrollArea className="flex-1 border border-border bg-popover rounded p-2">
+          <ScrollArea className="flex-1 border border-border bg-popover rounded p-2 min-h-0 h-full w-full overflow-y-auto">
             <div className="space-y-1.5">
               {repos.length === 0 ? (
                 <div className="text-center py-4 text-[9px] text-muted-foreground">No repositories</div>

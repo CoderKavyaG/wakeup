@@ -112,7 +112,7 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
       if (l.y + l.h > maxY) maxY = l.y + l.h;
     });
     
-    lgLayout.push({ i: id, x: 0, y: maxY, w: 4, h: 3 });
+    lgLayout.push({ i: id, x: 0, y: maxY, w: 4, h: 4, minW: 3, minH: 3 });
     currentLayouts.lg = lgLayout;
 
     const previousWidgets = get().widgets;
