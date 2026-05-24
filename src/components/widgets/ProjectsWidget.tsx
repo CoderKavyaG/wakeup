@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Folder, Github, ExternalLink, Plus, Trash2, Code2, AlertCircle } from "lucide-react";
+import { Folder, GitBranch, ExternalLink, Plus, Trash2, Code2, AlertCircle } from "lucide-react";
 
 export function ProjectsWidget() {
   const { projects, addProject, deleteProject, updateProject } = useProjectStore();
@@ -182,7 +182,7 @@ export function ProjectsWidget() {
                     {project.githubUrl && (
                       <a href={project.githubUrl} target="_blank" rel="noopener noreferrer">
                         <Button size="icon" variant="ghost" className="w-7 h-7 rounded-md">
-                          <Github className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
+                          <GitBranch className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
                         </Button>
                       </a>
                     )}

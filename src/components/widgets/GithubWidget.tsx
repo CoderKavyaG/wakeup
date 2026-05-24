@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Github, GitCommit, GitBranch, AlertTriangle, RefreshCw, Star, ExternalLink } from "lucide-react";
+import { GitCommit, GitBranch, AlertTriangle, RefreshCw, Star, ExternalLink } from "lucide-react";
 
 interface Repository {
   id: number;
@@ -160,7 +160,7 @@ export function GithubWidget() {
       {/* Header */}
       <div className="flex items-center justify-between mb-4 shrink-0">
         <div className="flex items-center space-x-2">
-          <Github className="w-4 h-4 text-primary" />
+          <GitBranch className="w-4 h-4 text-primary" />
           <h2 className="text-sm font-semibold tracking-wider uppercase text-secondary-foreground">GitHub Integration</h2>
         </div>
         <form onSubmit={handleUpdateUser} className="flex items-center space-x-2">
@@ -221,7 +221,7 @@ export function GithubWidget() {
         {/* Right Column: Repositories */}
         <div className="flex flex-col h-full overflow-hidden space-y-3">
           <div className="text-xs font-semibold uppercase text-muted-foreground tracking-wider flex items-center space-x-1.5 shrink-0">
-            <Github className="w-3.5 h-3.5 text-primary" />
+            <GitBranch className="w-3.5 h-3.5 text-primary" />
             <span>Repositiories</span>
           </div>
           <ScrollArea className="flex-1 border border-border/80 bg-popover/20 rounded-lg p-3">
