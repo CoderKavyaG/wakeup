@@ -7,7 +7,10 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const username = searchParams.get("username") || "coderkavyag";
-
+    
+    // Attempt to read token from header or env
+    let token = request.headers.get("Authorization")?.replace("Bearer ", "").replace("token ", "") || process.env.GITHUB_TOKEN;
+    
     // 1. Check cache first
     const cacheId = `github-cache-${username}`;
     const existingCache = await prisma.githubCache.findUnique({
@@ -16,75 +19,54 @@ export async function GET(request: Request) {
 
     if (existingCache) {
       const cacheAge = Date.now() - new Date(existingCache.updatedAt).getTime();
-      if (cacheAge < CACHE_TTL_MS) {
-        // Return fresh cached data!
+      // If we don't have a token, we HAVE to rely on cache
+      if (cacheAge < CACHE_TTL_MS || !token) {
         return NextResponse.json(existingCache.data);
       }
     }
 
-    // 2. Fetch fresh data from GitHub API
-    const headers: HeadersInit = {};
-    if (process.env.GITHUB_TOKEN) {
-      headers["Authorization"] = `token ${process.env.GITHUB_TOKEN}`;
+    if (!token) {
+      return NextResponse.json({ error: "No GitHub token provided and no valid cache found." }, { status: 401 });
     }
 
-    // Fetch repositories
-    const reposRes = await fetch(`https://api.github.com/users/${username}/repos?sort=updated&per_page=30`, {
+    const headers: HeadersInit = {
+      "Authorization": `bearer ${token}`,
+      "Accept": "application/vnd.github.v3+json",
+    };
+
+    // 2. Fetch Repositories
+    const reposRes = await fetch(`https://api.github.com/users/${username}/repos?sort=pushed&per_page=100`, {
       headers,
       next: { revalidate: 60 }
     });
     
     if (!reposRes.ok) {
-      // If we are rate limited or query fails, fall back to cached data even if expired!
-      if (existingCache) {
-        return NextResponse.json(existingCache.data);
-      }
+      if (existingCache) return NextResponse.json(existingCache.data);
       throw new Error(`GitHub API returned status ${reposRes.status}`);
     }
 
     const reposData = await reposRes.json();
 
-    // Fetch public events to extract commits and calculate streaks
-    const eventsRes = await fetch(`https://api.github.com/users/${username}/events/public?per_page=100`, {
-      headers,
-      next: { revalidate: 60 }
-    });
-
-    let eventsData: any[] = [];
-    if (eventsRes.ok) {
-      eventsData = await eventsRes.json();
-    }
-
     // 3. Process Repositories
-    const registeredProjects = await prisma.project.findMany({
-      select: { githubUrl: true }
-    });
-    const registeredUrls = new Set(
-      registeredProjects
-        .map(p => p.githubUrl?.toLowerCase() || "")
-        .filter(url => url !== "")
-    );
-
     const processedRepos = (reposData as any[]).map((r: any) => ({
       id: r.id,
       name: r.name,
       description: r.description || null,
       html_url: r.html_url,
-      updated_at: r.updated_at,
+      updated_at: r.pushed_at || r.updated_at,
       stargazers_count: r.stargazers_count,
       forks_count: r.forks,
       language: r.language || null,
-      isImported: registeredUrls.has(r.html_url.toLowerCase()),
+      open_issues_count: r.open_issues_count || 0
     }));
 
-    // Detect active vs stale repos (updated within 30 days)
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     const activeRepos = processedRepos.filter(r => new Date(r.updated_at) >= thirtyDaysAgo);
     const staleRepos = processedRepos.filter(r => new Date(r.updated_at) < thirtyDaysAgo);
 
-    // Calculate language usage insights
+    // Language Breakdown
     const langCounts: Record<string, number> = {};
     let totalLangs = 0;
     processedRepos.forEach(r => {
@@ -100,70 +82,119 @@ export async function GET(request: Request) {
       percentage: totalLangs > 0 ? Math.round((count / totalLangs) * 100) : 0
     })).sort((a, b) => b.percentage - a.percentage);
 
-    // 4. Process Commits and calculate streaks
-    const commits: any[] = [];
-    const commitDates = new Set<string>();
-
-    eventsData.forEach((event: any) => {
-      if (event.type === "PushEvent" && event.payload?.commits) {
-        const dateStr = event.created_at.split("T")[0];
-        commitDates.add(dateStr);
-
-        event.payload.commits.forEach((c: any) => {
-          commits.push({
-            sha: c.sha.substring(0, 7),
-            repoName: event.repo.name.split("/")[1] || event.repo.name,
-            message: c.message,
-            date: event.created_at,
-            url: `https://github.com/${event.repo.name}/commit/${c.sha}`
-          });
-        });
+    // 4. GraphQL Query for Contributions Calendar
+    const graphQuery = `
+      query {
+        user(login: "${username}") {
+          contributionsCollection {
+            contributionCalendar {
+              totalContributions
+              weeks {
+                contributionDays {
+                  contributionCount
+                  date
+                }
+              }
+            }
+          }
+        }
       }
+    `;
+
+    const graphRes = await fetch("https://api.github.com/graphql", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ query: graphQuery })
     });
 
-    // Commit Streak Logic
     let currentStreak = 0;
-    const todayStr = new Date().toISOString().split("T")[0];
-    const yesterdayStr = new Date(Date.now() - 24 * 3600 * 1000).toISOString().split("T")[0];
+    let totalContributions = 0;
 
-    // Check if committed today or yesterday to continue streak
-    const hasActivity = commitDates.has(todayStr) || commitDates.has(yesterdayStr);
-    
-    if (hasActivity) {
-      currentStreak = 0;
-      const checkDate = new Date();
-      // Start checking backwards from today
-      while (true) {
-        const checkStr = checkDate.toISOString().split("T")[0];
-        if (commitDates.has(checkStr)) {
-          currentStreak++;
-          checkDate.setDate(checkDate.getDate() - 1);
-        } else {
-          // If checkDate is today, let it slide to check yesterday. Otherwise streak is broken.
-          if (checkStr === todayStr) {
-            checkDate.setDate(checkDate.getDate() - 1);
-            continue;
+    if (graphRes.ok) {
+      const graphData = await graphRes.json();
+      const calendar = graphData?.data?.user?.contributionsCollection?.contributionCalendar;
+      if (calendar) {
+        totalContributions = calendar.totalContributions || 0;
+        
+        // Flatten days
+        const allDays = calendar.weeks.flatMap((w: any) => w.contributionDays);
+        allDays.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        
+        const todayStr = new Date().toISOString().split("T")[0];
+        const yesterdayStr = new Date(Date.now() - 24 * 3600 * 1000).toISOString().split("T")[0];
+
+        // Find today or yesterday to start streak logic
+        const startDayIndex = allDays.findIndex((d: any) => d.date === todayStr || d.date === yesterdayStr);
+        
+        if (startDayIndex !== -1) {
+          // If the most recent valid day (today or yesterday) has 0 contributions, and it's yesterday, streak is 0.
+          // If it's today with 0, we should check yesterday.
+          let startIndex = startDayIndex;
+          if (allDays[startIndex].date === todayStr && allDays[startIndex].contributionCount === 0) {
+            startIndex = startIndex + 1; // Check yesterday
           }
-          break;
+
+          if (allDays[startIndex] && allDays[startIndex].contributionCount > 0) {
+            // Count backwards
+            for (let i = startIndex; i < allDays.length; i++) {
+              if (allDays[i].contributionCount > 0) {
+                currentStreak++;
+              } else {
+                break;
+              }
+            }
+          }
         }
       }
     }
 
+    // 5. Fetch Parallel Commits for active repos (Cap to 20 to avoid rate limits)
+    const commitPromises = activeRepos.slice(0, 20).map(async (repo) => {
+      try {
+        const cRes = await fetch(`https://api.github.com/repos/${username}/${repo.name}/commits?per_page=1`, {
+          headers
+        });
+        if (cRes.ok) {
+          const cData = await cRes.json();
+          if (cData && cData.length > 0) {
+            const c = cData[0];
+            return {
+              sha: c.sha.substring(0, 7),
+              repoName: repo.name,
+              message: c.commit.message,
+              date: c.commit.committer.date,
+              url: c.html_url
+            };
+          }
+        }
+      } catch (e) {
+        // ignore individual repo failure
+      }
+      return null;
+    });
+
+    const commitResults = await Promise.all(commitPromises);
+    const commits = commitResults
+      .filter(Boolean)
+      .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 10);
+
     const payload = {
       username,
       repos: processedRepos.slice(0, 30),
-      commits: commits.slice(0, 6),
+      commits,
       stats: {
         totalRepos: processedRepos.length,
         activeReposCount: activeRepos.length,
         staleReposCount: staleRepos.length,
         currentStreak,
+        totalContributions,
         languageBreakdown
       },
       updatedAt: new Date().toISOString()
     };
 
-    // 5. Save/upsert to PostgreSQL cache
+    // 6. Save/upsert to PostgreSQL cache
     await prisma.githubCache.upsert({
       where: { id: cacheId },
       update: {
