@@ -1,8 +1,7 @@
 "use client";
 
 import React from "react";
-import { CommandPalette } from "./CommandPalette";
-import { SearchCommandPalette } from "../widgets/SearchCommandPalette";
+import { CockpitCommand } from "./CockpitCommand";
 import { useLayoutStore } from "@/store/useLayoutStore";
 import { Lock, Unlock } from "lucide-react";
 import { Button } from "../ui/button";
@@ -51,8 +50,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="h-screen w-full flex flex-col overflow-hidden bg-background text-foreground">
-      <CommandPalette />
-      <SearchCommandPalette />
+      <CockpitCommand />
 
       {/* Top Controls Bar */}
       <div className="shrink-0 px-6 py-3 border-b border-border bg-card flex items-center justify-between gap-4 select-none">
