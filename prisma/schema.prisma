@@ -1,0 +1,126 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ==========================================
+// DEVOS MODELS (PHASE 2)
+// ==========================================
+
+model Project {
+  id                   String   @id @default(uuid())
+  name                 String
+  description          String   @default("")
+  status               String   @default("active") // "planning" | "active" | "completed" | "stale"
+  tags                 String[] @default([])
+  githubUrl            String?
+  liveUrl              String?
+  
+  // Project Intelligence & Developer Memory Fields
+  summary              String?  @db.Text
+  architectureNotes    String?  @db.Text
+  deploymentInfo       String?  @db.Text
+  screenshots          String[] @default([])
+  techStack            String[] @default([])
+  resumeBullet         String?  @db.Text
+  interviewNotes       String?  @db.Text
+  projectHealth        Float    @default(100.0)
+  momentumScore        Float    @default(0.0)
+  nextAction           String?
+  completionPercentage Float    @default(0.0)
+
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model Task {
+  id        String   @id @default(uuid())
+  title     String
+  completed Boolean  @default(false)
+  priority  String   @default("medium") // "low" | "medium" | "high"
+  dueDate   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Note {
+  id        String   @id @default(uuid())
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Url {
+  id        String   @id @default(uuid())
+  label     String
+  url       String
+  category  String   @default("other") // "docs" | "deployment" | "github" | "other"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model LayoutState {
+  id        String   @id @default("global-layout")
+  layouts   Json     // Persisted grid coordinates
+  widgets   Json     // Enabled widgets list
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ==========================================
+// THEDAILYDEV SIBLING MODELS (SAFEKEEPING)
+// ==========================================
+
+model Trend {
+  id              Int          @id @default(autoincrement())
+  title           String
+  description     String?
+  url             String       @unique
+  source          String       // e.g., "Reddit", "HackerNews", "Dev.to"
+  category        String       // e.g., "AI", "Dev", "General"
+  engagementScore Int          @default(0)
+  upvotes         Int          @default(0)
+  comments        Int          @default(0)
+  originalId      String?      @unique
+  publishedAt     DateTime
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  savedTrends     SavedTrend[]
+
+  @@index([source, category])
+  @@index([engagementScore(sort: Desc)])
+  @@index([url])
+}
+
+model User {
+  id          Int          @id @default(autoincrement())
+  email       String       @unique
+  password    String?
+  googleId    String?      @unique
+  name        String?
+  role        String       @default("user") // "user", "admin"
+  createdAt   DateTime     @default(now())
+  savedTrends SavedTrend[]
+}
+
+model SavedTrend {
+  id          Int       @id @default(autoincrement())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      Int
+  trend       Trend?    @relation(fields: [trendId], references: [id], onDelete: Cascade)
+  trendId     Int?
+  title       String
+  url         String    @unique(map: "SavedTrend_userId_url_key")
+  source      String
+  description String?
+  image       String?
+  author      String?
+  publishedAt DateTime?
+  savedAt     DateTime  @default(now())
+
+  @@index([userId])
+  @@index([trendId])
+}
