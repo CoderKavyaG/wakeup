@@ -1,7 +1,17 @@
 import { streamText } from "ai";
-import { openai } from "@ai-sdk/openai";
+import { createOpenAI } from "@ai-sdk/openai";
 import { createTextStreamResponse } from "ai";
 import prisma from "@/lib/prisma";
+
+const openrouter = createOpenAI({
+  baseURL: "https://openrouter.ai/api/v1",
+  apiKey: process.env.OPENROUTER_API_KEY,
+});
+
+const groq = createOpenAI({
+  baseURL: "https://api.groq.com/openai/v1",
+  apiKey: process.env.GROQ_API_KEY,
+});
 
 export const dynamic = "force-dynamic";
 
@@ -23,8 +33,18 @@ export async function POST(request: Request) {
       return Response.json({ error: "Query is required" }, { status: 400 });
     }
 
+    let modelInstance = null;
+    
+    if (process.env.GROQ_API_KEY) {
+      // Prioritizing Groq because it is stable and insanely fast.
+      modelInstance = groq("llama-3.3-70b-versatile");
+    } else if (process.env.OPENROUTER_API_KEY) {
+      // OpenRouter with the user-specified Gemma model
+      modelInstance = openrouter("google/gemma-4-26b-a4b-it:free");
+    }
+
     // If no API key, fall back to fast DB-only response
-    if (!process.env.OPENAI_API_KEY) {
+    if (!modelInstance) {
       const result = await handleNoAIFallback(query);
       return Response.json({ result, fallback: true });
     }
@@ -88,7 +108,7 @@ Rules:
 - Keep responses under 150 words unless a detailed breakdown is explicitly asked for.`;
 
     const result = streamText({
-      model: openai("gpt-4o-mini"),
+      model: modelInstance,
       system: systemPrompt,
       prompt: query,
       maxOutputTokens: 300,
@@ -125,5 +145,5 @@ async function handleNoAIFallback(query: string): Promise<string> {
     return tasks.map((t) => `• [${t.priority}] ${t.title}`).join("\n");
   }
 
-  return "Add your OPENAI_API_KEY to .env to enable AI answers. I can still answer basic data queries.";
+  return "Please configure your OPENROUTER_API_KEY or GROQ_API_KEY in .env to enable AI answers. I can still answer basic data queries.";
 }
