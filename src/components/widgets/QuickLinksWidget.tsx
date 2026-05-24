@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useUrlStore, ResourceUrl } from "@/store/useUrlStore";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Link2, Search, Copy, Loader2, GripVertical, Trash2, Check, Plus } from "lucide-react";
+import { Link2, Search, Copy, Loader2, GripVertical, Trash2, Check, Plus, Briefcase, Linkedin, Twitter } from "lucide-react";
 import {
   DndContext,
   closestCenter,
@@ -26,9 +26,6 @@ import { CSS } from "@dnd-kit/utilities";
 // Default seeds
 const DEFAULT_LINKS: Omit<ResourceUrl, "id">[] = [
   { label: "GitHub", url: "https://github.com/coderkavya", category: "github" },
-  { label: "LinkedIn", url: "https://linkedin.com/in/coderkavyag", category: "other" },
-  { label: "Portfolio", url: "https://coderkavyag.me", category: "other" },
-  { label: "X / Twitter", url: "https://x.com/coderkavyag", category: "other" }
 ];
 
 interface SortableLinkItemProps {
@@ -72,7 +69,7 @@ function SortableLinkItem({ url, onCopy, copiedId, onDelete }: SortableLinkItemP
         onError={(e) => { e.currentTarget.style.display = 'none'; }}
       />
       
-      <a href={url.url} target="_blank" rel="noopener noreferrer" className="flex-1 text-xs text-foreground/90 hover:text-primary truncate font-medium min-w-0">
+      <a href={url.url} target="_blank" rel="noopener noreferrer" className="flex-1 text-xs text-foreground/90 hover:text-foreground truncate font-medium min-w-0" title={`${url.label} • ${url.url}`}>
         {url.label}
       </a>
 
@@ -140,6 +137,14 @@ export function QuickLinksWidget() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  const handleQuickCopy = (e: React.MouseEvent, text: string, id: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
   const handleDelete = (e: React.MouseEvent, id: string) => {
     e.preventDefault();
     e.stopPropagation();
@@ -189,21 +194,49 @@ export function QuickLinksWidget() {
     : urls;
 
   return (
-    <div className="flex flex-col h-full text-foreground bg-[#0f0f11] rounded-xl overflow-hidden divide-y divide-border/40 border border-white/10">
+    <div className="flex flex-col h-full text-foreground bg-[#0f0f11] rounded-xl overflow-hidden divide-y divide-border/40 border border-border/40">
       {/* Header */}
       <div className="px-3 py-2 flex items-center justify-between shrink-0 bg-[#0f0f11]">
         <div className="flex items-center gap-2">
-          <Link2 className="w-3.5 h-3.5 text-blue-400" />
-          <h3 className="text-xs font-semibold tracking-tight">Links</h3>
+          <Link2 className="w-3.5 h-3.5 text-foreground/80" />
+          <h3 className="text-xs font-semibold tracking-tight text-foreground/90">Links</h3>
         </div>
         <button 
           onClick={() => {
             setIsSearchActive(!isSearchActive);
             if (isSearchActive) setSearchQuery("");
           }}
-          className={`p-1 rounded hover:bg-white/5 transition-colors ${isSearchActive ? 'text-primary' : 'text-muted-foreground'}`}
+          className={`p-1 rounded hover:bg-white/5 transition-colors ${isSearchActive ? 'text-foreground' : 'text-muted-foreground'}`}
         >
           <Search className="w-3 h-3" />
+        </button>
+      </div>
+
+      {/* Quick Copy Action Bar */}
+      <div className="px-2 py-2 shrink-0 bg-[#141416] flex justify-between gap-1 border-b border-border/40">
+        <button
+          onClick={(e) => handleQuickCopy(e, "https://coderkavyag.me", "portfolio")}
+          title="Copy Portfolio Link"
+          className="flex-1 flex items-center justify-center gap-1.5 h-7 rounded-md bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-foreground transition-all text-[10px] font-medium border border-white/5"
+        >
+          {copiedId === "portfolio" ? <Check className="w-3 h-3 text-green-400" /> : <Briefcase className="w-3 h-3" />}
+          <span>Portfolio</span>
+        </button>
+        <button
+          onClick={(e) => handleQuickCopy(e, "https://linkedin.com/in/coderkavyag", "linkedin")}
+          title="Copy LinkedIn Link"
+          className="flex-1 flex items-center justify-center gap-1.5 h-7 rounded-md bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-foreground transition-all text-[10px] font-medium border border-white/5"
+        >
+          {copiedId === "linkedin" ? <Check className="w-3 h-3 text-green-400" /> : <Linkedin className="w-3 h-3" />}
+          <span>LinkedIn</span>
+        </button>
+        <button
+          onClick={(e) => handleQuickCopy(e, "https://x.com/coderkavyag", "twitter")}
+          title="Copy X (Twitter) Link"
+          className="flex-1 flex items-center justify-center gap-1.5 h-7 rounded-md bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-foreground transition-all text-[10px] font-medium border border-white/5"
+        >
+          {copiedId === "twitter" ? <Check className="w-3 h-3 text-green-400" /> : <Twitter className="w-3 h-3" />}
+          <span>Twitter</span>
         </button>
       </div>
 
@@ -215,7 +248,7 @@ export function QuickLinksWidget() {
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="Search links..."
-            className="h-6 text-[10px] bg-[#0f0f11] border-white/10 focus-visible:ring-1 focus-visible:ring-primary/50"
+            className="h-7 text-[11px] bg-[#0f0f11] border-white/10 focus-visible:ring-1 focus-visible:ring-white/20"
           />
         </div>
       )}
@@ -242,7 +275,7 @@ export function QuickLinksWidget() {
       {/* Add Row */}
       <div className="p-3 shrink-0 bg-[#0f0f11] relative border-t border-border/40">
         <form onSubmit={handleAddSubmit} className="relative flex items-center group">
-          <div className="absolute left-3 text-muted-foreground group-focus-within:text-primary transition-colors">
+          <div className="absolute left-3 text-muted-foreground group-focus-within:text-foreground transition-colors">
             <Link2 className="w-3.5 h-3.5" />
           </div>
           <Input 
@@ -250,13 +283,13 @@ export function QuickLinksWidget() {
             onChange={e => setNewUrlInput(e.target.value)}
             disabled={isAdding}
             placeholder="Paste URL..."
-            className="h-9 pl-9 pr-10 text-[11px] bg-[#1a1a1d] border border-white/10 rounded-lg focus-visible:ring-1 focus-visible:ring-primary/50 placeholder:text-muted-foreground/60 w-full transition-all"
+            className="h-9 pl-9 pr-10 text-[11px] bg-[#141416] border border-white/10 rounded-lg focus-visible:ring-1 focus-visible:ring-white/20 placeholder:text-muted-foreground/60 w-full transition-all"
           />
           <div className="absolute right-1">
             <button
               type="submit"
               disabled={isAdding || !newUrlInput.trim()}
-              className="w-7 h-7 rounded-md flex items-center justify-center bg-primary hover:bg-primary/90 text-white disabled:opacity-50 disabled:hover:bg-primary transition-all shadow-sm"
+              className="w-7 h-7 rounded-md flex items-center justify-center bg-white/10 hover:bg-white/20 text-foreground disabled:opacity-50 disabled:hover:bg-white/10 transition-all shadow-sm border border-white/5"
             >
               {isAdding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
             </button>
