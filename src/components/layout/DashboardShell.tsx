@@ -39,6 +39,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [rightSidebarOpen, setRightSidebarOpen] = useState(true);
   const [activeTab, setActiveTab] = useState<"stream" | "weekly" | "timeline">("stream");
   const [timelineData, setTimelineData] = useState<any>(null);
+  const [notifications, setNotifications] = useState<{ id: string; text: string; type: "warning" | "success" | "info" }[]>([]);
 
   const fetchTimeline = async () => {
     try {
@@ -55,6 +56,27 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
     fetchTimeline();
   }, [tasks, projects, notes]);
+
+  React.useEffect(() => {
+    if (timelineData) {
+      const newNotifs: any[] = [];
+      if (timelineData.weeklyReview?.staleProjects > 0) {
+        newNotifs.push({
+          id: "stale-notif",
+          text: `⚠️ Stale Projects: ${timelineData.weeklyReview.staleProjects} repositories need immediate update focus!`,
+          type: "warning"
+        });
+      }
+      if (timelineData.weeklyReview?.commitsPushed === 0) {
+        newNotifs.push({
+          id: "streak-notif",
+          text: "🔥 Streak Warning: No commits pushed in the last 7 days! Ship a code changes to keep momentum.",
+          type: "warning"
+        });
+      }
+      setNotifications(newNotifs.slice(0, 2));
+    }
+  }, [timelineData]);
 
   React.useEffect(() => {
     // Dispatch a resize event to force react-grid-layout to recalculate width
@@ -576,6 +598,29 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             </Tooltip>
           </div>
         </div>
+      </div>
+
+      {/* Floating Notification Toast Stack */}
+      <div className="fixed bottom-24 left-6 z-50 flex flex-col gap-2.5 max-w-sm pointer-events-none">
+        <AnimatePresence>
+          {notifications.map((notif) => (
+            <motion.div
+              key={notif.id}
+              initial={{ x: -200, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: -200, opacity: 0 }}
+              className="pointer-events-auto p-4 bg-popover/90 backdrop-blur-md border border-border shadow-2xl rounded-xl flex items-start justify-between gap-3 text-xs leading-relaxed max-w-xs font-sans text-foreground"
+            >
+              <span>{notif.text}</span>
+              <button 
+                onClick={() => setNotifications(prev => prev.filter(n => n.id !== notif.id))}
+                className="text-muted-foreground hover:text-foreground font-bold shrink-0 ml-1 leading-none text-xs transition-colors"
+              >
+                ✕
+              </button>
+            </motion.div>
+          ))}
+        </AnimatePresence>
       </div>
     </div>
   );
