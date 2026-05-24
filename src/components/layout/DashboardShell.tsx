@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { CommandPalette } from "./CommandPalette";
 import { useLayoutStore, WidgetType } from "@/store/useLayoutStore";
 import { useTaskStore } from "@/store/useTaskStore";
 import { useProjectStore } from "@/store/useProjectStore";
@@ -102,6 +103,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="h-screen w-full flex overflow-hidden bg-background text-foreground select-none">
+      <CommandPalette />
       {/* Left utility column */}
       <aside className="w-16 flex-shrink-0 border-r border-border bg-card flex flex-col items-center justify-between py-5 z-20">
         <div className="flex flex-col items-center space-y-6 w-full">
