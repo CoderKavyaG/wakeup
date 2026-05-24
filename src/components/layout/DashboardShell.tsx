@@ -22,7 +22,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       {/* Top Controls Bar */}
       <div className="shrink-0 px-6 pt-6 pb-2 flex items-center justify-between gap-4 select-none bg-[#0f0f11]">
         <div className="flex items-center space-x-2">
-          <div className="w-6 h-6 rounded-md bg-primary flex items-center justify-center font-bold text-white text-xs shadow-sm shadow-primary/20">
+          <div className="w-8 h-8 rounded-lg bg-foreground flex items-center justify-center font-bold text-background text-base shadow-sm border border-white/10">
             D
           </div>
           <div>
