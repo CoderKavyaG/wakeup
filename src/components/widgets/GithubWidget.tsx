@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { GitCommit, GitBranch, AlertTriangle, RefreshCw, Star, ExternalLink } from "lucide-react";
+import { GitCommit, GitBranch, AlertTriangle, RefreshCw, Star, ExternalLink, Flame, PieChart } from "lucide-react";
 
 interface Repository {
   id: number;
@@ -27,11 +27,26 @@ interface Commit {
   url: string;
 }
 
+interface LanguageShare {
+  language: string;
+  count: number;
+  percentage: number;
+}
+
+interface GithubStats {
+  totalRepos: number;
+  activeReposCount: number;
+  staleReposCount: number;
+  currentStreak: number;
+  languageBreakdown: LanguageShare[];
+}
+
 export function GithubWidget() {
   const [username, setUsername] = useState("TPAteeq");
   const [inputUsername, setInputUsername] = useState("TPAteeq");
   const [repos, setRepos] = useState<Repository[]>([]);
   const [commits, setCommits] = useState<Commit[]>([]);
+  const [stats, setStats] = useState<GithubStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,49 +55,15 @@ export function GithubWidget() {
     setLoading(true);
     setError(null);
     try {
-      // Fetch repos
-      const reposRes = await fetch(`https://api.github.com/users/${user}/repos?sort=updated&per_page=10`);
-      if (!reposRes.ok) throw new Error("User not found or API limit exceeded");
-      const reposData = await reposRes.json();
+      const res = await fetch(`/api/github?username=${user}`);
+      if (!res.ok) throw new Error("Failed to load GitHub data from DevOS backend");
+      const data = await res.json();
       
-      // Map and set repositories
-      const sortedRepos = (reposData as any[]).map((r: any) => ({
-        id: r.id,
-        name: r.name,
-        description: r.description,
-        html_url: r.html_url,
-        updated_at: r.updated_at,
-        stargazers_count: r.stargazers_count,
-        forks_count: r.forks,
-        language: r.language
-      }));
-      setRepos(sortedRepos);
-
-      // Fetch public events to extract commits
-      const eventsRes = await fetch(`https://api.github.com/users/${user}/events/public?per_page=20`);
-      if (eventsRes.ok) {
-        const eventsData = await eventsRes.json();
-        const extractedCommits: Commit[] = [];
-        
-        eventsData.forEach((event: any) => {
-          if (event.type === "PushEvent" && event.payload?.commits) {
-            event.payload.commits.forEach((c: any) => {
-              extractedCommits.push({
-                sha: c.sha.substring(0, 7),
-                repoName: event.repo.name.split("/")[1] || event.repo.name,
-                message: c.message,
-                date: event.created_at,
-                url: `https://github.com/${event.repo.name}/commit/${c.sha}`
-              });
-            });
-          }
-        });
-        
-        setCommits(extractedCommits.slice(0, 5));
-      }
+      setRepos(data.repos || []);
+      setCommits(data.commits || []);
+      setStats(data.stats || null);
     } catch (err: any) {
       setError(err.message || "An error occurred");
-      // Load fallback mock data for smooth offline developer demo experience
       loadMockData();
     } finally {
       setLoading(false);
@@ -104,7 +85,7 @@ export function GithubWidget() {
       {
         id: 2,
         name: "webrtc-chat",
-        description: "Multi-user stragner video chat with automatic ICE recovery",
+        description: "Multi-user stranger video chat with automatic ICE recovery",
         html_url: "https://github.com/example/webrtc-chat",
         updated_at: new Date(Date.now() - 35 * 24 * 60 * 60 * 1000).toISOString(),
         stargazers_count: 8,
@@ -128,6 +109,16 @@ export function GithubWidget() {
         url: "#"
       }
     ]);
+    setStats({
+      totalRepos: 2,
+      activeReposCount: 1,
+      staleReposCount: 1,
+      currentStreak: 5,
+      languageBreakdown: [
+        { language: "TypeScript", count: 1, percentage: 50 },
+        { language: "JavaScript", count: 1, percentage: 50 }
+      ]
+    });
   };
 
   useEffect(() => {
@@ -141,27 +132,19 @@ export function GithubWidget() {
     }
   };
 
-  const getStaleRepos = () => {
+  const staleRepos = repos.filter(repo => {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    return repos.filter(r => new Date(r.updated_at) < thirtyDaysAgo);
-  };
-
-  const activeRepos = repos.filter(r => {
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    return new Date(r.updated_at) >= thirtyDaysAgo;
+    return new Date(repo.updated_at) < thirtyDaysAgo;
   });
 
-  const staleRepos = getStaleRepos();
-
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex flex-col h-full overflow-hidden text-foreground">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4 shrink-0">
+      <div className="flex items-center justify-between mb-3 shrink-0">
         <div className="flex items-center space-x-2">
-          <GitBranch className="w-4 h-4 text-primary" />
-          <h2 className="text-sm font-semibold tracking-wider uppercase text-secondary-foreground">GitHub Integration</h2>
+          <GitBranch className="w-4 h-4 text-primary animate-pulse" />
+          <h2 className="text-sm font-semibold tracking-wider uppercase text-secondary-foreground">GitHub Workspace</h2>
         </div>
         <form onSubmit={handleUpdateUser} className="flex items-center space-x-2">
           <Input
@@ -170,26 +153,81 @@ export function GithubWidget() {
             placeholder="Username"
             className="h-7 w-28 text-xs bg-popover border-border text-foreground placeholder:text-muted-foreground py-0"
           />
-          <Button size="icon" variant="ghost" className="w-7 h-7 border border-border bg-popover/30" disabled={loading}>
-            <RefreshCw className={`w-3.5 h-3.5 text-muted-foreground ${loading ? 'animate-spin' : ''}`} onClick={() => fetchGithubData(username)} />
+          <Button size="icon" type="submit" variant="ghost" className="w-7 h-7 border border-border bg-popover/30" disabled={loading}>
+            <RefreshCw className={`w-3.5 h-3.5 text-muted-foreground ${loading ? 'animate-spin' : ''}`} />
           </Button>
         </form>
       </div>
 
-      {error && (
-        <div className="mb-2 p-2 bg-red-500/10 border border-red-500/20 rounded text-[11px] text-red-400 flex items-center space-x-1 shrink-0">
-          <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
-          <span>Using mock data ({error})</span>
+      {/* Highlights & Stats Banner */}
+      {stats && (
+        <div className="grid grid-cols-3 gap-2 mb-3 shrink-0">
+          <div className="p-2 border border-border/60 bg-popover/20 rounded-lg flex items-center justify-between">
+            <div className="min-w-0">
+              <span className="text-[9px] uppercase tracking-wider text-muted-foreground block">Streak</span>
+              <span className="text-xs font-bold font-mono">{stats.currentStreak} Days</span>
+            </div>
+            <Flame className={`w-4 h-4 ${stats.currentStreak > 0 ? "text-orange-500 fill-orange-500/20" : "text-muted-foreground"}`} />
+          </div>
+          <div className="p-2 border border-border/60 bg-popover/20 rounded-lg flex items-center justify-between">
+            <div className="min-w-0">
+              <span className="text-[9px] uppercase tracking-wider text-muted-foreground block">Active Repos</span>
+              <span className="text-xs font-bold font-mono text-green-400">{stats.activeReposCount}</span>
+            </div>
+            <GitBranch className="w-4 h-4 text-green-400" />
+          </div>
+          <div className="p-2 border border-border/60 bg-popover/20 rounded-lg flex items-center justify-between">
+            <div className="min-w-0">
+              <span className="text-[9px] uppercase tracking-wider text-muted-foreground block">Stale Repos</span>
+              <span className="text-xs font-bold font-mono text-yellow-400">{stats.staleReposCount}</span>
+            </div>
+            <AlertTriangle className="w-4 h-4 text-yellow-400" />
+          </div>
         </div>
       )}
 
       {/* Main Content Areas split horizontally */}
       <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 overflow-hidden">
-        {/* Left Column: Activity Feed & Commits */}
+        {/* Left Column: Commits & Languages */}
         <div className="flex flex-col h-full overflow-hidden space-y-3">
-          <div className="text-xs font-semibold uppercase text-muted-foreground tracking-wider flex items-center space-x-1.5 shrink-0">
-            <GitCommit className="w-3.5 h-3.5 text-primary" />
-            <span>Recent Commits</span>
+          {/* Language Breakdown */}
+          {stats && stats.languageBreakdown.length > 0 && (
+            <div className="shrink-0 space-y-1.5">
+              <div className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider flex items-center space-x-1.5">
+                <PieChart className="w-3 h-3 text-primary" />
+                <span>Language Share</span>
+              </div>
+              <div className="flex h-1.5 rounded-full overflow-hidden w-full bg-muted">
+                {stats.languageBreakdown.slice(0, 4).map((lang, idx) => {
+                  const colors = ["bg-primary", "bg-emerald-500", "bg-amber-500", "bg-indigo-500"];
+                  return (
+                    <div 
+                      key={lang.language} 
+                      className={`${colors[idx % colors.length]}`} 
+                      style={{ width: `${lang.percentage}%` }}
+                      title={`${lang.language}: ${lang.percentage}%`}
+                    />
+                  );
+                })}
+              </div>
+              <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1 text-[9px] text-muted-foreground">
+                {stats.languageBreakdown.slice(0, 4).map((lang, idx) => {
+                  const dotColors = ["bg-primary", "bg-emerald-500", "bg-amber-500", "bg-indigo-500"];
+                  return (
+                    <div key={lang.language} className="flex items-center space-x-1">
+                      <span className={`w-1.5 h-1.5 rounded-full ${dotColors[idx % dotColors.length]}`} />
+                      <span className="font-bold text-foreground/80">{lang.language}</span>
+                      <span>{lang.percentage}%</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <div className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider flex items-center space-x-1.5 shrink-0">
+            <GitCommit className="w-3.5 h-3.5 text-primary animate-pulse" />
+            <span>Activity Feed</span>
           </div>
           <ScrollArea className="flex-1 border border-border/80 bg-popover/20 rounded-lg p-3">
             <div className="space-y-3">
@@ -197,9 +235,9 @@ export function GithubWidget() {
                 <div className="text-center py-6 text-xs text-muted-foreground">No recent pushes detected.</div>
               ) : (
                 commits.map((commit, i) => (
-                  <div key={commit.sha + i} className="flex items-start space-x-2 border-b border-border/50 pb-2.5 last:border-0 last:pb-0">
-                    <div className="mt-0.5 p-1 bg-primary/10 rounded">
-                      <GitBranch className="w-3 h-3 text-primary" />
+                  <div key={commit.sha + i} className="flex items-start space-x-2 border-b border-border/40 pb-2 last:border-0 last:pb-0">
+                    <div className="mt-0.5 p-1 bg-primary/10 rounded shrink-0">
+                      <GitCommit className="w-3 h-3 text-primary" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
@@ -220,24 +258,22 @@ export function GithubWidget() {
 
         {/* Right Column: Repositories */}
         <div className="flex flex-col h-full overflow-hidden space-y-3">
-          <div className="text-xs font-semibold uppercase text-muted-foreground tracking-wider flex items-center space-x-1.5 shrink-0">
+          <div className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider flex items-center space-x-1.5 shrink-0">
             <GitBranch className="w-3.5 h-3.5 text-primary" />
             <span>Repositiories</span>
           </div>
           <ScrollArea className="flex-1 border border-border/80 bg-popover/20 rounded-lg p-3">
-            <div className="space-y-3">
-              {/* Stale Warning Banner if any */}
+            <div className="space-y-2.5">
               {staleRepos.length > 0 && (
                 <div className="p-2 bg-yellow-500/10 border border-yellow-500/20 rounded text-[10px] text-yellow-400 space-y-1">
                   <div className="flex items-center space-x-1 font-semibold">
                     <AlertTriangle className="w-3 h-3" />
                     <span>{staleRepos.length} Stale Repositories Detected</span>
                   </div>
-                  <p className="text-[9px] text-muted-foreground">No updates in over 30 days. Action recommended.</p>
+                  <p className="text-[9px] text-muted-foreground/80">No commits in over 30 days. Action recommended.</p>
                 </div>
               )}
 
-              {/* Active Repos */}
               {repos.length === 0 ? (
                 <div className="text-center py-6 text-xs text-muted-foreground">No repositories found.</div>
               ) : (
@@ -256,9 +292,9 @@ export function GithubWidget() {
                           )}
                         </div>
                         {isStale ? (
-                          <Badge variant="outline" className="text-[9px] bg-red-500/10 text-red-400 border-red-500/20 uppercase shrink-0 py-0">stale</Badge>
+                          <Badge variant="outline" className="text-[8px] bg-yellow-500/10 text-yellow-400 border-yellow-500/20 uppercase shrink-0 py-0">stale</Badge>
                         ) : (
-                          <Badge variant="outline" className="text-[9px] bg-green-500/10 text-green-400 border-green-500/20 uppercase shrink-0 py-0">active</Badge>
+                          <Badge variant="outline" className="text-[8px] bg-emerald-500/10 text-emerald-400 border-emerald-500/20 uppercase shrink-0 py-0">active</Badge>
                         )}
                       </div>
                       <div className="flex items-center justify-between mt-2 text-[9px] text-muted-foreground/80">
