@@ -7,11 +7,9 @@ import { useProjectStore } from "@/store/useProjectStore";
 import { useNoteStore } from "@/store/useNoteStore";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-  LayoutGrid, 
   Terminal as TerminalIcon, 
   GitBranch, 
   Plus, 
-  Trash2, 
   FolderPlus, 
   CheckSquare, 
   FileText, 
@@ -20,14 +18,14 @@ import {
   RefreshCw, 
   User, 
   HelpCircle,
-  Activity,
-  Maximize2
+  Activity
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
+import { Badge } from "../ui/badge";
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
-  const { addWidget, setLayouts, widgets } = useLayoutStore();
+  const { addWidget, widgets } = useLayoutStore();
   const { tasks } = useTaskStore();
   const { projects } = useProjectStore();
   const { notes } = useNoteStore();
@@ -110,48 +108,54 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           {/* Navigation Utilities */}
           <div className="flex flex-col items-center space-y-4 w-full px-2">
             <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  onClick={() => setShowWidgetDrawer(!showWidgetDrawer)} 
-                  variant="ghost" 
-                  size="icon" 
-                  className={`w-10 h-10 rounded-lg ${showWidgetDrawer ? 'bg-primary/10 text-primary border border-primary/20' : 'text-muted-foreground'}`}
-                >
-                  <Plus className="w-5 h-5" />
-                </Button>
-              </TooltipTrigger>
+              <TooltipTrigger
+                render={
+                  <Button 
+                    onClick={() => setShowWidgetDrawer(!showWidgetDrawer)} 
+                    variant="ghost" 
+                    size="icon" 
+                    className={`w-10 h-10 rounded-lg ${showWidgetDrawer ? 'bg-primary/10 text-primary border border-primary/20' : 'text-muted-foreground'}`}
+                  >
+                    <Plus className="w-5 h-5" />
+                  </Button>
+                }
+              />
               <TooltipContent side="right" className="bg-popover border-border text-foreground">
                 <p className="text-xs font-bold">Add Widget</p>
               </TooltipContent>
             </Tooltip>
 
             <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  onClick={() => setRightSidebarOpen(!rightSidebarOpen)} 
-                  variant="ghost" 
-                  size="icon" 
-                  className={`w-10 h-10 rounded-lg ${rightSidebarOpen ? 'bg-primary/10 text-primary' : 'text-muted-foreground'}`}
-                >
-                  <Activity className="w-5 h-5" />
-                </Button>
-              </TooltipTrigger>
+              <TooltipTrigger
+                render={
+                  <Button 
+                    onClick={() => setRightSidebarOpen(!rightSidebarOpen)} 
+                    variant="ghost" 
+                    size="icon" 
+                    className={`w-10 h-10 rounded-lg ${rightSidebarOpen ? 'bg-primary/10 text-primary' : 'text-muted-foreground'}`}
+                  >
+                    <Activity className="w-5 h-5" />
+                  </Button>
+                }
+              />
               <TooltipContent side="right" className="bg-popover border-border text-foreground">
                 <p className="text-xs font-bold">Toggle Activity Stream</p>
               </TooltipContent>
             </Tooltip>
 
             <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  onClick={resetDashboard} 
-                  variant="ghost" 
-                  size="icon" 
-                  className="w-10 h-10 rounded-lg text-muted-foreground hover:text-foreground"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                </Button>
-              </TooltipTrigger>
+              <TooltipTrigger
+                render={
+                  <Button 
+                    onClick={resetDashboard} 
+                    variant="ghost" 
+                    size="icon" 
+                    className="w-10 h-10 rounded-lg text-muted-foreground hover:text-foreground"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                  </Button>
+                }
+              />
               <TooltipContent side="right" className="bg-popover border-border text-foreground">
                 <p className="text-xs font-bold">Reset Workspace Layout</p>
               </TooltipContent>
@@ -162,11 +166,13 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         {/* User Profile */}
         <div className="flex flex-col items-center space-y-4 w-full">
           <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" className="w-10 h-10 rounded-lg text-muted-foreground">
-                <HelpCircle className="w-4 h-4" />
-              </Button>
-            </TooltipTrigger>
+            <TooltipTrigger
+              render={
+                <Button variant="ghost" size="icon" className="w-10 h-10 rounded-lg text-muted-foreground">
+                  <HelpCircle className="w-4 h-4" />
+                </Button>
+              }
+            />
             <TooltipContent side="right" className="bg-popover border-border text-foreground">
               <p className="text-xs font-bold">Documentation & Shortcuts</p>
             </TooltipContent>
@@ -292,16 +298,18 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20">
           <div className="h-14 rounded-full bg-card/90 backdrop-blur-md border border-border shadow-2xl flex items-center px-4 space-x-3.5">
             <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  onClick={() => setShowWidgetDrawer(true)} 
-                  size="icon" 
-                  variant="ghost" 
-                  className="w-9 h-9 rounded-full bg-primary text-white hover:bg-primary/90"
-                >
-                  <Plus className="w-4 h-4" />
-                </Button>
-              </TooltipTrigger>
+              <TooltipTrigger
+                render={
+                  <Button 
+                    onClick={() => setShowWidgetDrawer(true)} 
+                    size="icon" 
+                    variant="ghost" 
+                    className="w-9 h-9 rounded-full bg-primary text-white hover:bg-primary/90"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                }
+              />
               <TooltipContent side="top" className="bg-popover border-border text-foreground">
                 <p className="text-xs font-bold">Register New Widget</p>
               </TooltipContent>
@@ -311,61 +319,69 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
             {/* Quick Link/Navigation Shortuct Icons */}
             <Tooltip>
-              <TooltipTrigger asChild>
-                <a href="https://github.com" target="_blank" rel="noopener noreferrer">
-                  <Button size="icon" variant="ghost" className="w-9 h-9 rounded-full text-muted-foreground hover:text-foreground">
-                    <GitBranch className="w-4 h-4" />
-                  </Button>
-                </a>
-              </TooltipTrigger>
+              <TooltipTrigger
+                render={
+                  <a href="https://github.com" target="_blank" rel="noopener noreferrer">
+                    <Button size="icon" variant="ghost" className="w-9 h-9 rounded-full text-muted-foreground hover:text-foreground">
+                      <GitBranch className="w-4 h-4" />
+                    </Button>
+                  </a>
+                }
+              />
               <TooltipContent side="top" className="bg-popover border-border text-foreground">
                 <p className="text-xs font-bold">GitHub Portal</p>
               </TooltipContent>
             </Tooltip>
 
             <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  onClick={() => addWidget("notes")} 
-                  size="icon" 
-                  variant="ghost" 
-                  className="w-9 h-9 rounded-full text-muted-foreground hover:text-foreground"
-                >
-                  <FileText className="w-4 h-4" />
-                </Button>
-              </TooltipTrigger>
+              <TooltipTrigger
+                render={
+                  <Button 
+                    onClick={() => addWidget("notes")} 
+                    size="icon" 
+                    variant="ghost" 
+                    className="w-9 h-9 rounded-full text-muted-foreground hover:text-foreground"
+                  >
+                    <FileText className="w-4 h-4" />
+                  </Button>
+                }
+              />
               <TooltipContent side="top" className="bg-popover border-border text-foreground">
                 <p className="text-xs font-bold">New Thought Draft</p>
               </TooltipContent>
             </Tooltip>
 
             <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  onClick={() => addWidget("tasks")} 
-                  size="icon" 
-                  variant="ghost" 
-                  className="w-9 h-9 rounded-full text-muted-foreground hover:text-foreground"
-                >
-                  <CheckSquare className="w-4 h-4" />
-                </Button>
-              </TooltipTrigger>
+              <TooltipTrigger
+                render={
+                  <Button 
+                    onClick={() => addWidget("tasks")} 
+                    size="icon" 
+                    variant="ghost" 
+                    className="w-9 h-9 rounded-full text-muted-foreground hover:text-foreground"
+                  >
+                    <CheckSquare className="w-4 h-4" />
+                  </Button>
+                }
+              />
               <TooltipContent side="top" className="bg-popover border-border text-foreground">
                 <p className="text-xs font-bold">Add Fast Task</p>
               </TooltipContent>
             </Tooltip>
 
             <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  onClick={() => addWidget("health")} 
-                  size="icon" 
-                  variant="ghost" 
-                  className="w-9 h-9 rounded-full text-muted-foreground hover:text-foreground"
-                >
-                  <Server className="w-4 h-4" />
-                </Button>
-              </TooltipTrigger>
+              <TooltipTrigger
+                render={
+                  <Button 
+                    onClick={() => addWidget("health")} 
+                    size="icon" 
+                    variant="ghost" 
+                    className="w-9 h-9 rounded-full text-muted-foreground hover:text-foreground"
+                  >
+                    <Server className="w-4 h-4" />
+                  </Button>
+                }
+              />
               <TooltipContent side="top" className="bg-popover border-border text-foreground">
                 <p className="text-xs font-bold">Deployment Cockpit</p>
               </TooltipContent>
