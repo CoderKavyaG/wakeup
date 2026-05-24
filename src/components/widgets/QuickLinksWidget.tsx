@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useUrlStore, ResourceUrl } from "@/store/useUrlStore";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Link2, Search, Copy, Loader2, GripVertical, Trash2, Check, Plus, Briefcase, Linkedin, Twitter } from "lucide-react";
+import { Link2, Search, Copy, Loader2, GripVertical, Trash2, Check, Plus, Briefcase, User, MessageSquare } from "lucide-react";
 import {
   DndContext,
   closestCenter,
@@ -227,7 +227,7 @@ export function QuickLinksWidget() {
           title="Copy LinkedIn Link"
           className="flex-1 flex items-center justify-center gap-1.5 h-7 rounded-md bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-foreground transition-all text-[10px] font-medium border border-white/5"
         >
-          {copiedId === "linkedin" ? <Check className="w-3 h-3 text-green-400" /> : <Linkedin className="w-3 h-3" />}
+          {copiedId === "linkedin" ? <Check className="w-3 h-3 text-green-400" /> : <User className="w-3 h-3" />}
           <span>LinkedIn</span>
         </button>
         <button
@@ -235,7 +235,7 @@ export function QuickLinksWidget() {
           title="Copy X (Twitter) Link"
           className="flex-1 flex items-center justify-center gap-1.5 h-7 rounded-md bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-foreground transition-all text-[10px] font-medium border border-white/5"
         >
-          {copiedId === "twitter" ? <Check className="w-3 h-3 text-green-400" /> : <Twitter className="w-3 h-3" />}
+          {copiedId === "twitter" ? <Check className="w-3 h-3 text-green-400" /> : <MessageSquare className="w-3 h-3" />}
           <span>Twitter</span>
         </button>
       </div>
