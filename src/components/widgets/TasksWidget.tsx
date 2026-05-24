@@ -6,13 +6,14 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Calendar as CalendarIcon, CheckSquare, Square, Plus, Trash2, Clock } from "lucide-react";
+import { CheckSquare, Square, Plus, Trash2, Clock, AlertTriangle } from "lucide-react";
 
 export function TasksWidget() {
   const { tasks, addTask, toggleTask, deleteTask } = useTaskStore();
   const [title, setTitle] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [priority, setPriority] = useState<"low" | "medium" | "high">("medium");
+  const [filter, setFilter] = useState<"all" | "active" | "overdue" | "completed">("all");
 
   const handleAddTask = (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,24 +44,90 @@ export function TasksWidget() {
   const isOverdue = (dateStr?: string) => {
     if (!dateStr) return false;
     const today = new Date();
-    today.setHours(0,0,0,0);
+    today.setHours(0, 0, 0, 0);
     return new Date(dateStr) < today;
   };
 
+  const getFriendlyCountdown = (dateStr?: string) => {
+    if (!dateStr) return "";
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const targetDate = new Date(dateStr);
+    targetDate.setHours(0, 0, 0, 0);
+    
+    const diffTime = targetDate.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays < 0) {
+      return `overdue by ${Math.abs(diffDays)}d`;
+    }
+    if (diffDays === 0) {
+      return "due today";
+    }
+    if (diffDays === 1) {
+      return "due tomorrow";
+    }
+    return `due in ${diffDays} days`;
+  };
+
+  // Sort logic: active (uncompleted) first, then high priority first, then proximity of due dates
+  const sortedTasks = [...tasks].sort((a, b) => {
+    // 1. Completion status
+    if (a.completed !== b.completed) {
+      return a.completed ? 1 : -1;
+    }
+    // 2. Priority weight
+    const pWeight = { high: 3, medium: 2, low: 1 };
+    const aWeight = pWeight[a.priority] || 2;
+    const bWeight = pWeight[b.priority] || 2;
+    if (aWeight !== bWeight) {
+      return bWeight - aWeight;
+    }
+    // 3. Due dates proximity
+    if (a.dueDate && b.dueDate) {
+      return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+    }
+    if (a.dueDate) return -1;
+    if (b.dueDate) return 1;
+    return 0;
+  });
+
+  const filteredTasks = sortedTasks.filter((t) => {
+    if (filter === "active") return !t.completed;
+    if (filter === "completed") return t.completed;
+    if (filter === "overdue") return !t.completed && isOverdue(t.dueDate);
+    return true;
+  });
+
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex flex-col h-full overflow-hidden text-foreground">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4 shrink-0">
+      <div className="flex items-center justify-between mb-3 shrink-0">
         <div className="flex items-center space-x-2">
-          <CheckSquare className="w-4 h-4 text-primary" />
-          <h2 className="text-sm font-semibold tracking-wider uppercase text-secondary-foreground">Tasks & Deadlines</h2>
+          <CheckSquare className="w-4 h-4 text-primary animate-pulse" />
+          <h2 className="text-sm font-semibold tracking-wider uppercase text-secondary-foreground">Tasks & Milestones</h2>
         </div>
       </div>
 
+      {/* Task Filters */}
+      <div className="flex space-x-1.5 mb-3 shrink-0">
+        {(["all", "active", "overdue", "completed"] as const).map((f) => (
+          <Button
+            key={f}
+            size="sm"
+            variant={filter === f ? "secondary" : "ghost"}
+            className="text-[9px] h-6 px-2 font-semibold uppercase tracking-wider"
+            onClick={() => setFilter(f)}
+          >
+            {f}
+          </Button>
+        ))}
+      </div>
+
       {/* Task Creation Form inline */}
-      <form onSubmit={handleAddTask} className="grid grid-cols-1 gap-2 mb-4 shrink-0 bg-popover/20 border border-border/50 rounded-lg p-2.5">
+      <form onSubmit={handleAddTask} className="grid grid-cols-1 gap-2 mb-3 shrink-0 bg-popover/20 border border-border/50 rounded-lg p-2.5">
         <Input
-          placeholder="New task..."
+          placeholder="Add next action item..."
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           className="h-8 text-xs bg-popover border-border text-foreground placeholder:text-muted-foreground"
@@ -81,7 +148,7 @@ export function TasksWidget() {
             <option value="medium">Medium</option>
             <option value="high">High</option>
           </select>
-          <Button type="submit" size="sm" className="h-8 bg-primary hover:bg-primary/95 text-white flex-1 text-xs">
+          <Button type="submit" size="sm" className="h-8 bg-primary hover:bg-primary/95 text-white flex-1 text-xs font-bold">
             <Plus className="w-3.5 h-3.5" />
           </Button>
         </div>
@@ -90,60 +157,64 @@ export function TasksWidget() {
       {/* Tasks List */}
       <ScrollArea className="flex-1 -mx-2 px-2">
         <div className="space-y-2 pb-2">
-          {tasks.length === 0 ? (
+          {filteredTasks.length === 0 ? (
             <div className="text-center py-8 text-xs text-muted-foreground">
-              No tasks found. Relax or add some.
+              No tasks matching this filter.
             </div>
           ) : (
-            tasks.map((task) => (
-              <div
-                key={task.id}
-                className={`flex items-start justify-between p-2.5 rounded-lg border transition-all duration-200 ${
-                  task.completed
-                    ? "bg-popover/10 border-border/30 opacity-60"
-                    : "bg-popover/40 border-border/80 hover:border-primary/20"
-                }`}
-              >
-                <div className="flex items-start space-x-2.5 min-w-0 flex-1">
-                  <button
-                    onClick={() => toggleTask(task.id)}
-                    className="mt-0.5 text-muted-foreground hover:text-primary shrink-0 transition-colors"
-                  >
-                    {task.completed ? (
-                      <CheckSquare className="w-4 h-4 text-primary" />
-                    ) : (
-                      <Square className="w-4 h-4" />
-                    )}
-                  </button>
-                  <div className="min-w-0">
-                    <p className={`text-xs font-medium truncate ${task.completed ? "line-through text-muted-foreground" : "text-foreground"}`}>
-                      {task.title}
-                    </p>
-                    <div className="flex items-center space-x-2 mt-1.5 flex-wrap gap-y-1">
-                      <Badge variant="outline" className={`text-[9px] uppercase px-1 py-0 border ${getPriorityColor(task.priority)}`}>
-                        {task.priority}
-                      </Badge>
-                      {task.dueDate && (
-                        <span className={`text-[9px] flex items-center space-x-1 ${isOverdue(task.dueDate) && !task.completed ? "text-red-400 font-bold" : "text-muted-foreground"}`}>
-                          <Clock className="w-2.5 h-2.5 shrink-0" />
-                          <span>{task.dueDate}</span>
-                          {isOverdue(task.dueDate) && !task.completed && <span>(overdue)</span>}
-                        </span>
+            filteredTasks.map((task) => {
+              const overdue = isOverdue(task.dueDate) && !task.completed;
+              return (
+                <div
+                  key={task.id}
+                  className={`flex items-start justify-between p-2.5 rounded-lg border transition-all duration-200 ${
+                    task.completed
+                      ? "bg-popover/10 border-border/30 opacity-60"
+                      : overdue 
+                      ? "bg-red-500/5 border-red-500/20 hover:border-red-500/30"
+                      : "bg-popover/40 border-border/80 hover:border-primary/20"
+                  }`}
+                >
+                  <div className="flex items-start space-x-2.5 min-w-0 flex-1">
+                    <button
+                      onClick={() => toggleTask(task.id)}
+                      className="mt-0.5 text-muted-foreground hover:text-primary shrink-0 transition-colors"
+                    >
+                      {task.completed ? (
+                        <CheckSquare className="w-4 h-4 text-primary" />
+                      ) : (
+                        <Square className="w-4 h-4" />
                       )}
+                    </button>
+                    <div className="min-w-0 flex-1">
+                      <p className={`text-xs font-semibold truncate ${task.completed ? "line-through text-muted-foreground font-normal" : "text-foreground"}`}>
+                        {task.title}
+                      </p>
+                      <div className="flex items-center space-x-2 mt-1 flex-wrap gap-y-1">
+                        <Badge variant="outline" className={`text-[8px] uppercase px-1 py-0 border font-bold ${getPriorityColor(task.priority)}`}>
+                          {task.priority}
+                        </Badge>
+                        {task.dueDate && (
+                          <span className={`text-[9px] font-medium flex items-center space-x-1 ${overdue ? "text-red-400 font-bold" : "text-muted-foreground"}`}>
+                            {overdue ? <AlertTriangle className="w-2.5 h-2.5 text-red-400 shrink-0" /> : <Clock className="w-2.5 h-2.5 shrink-0" />}
+                            <span>{getFriendlyCountdown(task.dueDate)} ({task.dueDate})</span>
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  onClick={() => deleteTask(task.id)}
-                  className="w-7 h-7 rounded-md text-muted-foreground hover:text-destructive shrink-0"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </Button>
-              </div>
-            ))
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => deleteTask(task.id)}
+                    className="w-7 h-7 rounded-md text-muted-foreground hover:text-destructive shrink-0"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              );
+            })
           )}
         </div>
       </ScrollArea>
