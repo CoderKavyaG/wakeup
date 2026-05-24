@@ -19,7 +19,11 @@ import {
   RefreshCw, 
   User, 
   HelpCircle,
-  Activity
+  Activity,
+  Clock,
+  TrendingUp,
+  Sparkles,
+  Award
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
@@ -33,6 +37,24 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   const [showWidgetDrawer, setShowWidgetDrawer] = useState(false);
   const [rightSidebarOpen, setRightSidebarOpen] = useState(true);
+  const [activeTab, setActiveTab] = useState<"stream" | "weekly" | "timeline">("stream");
+  const [timelineData, setTimelineData] = useState<any>(null);
+
+  const fetchTimeline = async () => {
+    try {
+      const res = await fetch("/api/system/timeline");
+      if (res.ok) {
+        const data = await res.json();
+        setTimelineData(data);
+      }
+    } catch (e) {
+      console.warn("Failed to fetch timeline:", e);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchTimeline();
+  }, [tasks, projects, notes]);
 
   React.useEffect(() => {
     // Dispatch a resize event to force react-grid-layout to recalculate width
@@ -259,9 +281,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           {/* Dynamic Workspace Container */}
           <div className="flex-1 overflow-y-auto relative p-6 pb-24">
             {children}
-          </div>
-
-          {/* Right Live Activity Feed Panel */}
+          </div>          {/* Right Live Activity Feed Panel */}
           <AnimatePresence>
             {rightSidebarOpen && (
               <motion.aside
@@ -271,30 +291,191 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 transition={{ type: "spring", stiffness: 300, damping: 30 }}
                 className="flex-shrink-0 border-l border-border bg-card overflow-hidden flex flex-col z-10"
               >
-                <div className="p-5 flex items-center justify-between border-b border-border/60 shrink-0">
-                  <div className="flex items-center space-x-2">
-                    <Activity className="w-4 h-4 text-primary" />
-                    <span className="text-xs font-bold tracking-wider uppercase text-secondary-foreground">Activity Stream</span>
-                  </div>
-                  <Badge className="bg-primary/15 text-primary border border-primary/20 text-[9px] uppercase leading-none py-0.5 px-1.5 font-bold rounded-full">
-                    Live
-                  </Badge>
+                {/* Tabs switcher header */}
+                <div className="border-b border-border/60 shrink-0 bg-muted/10 p-2 grid grid-cols-3 gap-1">
+                  <button
+                    onClick={() => setActiveTab("stream")}
+                    className={`py-1.5 text-[10px] font-bold uppercase rounded-md transition-all ${
+                      activeTab === "stream"
+                        ? "bg-primary/10 text-primary border border-primary/20 shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Stream
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("weekly")}
+                    className={`py-1.5 text-[10px] font-bold uppercase rounded-md transition-all ${
+                      activeTab === "weekly"
+                        ? "bg-primary/10 text-primary border border-primary/20 shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Weekly
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("timeline")}
+                    className={`py-1.5 text-[10px] font-bold uppercase rounded-md transition-all ${
+                      activeTab === "timeline"
+                        ? "bg-primary/10 text-primary border border-primary/20 shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Timeline
+                  </button>
                 </div>
 
-                <div className="flex-1 p-5 overflow-y-auto space-y-4">
-                  {activityLogs.map((log) => (
-                    <div key={log.id} className="flex items-start space-x-2.5">
-                      <div className="p-1.5 bg-popover border border-border rounded-md shrink-0 mt-0.5">
-                        {log.icon}
+                {/* Tab content area */}
+                <div className="flex-1 overflow-y-auto p-5">
+                  {activeTab === "stream" && (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between pb-1 select-none">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Live Logs</span>
+                        <Badge className="bg-green-500/10 text-green-400 border border-green-500/20 text-[8px] px-1.5 py-0">
+                          Active
+                        </Badge>
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[11px] text-foreground leading-snug font-medium">
-                          {log.text}
-                        </p>
-                        <span className="text-[9px] text-muted-foreground/60 block mt-0.5 font-mono">{log.time}</span>
+                      <div className="space-y-4">
+                        {activityLogs.map((log) => (
+                          <div key={log.id} className="flex items-start space-x-2.5">
+                            <div className="p-1.5 bg-popover border border-border rounded-md shrink-0 mt-0.5">
+                              {log.icon}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[11px] text-foreground leading-snug font-medium">
+                                {log.text}
+                              </p>
+                              <span className="text-[9px] text-muted-foreground/60 block mt-0.5 font-mono">{log.time}</span>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                  ))}
+                  )}
+
+                  {activeTab === "weekly" && (
+                    <div className="space-y-4">
+                      {/* Weekly Reflection card */}
+                      <div className="p-4 rounded-xl border border-primary/25 bg-primary/5 space-y-3">
+                        <div className="flex items-center gap-1.5">
+                          <Sparkles className="w-4 h-4 text-primary animate-pulse" />
+                          <span className="text-xs font-bold text-primary uppercase tracking-wider">Weekly Reflection</span>
+                        </div>
+                        <p className="text-xs text-foreground leading-relaxed font-sans font-medium">
+                          {timelineData?.weeklyReview?.feedbackSummary || "Analyzing dashboard productivity velocity metrics..."}
+                        </p>
+                      </div>
+
+                      {/* Velocity Metrics Grid */}
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <div className="p-3 border border-border bg-popover/40 rounded-xl">
+                          <span className="text-[9px] font-bold text-muted-foreground uppercase block">Commits Pushed</span>
+                          <span className="text-xl font-bold font-mono text-green-400 block mt-0.5">
+                            {timelineData?.weeklyReview?.commitsPushed ?? 0}
+                          </span>
+                        </div>
+                        <div className="p-3 border border-border bg-popover/40 rounded-xl">
+                          <span className="text-[9px] font-bold text-muted-foreground uppercase block">Tasks Cleared</span>
+                          <span className="text-xl font-bold font-mono text-yellow-400 block mt-0.5">
+                            {timelineData?.weeklyReview?.tasksCompleted ?? 0}
+                          </span>
+                        </div>
+                        <div className="p-3 border border-border bg-popover/40 rounded-xl">
+                          <span className="text-[9px] font-bold text-muted-foreground uppercase block">Active Projects</span>
+                          <span className="text-xl font-bold font-mono text-blue-400 block mt-0.5">
+                            {timelineData?.weeklyReview?.activeProjects ?? 0}
+                          </span>
+                        </div>
+                        <div className="p-3 border border-border bg-popover/40 rounded-xl">
+                          <span className="text-[9px] font-bold text-muted-foreground uppercase block">Stale Items</span>
+                          <span className={`text-xl font-bold font-mono block mt-0.5 ${
+                            (timelineData?.weeklyReview?.staleProjects ?? 0) > 0 ? "text-rose-400" : "text-muted-foreground"
+                          }`}>
+                            {timelineData?.weeklyReview?.staleProjects ?? 0}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Momentum Score Progress */}
+                      <div className="p-3 border border-border bg-popover/20 rounded-xl space-y-2">
+                        <div className="flex items-center justify-between text-[10px] font-bold text-muted-foreground uppercase">
+                          <span>Developer Momentum</span>
+                          <span className="text-primary font-mono">{timelineData?.weeklyReview?.totalMomentum ?? 0} XP</span>
+                        </div>
+                        <div className="h-1.5 w-full bg-border/60 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-primary transition-all duration-500"
+                            style={{ width: `${Math.min(100, ((timelineData?.weeklyReview?.totalMomentum ?? 0) / 200) * 100)}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Health Progress */}
+                      <div className="p-3 border border-border bg-popover/20 rounded-xl space-y-2">
+                        <div className="flex items-center justify-between text-[10px] font-bold text-muted-foreground uppercase">
+                          <span>Portfolio Health</span>
+                          <span className="text-green-400 font-mono">{timelineData?.weeklyReview?.averageProjectHealth ?? 100}%</span>
+                        </div>
+                        <div className="h-1.5 w-full bg-border/60 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-green-500 transition-all duration-500"
+                            style={{ width: `${timelineData?.weeklyReview?.averageProjectHealth ?? 100}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeTab === "timeline" && (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between pb-1 select-none">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Developer Timeline</span>
+                        <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+                      </div>
+                      
+                      {!timelineData?.timeline || timelineData.timeline.length === 0 ? (
+                        <div className="p-8 text-center text-xs text-muted-foreground">
+                          No timeline events logged yet. Register projects or clear tasks to begin!
+                        </div>
+                      ) : (
+                        <div className="relative pl-5 border-l border-border/80 space-y-6">
+                          {timelineData.timeline.map((event: any, index: number) => {
+                            const dateObj = new Date(event.date);
+                            const formattedDate = dateObj.toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit"
+                            });
+
+                            return (
+                              <div key={event.id} className="relative group">
+                                {/* Chronological Event Dot */}
+                                <div className={`absolute -left-[25px] top-0.5 w-2.5 h-2.5 rounded-full border bg-card transition-colors ${
+                                  event.type === "commit" ? "border-green-500 bg-green-500/10" :
+                                  event.type === "task-completed" ? "border-yellow-500 bg-yellow-500/10" :
+                                  event.type === "note" ? "border-purple-500 bg-purple-500/10" :
+                                  "border-primary bg-primary/10"
+                                }`} />
+
+                                <div className="space-y-1">
+                                  <span className="text-[9px] text-muted-foreground/60 font-mono block">
+                                    {formattedDate}
+                                  </span>
+                                  <span className="text-xs font-bold text-foreground leading-snug block group-hover:text-primary transition-colors">
+                                    {event.title}
+                                  </span>
+                                  <p className="text-[10px] text-muted-foreground/80 leading-relaxed font-sans">
+                                    {event.description}
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </motion.aside>
             )}
