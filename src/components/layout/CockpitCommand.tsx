@@ -6,6 +6,7 @@ import { useProjectStore } from "@/store/useProjectStore";
 import { useTaskStore } from "@/store/useTaskStore";
 import { useNoteStore } from "@/store/useNoteStore";
 import { useUrlStore } from "@/store/useUrlStore";
+import { useLayoutStore } from "@/store/useLayoutStore";
 import {
   Terminal,
   Search,
@@ -125,6 +126,7 @@ export function CockpitCommand() {
   const { tasks, addTask } = useTaskStore();
   const { notes, addNote } = useNoteStore();
   const { urls } = useUrlStore();
+  const { resetLayout } = useLayoutStore();
 
   const suggestions = buildSuggestions(projects, tasks);
 
@@ -346,6 +348,14 @@ export function CockpitCommand() {
         setTimeout(() => setConfirmation(null), 3000);
         return true;
       }
+    }
+
+    if (lower === "reset layout" || lower === "reset layout to default") {
+      resetLayout();
+      setConfirmation(`✓ Layout reset to default`);
+      setInput("");
+      setTimeout(() => setConfirmation(null), 3000);
+      return true;
     }
 
     return false;
@@ -585,10 +595,11 @@ export function CockpitCommand() {
                     ))}
 
                     {/* Command shortcuts legend */}
-                    <div className="pt-3 px-2 border-t border-border/20 mt-2 grid grid-cols-2 gap-1">
+                    <div className="pt-3 px-2 border-t border-border/20 mt-2 grid grid-cols-1 gap-2">
                       {[
                         { prefix: "task:", desc: "Create a task instantly" },
                         { prefix: "note:", desc: "Save a quick note" },
+                        { prefix: "reset layout", desc: "Reset workspace to defaults" },
                       ].map((c) => (
                         <div key={c.prefix} className="flex items-center gap-1.5 text-[10px] text-muted-foreground/40">
                           <code className="font-mono bg-white/5 px-1.5 py-0.5 rounded text-muted-foreground/60">
