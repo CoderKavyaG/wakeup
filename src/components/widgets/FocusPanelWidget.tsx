@@ -13,31 +13,23 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   ListTodo,
   BrainCircuit,
-  Link2,
+  CheckSquare,
+  Pencil,
   Trash2,
   ChevronDown,
-  ChevronRight,
-  ExternalLink,
-  Loader2
+  ChevronRight
 } from "lucide-react";
 
 export function FocusPanelWidget() {
   const { tasks, addTask, toggleTask, deleteTask } = useTaskStore();
   const { notes, addNote, deleteNote } = useNoteStore();
-  const { urls, addUrl, deleteUrl } = useUrlStore();
+  // Unified Input State
+  const [inputMode, setInputMode] = useState<"task" | "note">("task");
+  const [unifiedInput, setUnifiedInput] = useState("");
+  const unifiedInputRef = useRef<HTMLTextAreaElement>(null);
 
   // Tasks State
-  const [taskInput, setTaskInput] = useState("");
   const [showDone, setShowDone] = useState(false);
-  const taskInputRef = useRef<HTMLInputElement>(null);
-
-  // Notes State
-  const [noteInput, setNoteInput] = useState("");
-
-  // URLs State
-  const [urlInput, setUrlInput] = useState("");
-  const [urlLoading, setUrlLoading] = useState(false);
-  const [urlFilter, setUrlFilter] = useState<string>("All");
 
   // ── TASKS LOGIC ──
   const parseTaskInput = (text: string) => {
@@ -77,11 +69,24 @@ export function FocusPanelWidget() {
     return { title: title || text, priority, dueDate };
   };
 
-  const handleAddTask = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && taskInput.trim()) {
-      const parsed = parseTaskInput(taskInput);
-      addTask({ title: parsed.title, priority: parsed.priority, dueDate: parsed.dueDate });
-      setTaskInput("");
+  const handleUnifiedEnter = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      if (inputMode === "task") {
+        e.preventDefault();
+        if (unifiedInput.trim()) {
+          const parsed = parseTaskInput(unifiedInput);
+          addTask({ title: parsed.title, priority: parsed.priority, dueDate: parsed.dueDate });
+          setUnifiedInput("");
+        }
+      } else if (inputMode === "note") {
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          if (unifiedInput.trim()) {
+            addNote(unifiedInput.trim());
+            setUnifiedInput("");
+          }
+        }
+      }
     }
   };
 
@@ -90,7 +95,7 @@ export function FocusPanelWidget() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "/" && document.activeElement?.tagName !== "INPUT" && document.activeElement?.tagName !== "TEXTAREA") {
         e.preventDefault();
-        taskInputRef.current?.focus();
+        unifiedInputRef.current?.focus();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -107,17 +112,6 @@ export function FocusPanelWidget() {
   };
 
   // ── NOTES LOGIC ──
-  const handleAddNote = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
-      e.preventDefault();
-      if (noteInput.trim()) {
-        addNote(noteInput.trim());
-        setNoteInput("");
-      }
-    }
-  };
-
-  const wordCount = notes.reduce((acc, note) => acc + (note.content.match(/\b\w+\b/g)?.length || 0), 0);
 
   const renderNoteCard = (note: Note) => {
     const lines = note.content.split("\n");
@@ -142,220 +136,115 @@ export function FocusPanelWidget() {
     );
   };
 
-  // ── URLS LOGIC ──
-  const guessCategory = (urlStr: string): "docs" | "deployment" | "github" | "other" => {
-    const lower = urlStr.toLowerCase();
-    if (lower.includes("github.com")) return "github";
-    if (lower.includes("docs") || lower.includes("developer") || lower.includes("reference")) return "docs";
-    if (lower.includes("vercel.com") || lower.includes("netlify.com") || lower.includes("aws") || lower.includes("railway") || lower.includes("neon")) return "deployment";
-    return "other";
-  };
-
-  const handleAddUrl = async (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && urlInput.trim()) {
-      e.preventDefault();
-      const rawUrl = urlInput.trim();
-      const validUrl = rawUrl.startsWith("http") ? rawUrl : `https://${rawUrl}`;
-      setUrlLoading(true);
-      
-      try {
-        const res = await fetch(`/api/urls/meta?url=${encodeURIComponent(validUrl)}`);
-        let title = validUrl;
-        if (res.ok) {
-          const data = await res.json();
-          if (data.title) title = data.title;
-        }
-        
-        addUrl({
-          url: validUrl,
-          label: title,
-          category: guessCategory(validUrl)
-        });
-        setUrlInput("");
-      } catch (err) {
-        // Fallback
-        addUrl({ url: validUrl, label: validUrl, category: guessCategory(validUrl) });
-        setUrlInput("");
-      } finally {
-        setUrlLoading(false);
-      }
-    }
-  };
-
-  const urlCategories = ["All", "docs", "deployment", "github", "other"];
-  const filteredUrls = urlFilter === "All" ? urls : urls.filter(u => u.category === urlFilter);
+  const wordCount = notes.reduce((acc, note) => acc + (note.content.match(/\b\w+\b/g)?.length || 0), 0);
 
   return (
     <div className="flex flex-col h-full text-foreground bg-[#0f0f11] rounded-xl overflow-hidden divide-y divide-border/40">
       
-      {/* ── TASKS SECTION ── */}
-      <div className="flex-1 flex flex-col min-h-0">
-        <div className="px-4 py-3 flex items-center justify-between shrink-0 bg-[#0f0f11]">
-          <div className="flex items-center gap-2">
-            <ListTodo className="w-4 h-4 text-primary" />
-            <h3 className="text-sm font-semibold tracking-tight">Today's Focus</h3>
-          </div>
-          <Badge variant="secondary" className="font-mono text-[10px]">{pendingTasks.length}</Badge>
-        </div>
-        
-        <div className="px-4 pb-2 shrink-0">
-          <Input 
-            ref={taskInputRef}
-            value={taskInput}
-            onChange={e => setTaskInput(e.target.value)}
-            onKeyDown={handleAddTask}
-            placeholder="Press / to add task (e.g. 'Deploy app tomorrow urgent')"
-            className="h-8 text-xs bg-[#0f0f11] border-white/10 focus-visible:ring-1 focus-visible:ring-primary/50"
-          />
-        </div>
-
-        <ScrollArea className="flex-1 px-4 pb-2 min-h-0 h-full w-full overflow-y-auto">
-          <div className="space-y-1.5">
-            {pendingTasks.map(t => (
-              <div key={t.id} className="group flex items-start gap-2.5 p-1.5 rounded hover:bg-white/5 transition-colors">
-                <Checkbox 
-                  checked={t.completed} 
-                  onCheckedChange={() => toggleTask(t.id)} 
-                  className="mt-0.5 border-muted-foreground/50 data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
-                />
-                <div className="flex-1 min-w-0">
-                  <span className="text-sm text-foreground/90 leading-tight">{t.title}</span>
-                  {t.dueDate && <span className="ml-2 text-[10px] text-muted-foreground font-mono bg-[#0f0f11] px-1 rounded">{t.dueDate}</span>}
-                </div>
-                <div className="flex items-center gap-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <div className={`w-1.5 h-1.5 rounded-full ${getPriorityColor(t.priority)}`} title={`Priority: ${t.priority}`} />
-                  <Button variant="ghost" size="icon" className="w-5 h-5 text-muted-foreground hover:text-destructive" onClick={() => deleteTask(t.id)}>
-                    <Trash2 className="w-3 h-3" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-
-            {completedTasks.length > 0 && (
-              <div className="mt-4 pt-2 border-t border-white/10">
-                <button 
-                  onClick={() => setShowDone(!showDone)}
-                  className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-semibold uppercase tracking-wider hover:text-foreground transition-colors"
-                >
-                  {showDone ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                  Done today ({completedTasks.length})
-                </button>
-                
-                {showDone && (
-                  <div className="mt-2 space-y-1">
-                    {completedTasks.map(t => (
-                      <div key={t.id} className="group flex items-center gap-2.5 p-1 rounded opacity-50 hover:opacity-100 transition-all">
-                        <Checkbox checked={t.completed} onCheckedChange={() => toggleTask(t.id)} />
-                        <span className="text-xs line-through text-muted-foreground flex-1 truncate">{t.title}</span>
-                        <Button variant="ghost" size="icon" className="w-5 h-5 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100" onClick={() => deleteTask(t.id)}>
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </ScrollArea>
+      {/* ── UNIFIED INPUT SECTION ── */}
+      <div className="px-4 py-3 shrink-0 relative bg-[#0f0f11]">
+        <Textarea 
+          ref={unifiedInputRef as any}
+          value={unifiedInput}
+          onChange={e => setUnifiedInput(e.target.value)}
+          onKeyDown={handleUnifiedEnter}
+          placeholder={inputMode === "task" ? "Add a task... (try 'fix bug tomorrow')" : "Brain dump... (Ctrl+Enter to save)"}
+          className="min-h-[60px] text-xs resize-none bg-[#0f0f11] border-white/10 focus-visible:ring-1 focus-visible:ring-primary/50 pr-10 custom-scrollbar"
+        />
+        <button
+          onClick={() => setInputMode(m => m === "task" ? "note" : "task")}
+          className="absolute top-5 right-6 transition-all flex items-center justify-center w-6 h-6 rounded hover:bg-white/5"
+          title={inputMode === "task" ? "Switch to Note Mode" : "Switch to Task Mode"}
+        >
+          {inputMode === "task" ? (
+            <CheckSquare className="w-4 h-4 text-white/80 drop-shadow-[0_0_2px_rgba(255,255,255,0.8)]" />
+          ) : (
+            <Pencil className="w-4 h-4 text-white/80 drop-shadow-[0_0_2px_rgba(255,255,255,0.8)]" />
+          )}
+        </button>
       </div>
 
-      {/* ── NOTES SECTION ── */}
-      <div className="flex-1 flex flex-col min-h-0">
-        <div className="px-4 py-3 flex items-center justify-between shrink-0 bg-[#0f0f11]">
-          <div className="flex items-center gap-2">
-            <BrainCircuit className="w-4 h-4 text-purple-400" />
-            <h3 className="text-sm font-semibold tracking-tight">Brain Dump</h3>
-          </div>
-          <span className="text-[10px] font-mono text-muted-foreground">{wordCount} words</span>
-        </div>
+      <div className="flex-1 flex flex-col min-h-0 divide-y divide-border/40">
         
-        <div className="px-4 pb-2 shrink-0">
-          <Textarea 
-            value={noteInput}
-            onChange={e => setNoteInput(e.target.value)}
-            onKeyDown={handleAddNote}
-            placeholder="Type your thoughts... (Ctrl+Enter to save)"
-            className="min-h-[60px] text-xs resize-none bg-[#0f0f11] border-white/10 focus-visible:ring-1 focus-visible:ring-purple-500/50"
-          />
-        </div>
-
-        <ScrollArea className="flex-1 px-4 pb-2 min-h-0 h-full w-full overflow-y-auto">
-          <div className="space-y-2">
-            {notes.map(renderNoteCard)}
+        {/* ── TASKS SECTION ── */}
+        <div className="flex-1 flex flex-col min-h-0">
+          <div className="px-4 py-2 flex items-center justify-between shrink-0 bg-[#0f0f11]">
+            <div className="flex items-center gap-2">
+              <ListTodo className="w-4 h-4 text-primary" />
+              <h3 className="text-sm font-semibold tracking-tight">Today's Focus</h3>
+            </div>
+            <Badge variant="secondary" className="font-mono text-[10px]">{pendingTasks.length}</Badge>
           </div>
-        </ScrollArea>
-      </div>
 
-      {/* ── URLS SECTION ── */}
-      <div className="flex-1 flex flex-col min-h-0">
-        <div className="px-4 py-3 flex items-center justify-between shrink-0 bg-[#0f0f11]">
-          <div className="flex items-center gap-2">
-            <Link2 className="w-4 h-4 text-blue-400" />
-            <h3 className="text-sm font-semibold tracking-tight">Quick Links</h3>
-          </div>
-          <div className="flex gap-1 overflow-x-auto no-scrollbar">
-            {urlCategories.map(cat => (
-              <Badge 
-                key={cat} 
-                variant={urlFilter === cat ? "default" : "outline"}
-                className={`text-[9px] cursor-pointer hover:bg-primary/20 ${urlFilter === cat ? 'bg-primary/20 text-primary border-primary/30' : 'text-muted-foreground'}`}
-                onClick={() => setUrlFilter(cat)}
-              >
-                {cat}
-              </Badge>
-            ))}
-          </div>
-        </div>
-
-        <div className="px-4 pb-2 shrink-0 relative">
-          <Input 
-            value={urlInput}
-            onChange={e => setUrlInput(e.target.value)}
-            onKeyDown={handleAddUrl}
-            disabled={urlLoading}
-            placeholder="Paste URL and hit Enter..."
-            className="h-8 text-xs bg-[#0f0f11] border-white/10 focus-visible:ring-1 focus-visible:ring-blue-500/50 pr-8"
-          />
-          {urlLoading && <Loader2 className="w-3 h-3 absolute right-7 top-2.5 animate-spin text-muted-foreground" />}
-        </div>
-
-        <ScrollArea className="flex-1 px-4 pb-2 min-h-0 h-full w-full overflow-y-auto">
-          <div className="space-y-1.5">
-            {filteredUrls.map(u => {
-              let domain = "";
-              try { domain = new URL(u.url).hostname; } catch {}
-              return (
-                <div key={u.id} className="group flex items-center gap-3 p-2 border border-white/10 bg-[#0f0f11] rounded hover:bg-white/5 transition-colors">
-                  <img 
-                    src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`} 
-                    alt="favicon" 
-                    className="w-4 h-4 rounded-sm"
-                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+          <ScrollArea className="flex-1 px-4 pb-2 min-h-0 h-full w-full overflow-y-auto custom-scrollbar">
+            <div className="space-y-1.5">
+              {pendingTasks.map(t => (
+                <div key={t.id} className="group flex items-start gap-2.5 p-1.5 rounded hover:bg-white/5 transition-colors">
+                  <Checkbox 
+                    checked={t.completed} 
+                    onCheckedChange={() => toggleTask(t.id)} 
+                    className="mt-0.5 border-muted-foreground/50 data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
                   />
-                  <div className="flex-1 min-w-0 flex items-center gap-2">
-                    <a href={u.url} target="_blank" rel="noopener noreferrer" className="text-xs text-foreground/90 hover:text-primary hover:underline truncate font-medium">
-                      {u.label}
-                    </a>
-                    {u.category && u.category !== "other" && (
-                      <Badge variant="outline" className="text-[8px] uppercase px-1 py-0 h-4 border-white/10 shrink-0">{u.category}</Badge>
-                    )}
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm text-foreground/90 leading-tight">{t.title}</span>
+                    {t.dueDate && <span className="ml-2 text-[10px] text-muted-foreground font-mono bg-[#0f0f11] px-1 rounded">{t.dueDate}</span>}
                   </div>
-                  <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <a href={u.url} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground p-1">
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
-                    <Button variant="ghost" size="icon" className="w-5 h-5 text-muted-foreground hover:text-destructive" onClick={() => deleteUrl(u.id)}>
+                  <div className="flex items-center gap-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className={`w-1.5 h-1.5 rounded-full ${getPriorityColor(t.priority)}`} title={`Priority: ${t.priority}`} />
+                    <Button variant="ghost" size="icon" className="w-5 h-5 text-muted-foreground hover:text-destructive" onClick={() => deleteTask(t.id)}>
                       <Trash2 className="w-3 h-3" />
                     </Button>
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        </ScrollArea>
-      </div>
+              ))}
 
+              {completedTasks.length > 0 && (
+                <div className="mt-4 pt-2 border-t border-white/10">
+                  <button 
+                    onClick={() => setShowDone(!showDone)}
+                    className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-semibold uppercase tracking-wider hover:text-foreground transition-colors"
+                  >
+                    {showDone ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                    Done today ({completedTasks.length})
+                  </button>
+                  
+                  {showDone && (
+                    <div className="mt-2 space-y-1">
+                      {completedTasks.map(t => (
+                        <div key={t.id} className="group flex items-center gap-2.5 p-1 rounded opacity-50 hover:opacity-100 transition-all">
+                          <Checkbox checked={t.completed} onCheckedChange={() => toggleTask(t.id)} />
+                          <span className="text-xs line-through text-muted-foreground flex-1 truncate">{t.title}</span>
+                          <Button variant="ghost" size="icon" className="w-5 h-5 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100" onClick={() => deleteTask(t.id)}>
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        </div>
+
+        {/* ── NOTES SECTION ── */}
+        <div className="flex-1 flex flex-col min-h-0">
+          <div className="px-4 py-2 flex items-center justify-between shrink-0 bg-[#0f0f11]">
+            <div className="flex items-center gap-2">
+              <BrainCircuit className="w-4 h-4 text-purple-400" />
+              <h3 className="text-sm font-semibold tracking-tight">Brain Dump</h3>
+            </div>
+            <span className="text-[10px] font-mono text-muted-foreground">{wordCount} words</span>
+          </div>
+
+          <ScrollArea className="flex-1 px-4 pb-2 min-h-0 h-full w-full overflow-y-auto custom-scrollbar">
+            <div className="space-y-2">
+              {notes.map(renderNoteCard)}
+            </div>
+          </ScrollArea>
+        </div>
+
+      </div>
     </div>
   );
 }
