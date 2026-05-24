@@ -56,6 +56,15 @@ export async function GET(request: Request) {
     }
 
     // 3. Process Repositories
+    const registeredProjects = await prisma.project.findMany({
+      select: { githubUrl: true }
+    });
+    const registeredUrls = new Set(
+      registeredProjects
+        .map(p => p.githubUrl?.toLowerCase() || "")
+        .filter(url => url !== "")
+    );
+
     const processedRepos = (reposData as any[]).map((r: any) => ({
       id: r.id,
       name: r.name,
@@ -65,6 +74,7 @@ export async function GET(request: Request) {
       stargazers_count: r.stargazers_count,
       forks_count: r.forks,
       language: r.language || null,
+      isImported: registeredUrls.has(r.html_url.toLowerCase()),
     }));
 
     // Detect active vs stale repos (updated within 30 days)
@@ -141,7 +151,7 @@ export async function GET(request: Request) {
 
     const payload = {
       username,
-      repos: processedRepos.slice(0, 8),
+      repos: processedRepos.slice(0, 30),
       commits: commits.slice(0, 6),
       stats: {
         totalRepos: processedRepos.length,
