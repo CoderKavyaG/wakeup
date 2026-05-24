@@ -14,6 +14,7 @@ interface UrlState {
   fetchUrls: () => Promise<void>;
   addUrl: (url: Omit<ResourceUrl, "id">) => Promise<void>;
   deleteUrl: (id: string) => Promise<void>;
+  reorderUrls: (urls: ResourceUrl[]) => void;
 }
 
 export const useUrlStore = create<UrlState>((set, get) => ({
@@ -79,9 +80,10 @@ export const useUrlStore = create<UrlState>((set, get) => ({
 
       if (!res.ok) throw new Error("Failed to delete URL");
     } catch (err) {
-      // Revert
       const errorMessage = err instanceof Error ? err.message : 'An error occurred';
       set({ urls: previousUrls, error: errorMessage });
     }
   },
+
+  reorderUrls: (newUrls) => set({ urls: newUrls }),
 }));

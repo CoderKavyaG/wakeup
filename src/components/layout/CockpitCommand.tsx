@@ -360,7 +360,7 @@ export function CockpitCommand() {
 
     if (lower.startsWith("add ")) {
       const type = lower.replace("add ", "").trim();
-      if (["projects", "github", "focus", "machine"].includes(type)) {
+      if (["projects", "github", "focus", "machine", "quicklinks"].includes(type)) {
         addWidget(type as any);
         setConfirmation(`✓ Added ${type} widget`);
         setInput("");
@@ -603,7 +603,7 @@ export function CockpitCommand() {
                     {/* Command shortcuts legend */}
                     <div className="pt-3 px-2 border-t border-border/20 mt-2 grid grid-cols-1 gap-2">
                       {[
-                        { prefix: "add <widget>", desc: "E.g., add projects, add focus" },
+                        { prefix: "add <widget>", desc: "E.g., add projects, add focus, add quicklinks" },
                         { prefix: "task:", desc: "Create a task instantly" },
                         { prefix: "note:", desc: "Save a quick note" },
                         { prefix: "reset layout", desc: "Reset workspace to defaults" },

@@ -5,7 +5,8 @@ export type WidgetType =
   | "projects" 
   | "github" 
   | "focus" 
-  | "machine";
+  | "machine"
+  | "quicklinks";
 
 export interface WidgetInstance {
   id: string;
@@ -33,7 +34,7 @@ const defaultLayouts: { [key: string]: Layout } = {
   lg: [
     { i: "projects-1", x: 4, y: 0, w: 5, h: 4, minW: 4, minH: 3 },
     { i: "github-1", x: 9, y: 0, w: 3, h: 4, minW: 3, minH: 3 },
-    { i: "focus-1", x: 0, y: 4, w: 10, h: 4, minW: 3, minH: 7 },
+    { i: "focus-1", x: 0, y: 4, w: 10, h: 6, minW: 4, minH: 9 },
     { i: "machine-1", x: 10, y: 4, w: 2, h: 4, minW: 2, minH: 3 },
   ],
 };
@@ -112,7 +113,24 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
       if (l.y + l.h > maxY) maxY = l.y + l.h;
     });
     
-    lgLayout.push({ i: id, x: 0, y: maxY, w: 4, h: 4, minW: 3, minH: 3 });
+    let minW = 3;
+    let minH = 3;
+    let defaultW = 4;
+    let defaultH = 4;
+    
+    if (type === "focus") {
+      minW = 4;
+      minH = 9;
+      defaultW = 10;
+      defaultH = 9;
+    } else if (type === "quicklinks") {
+      minW = 2;
+      minH = 4;
+      defaultW = 2;
+      defaultH = 5;
+    }
+    
+    lgLayout.push({ i: id, x: 0, y: maxY, w: defaultW, h: defaultH, minW, minH });
     currentLayouts.lg = lgLayout;
 
     const previousWidgets = get().widgets;

@@ -149,7 +149,7 @@ export function FocusPanelWidget() {
           onChange={e => setUnifiedInput(e.target.value)}
           onKeyDown={handleUnifiedEnter}
           placeholder={inputMode === "task" ? "Add a task... (try 'fix bug tomorrow')" : "Brain dump... (Ctrl+Enter to save)"}
-          className="min-h-[60px] text-xs resize-none bg-[#0f0f11] border-white/10 focus-visible:ring-1 focus-visible:ring-primary/50 pr-10 custom-scrollbar"
+          className="min-h-[60px] text-sm resize-none bg-[#0f0f11] border-white/10 focus-visible:ring-1 focus-visible:ring-primary/50 p-3 pr-10 custom-scrollbar"
         />
         <button
           onClick={() => setInputMode(m => m === "task" ? "note" : "task")}
