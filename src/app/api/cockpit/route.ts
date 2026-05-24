@@ -100,6 +100,7 @@ RECENT NOTES:
 ${notesSummary || "No recent notes."}
 
 Rules:
+- If the user says a casual greeting (e.g., "hey", "hello", "hi"), simply reply back warmly and ask how you can help. Do NOT output a random project or task description in response to a simple greeting.
 - Answer concisely and actionably. No fluff, no preamble.
 - If asked what to work on, pick ONE thing and explain why briefly.
 - If asked about stale projects, list them with days since last update if you can infer it.
