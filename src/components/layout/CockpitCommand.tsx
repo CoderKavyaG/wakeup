@@ -440,12 +440,7 @@ export function CockpitCommand() {
 
   return (
     <>
-      {/* Trigger hint badge */}
-      <div className="fixed top-3.5 right-6 z-10 flex items-center gap-1.5 bg-card/70 backdrop-blur border border-border/60 rounded-lg px-2.5 py-1.5 text-[10px] text-muted-foreground font-mono select-none shadow-sm">
-        <Terminal className="w-3 h-3" />
-        <span>Cockpit</span>
-        <kbd className="bg-muted px-1.5 py-0.5 rounded border border-border/80 text-[9px] font-semibold">⌘K</kbd>
-      </div>
+
 
       <AnimatePresence>
         {isOpen && (

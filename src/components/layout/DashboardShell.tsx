@@ -56,6 +56,18 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             )}
           </Button>
 
+          {/* Cockpit Command Trigger */}
+          <button
+            onClick={() => {
+              const event = new KeyboardEvent('keydown', { key: 'k', metaKey: true });
+              window.dispatchEvent(event);
+            }}
+            className="flex items-center gap-1.5 h-7 px-3 rounded-lg border border-border/80 hover:bg-muted text-muted-foreground transition-colors text-[11px] font-semibold"
+          >
+            <span>Cockpit</span>
+            <kbd className="bg-muted px-1 rounded text-[9px] font-mono border border-border">⌘K</kbd>
+          </button>
+
 
 
           {/* Clear */}
