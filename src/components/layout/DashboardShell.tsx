@@ -4,7 +4,7 @@ import React from "react";
 import { CockpitCommand } from "./CockpitCommand";
 import { useLayoutStore } from "@/store/useLayoutStore";
 import { useUrlStore } from "@/store/useUrlStore";
-import { Lock, Unlock, Link2, X } from "lucide-react";
+import { Lock, Unlock, Bookmark, X } from "lucide-react";
 import { Button } from "../ui/button";
 import { QuickLinksWidget } from "../widgets/QuickLinksWidget";
 import { AnimatePresence, motion } from "framer-motion";
@@ -95,11 +95,11 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           <AnimatePresence>
             {isQuickLinksOpen && (
               <motion.div
-                initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                initial={{ opacity: 0, y: 15, scale: 0.96 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 20, scale: 0.95 }}
-                transition={{ duration: 0.2, ease: "easeOut" }}
-                className="w-72 h-96 shadow-2xl rounded-xl border border-white/10 overflow-hidden pointer-events-auto bg-[#0f0f11]"
+                exit={{ opacity: 0, y: 15, scale: 0.96 }}
+                transition={{ type: "spring", stiffness: 350, damping: 25 }}
+                className="w-64 h-80 shadow-2xl rounded-xl border border-border/60 overflow-hidden pointer-events-auto bg-[#0f0f11]"
               >
                 <QuickLinksWidget />
               </motion.div>
@@ -108,10 +108,14 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           
           <button
             onClick={toggleQuickLinks}
-            className="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-white shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all pointer-events-auto"
+            className={`w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-all pointer-events-auto border ${
+              isQuickLinksOpen 
+                ? "bg-white/10 text-white border-white/20 hover:bg-white/20" 
+                : "bg-[#1a1a1d] text-muted-foreground border-white/10 hover:text-foreground hover:bg-[#252528] hover:border-white/20"
+            }`}
             title="Quick Links"
           >
-            {isQuickLinksOpen ? <X className="w-5 h-5" /> : <Link2 className="w-5 h-5" />}
+            {isQuickLinksOpen ? <X className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}
           </button>
         </div>
       </main>
