@@ -33,6 +33,11 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [showWidgetDrawer, setShowWidgetDrawer] = useState(false);
   const [rightSidebarOpen, setRightSidebarOpen] = useState(true);
 
+  React.useEffect(() => {
+    // Dispatch a resize event to force react-grid-layout to recalculate width
+    window.dispatchEvent(new Event("resize"));
+  }, [rightSidebarOpen]);
+
   // Generate dynamic developer activity logs for high-fidelity interactive feel
   const getActivityLogs = () => {
     const logs = [];
