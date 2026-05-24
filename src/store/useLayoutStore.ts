@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { Layout } from "react-grid-layout";
+import { Layout } from "react-grid-layout/legacy";
 
 export type WidgetType = 
   | "projects" 
@@ -17,14 +17,14 @@ export interface WidgetInstance {
 }
 
 interface LayoutState {
-  layouts: { [key: string]: Layout[] };
+  layouts: { [key: string]: Layout };
   widgets: WidgetInstance[];
-  setLayouts: (layouts: { [key: string]: Layout[] }) => void;
+  setLayouts: (layouts: { [key: string]: Layout }) => void;
   addWidget: (type: WidgetType) => void;
   removeWidget: (id: string) => void;
 }
 
-const defaultLayouts: { [key: string]: Layout[] } = {
+const defaultLayouts: { [key: string]: Layout } = {
   lg: [
     { i: "projects-1", x: 0, y: 0, w: 7, h: 4, minW: 4, minH: 3 },
     { i: "daily-1", x: 7, y: 0, w: 5, h: 3, minW: 3, minH: 2 },
