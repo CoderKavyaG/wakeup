@@ -1,0 +1,282 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
+import { 
+  Terminal, Server, FolderCode, Folder, File, Code2, 
+  ExternalLink, CheckCircle2, Play, RefreshCw, XCircle,
+  Activity
+} from "lucide-react";
+
+interface FileItem {
+  name: string;
+  isDirectory: boolean;
+}
+
+const KNOWN_PORTS: Record<number, string> = {
+  3000: "Next.js / Node",
+  3001: "API Server",
+  4000: "Express",
+  5000: "Flask / Server",
+  5432: "PostgreSQL",
+  6379: "Redis",
+  27017: "MongoDB",
+  8000: "Python Server",
+  8080: "Generic Server"
+};
+
+export function MachineControlWidget() {
+  const [workspacePath, setWorkspacePath] = useState<string>("");
+  const [isEditingPath, setIsEditingPath] = useState(false);
+  const [files, setFiles] = useState<FileItem[]>([]);
+  const [ports, setPorts] = useState<number[]>([]);
+  
+  const [filesLoading, setFilesLoading] = useState(false);
+  const [portsLoading, setPortsLoading] = useState(false);
+  
+  const [agentOffline, setAgentOffline] = useState(false);
+
+  // Load saved workspace on mount
+  useEffect(() => {
+    const saved = localStorage.getItem("DEVOS_WORKSPACE");
+    if (saved) {
+      setWorkspacePath(saved);
+      fetchFiles(saved);
+    }
+    fetchPorts();
+    
+    // Auto refresh ports every 10 seconds
+    const interval = setInterval(fetchPorts, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const fetchFiles = async (path: string) => {
+    if (!path) return;
+    setFilesLoading(true);
+    setAgentOffline(false);
+    try {
+      const res = await fetch(`/api/machine/files?path=${encodeURIComponent(path)}`);
+      if (res.status === 503) {
+        setAgentOffline(true);
+        return;
+      }
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setFiles(data);
+      } else {
+        setFiles([]);
+      }
+    } catch {
+      setFiles([]);
+    } finally {
+      setFilesLoading(false);
+    }
+  };
+
+  const fetchPorts = async () => {
+    setPortsLoading(true);
+    setAgentOffline(false);
+    try {
+      const res = await fetch(`/api/machine/ports`);
+      if (res.status === 503) {
+        setAgentOffline(true);
+        return;
+      }
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setPorts(data);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setPortsLoading(false);
+    }
+  };
+
+  const handleSaveWorkspace = () => {
+    localStorage.setItem("DEVOS_WORKSPACE", workspacePath);
+    setIsEditingPath(false);
+    fetchFiles(workspacePath);
+  };
+
+  const handleOpenVSCode = async () => {
+    if (!workspacePath) return;
+    try {
+      await fetch(`/api/machine/open`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: workspacePath, app: "vscode" })
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleLaunch = async (app: string) => {
+    try {
+      await fetch(`/api/machine/launch`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ app })
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-full text-foreground bg-background rounded-xl overflow-hidden divide-y divide-border/40">
+      
+      {/* ── HEADER ── */}
+      <div className="px-4 py-3 shrink-0 flex items-center justify-between bg-popover/30">
+        <div className="flex items-center gap-2">
+          <Server className="w-4 h-4 text-primary" />
+          <h3 className="text-sm font-semibold tracking-tight">Machine Control</h3>
+        </div>
+        {agentOffline ? (
+          <Badge variant="outline" className="text-[9px] uppercase border-red-500/20 text-red-400 bg-red-500/10">
+            Agent Offline
+          </Badge>
+        ) : (
+          <Badge variant="outline" className="text-[9px] uppercase border-green-500/20 text-green-500 bg-green-500/10 flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+            Agent Connected
+          </Badge>
+        )}
+      </div>
+
+      <div className="flex-1 flex flex-col md:flex-row overflow-hidden divide-y md:divide-y-0 md:divide-x divide-border/40">
+        
+        {/* ── SECTION 1: WORKSPACE ── */}
+        <div className="flex-1 flex flex-col min-h-0 bg-card/30">
+          <div className="p-3 shrink-0 border-b border-border/40 bg-popover/20 flex items-center justify-between">
+            <div className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
+              <FolderCode className="w-3.5 h-3.5" /> Workspace
+            </div>
+            {!isEditingPath && (
+              <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={() => setIsEditingPath(true)}>
+                Change
+              </Button>
+            )}
+          </div>
+          
+          <div className="p-3 shrink-0">
+            {isEditingPath || !workspacePath ? (
+              <div className="flex gap-2">
+                <Input 
+                  value={workspacePath}
+                  onChange={e => setWorkspacePath(e.target.value)}
+                  placeholder="C:\Users\Kavya\Projects..."
+                  className="h-7 text-xs bg-card border-border/80"
+                />
+                <Button size="sm" className="h-7 px-3 text-xs" onClick={handleSaveWorkspace}>Save</Button>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                <div className="text-xs font-mono text-muted-foreground break-all bg-black/20 p-1.5 rounded border border-border/40">
+                  {workspacePath}
+                </div>
+                <Button size="sm" variant="secondary" className="h-7 text-xs w-full bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20" onClick={handleOpenVSCode} disabled={agentOffline}>
+                  <Code2 className="w-3.5 h-3.5 mr-1.5" /> Open in VS Code
+                </Button>
+              </div>
+            )}
+          </div>
+
+          <ScrollArea className="flex-1 px-3 pb-3">
+            {filesLoading ? (
+              <div className="text-center text-muted-foreground text-xs py-4 flex items-center justify-center gap-2">
+                <RefreshCw className="w-3 h-3 animate-spin" /> Loading...
+              </div>
+            ) : files.length > 0 ? (
+              <div className="space-y-0.5 mt-1">
+                {files.map((f, i) => (
+                  <div key={i} className="flex items-center gap-2 text-xs py-1 px-1.5 rounded hover:bg-white/5 font-mono text-muted-foreground">
+                    {f.isDirectory ? <Folder className="w-3 h-3 text-blue-400 shrink-0" /> : <File className="w-3 h-3 text-slate-500 shrink-0" />}
+                    <span className="truncate">{f.name}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center text-muted-foreground/50 text-[10px] py-4 uppercase tracking-widest">
+                No files found
+              </div>
+            )}
+          </ScrollArea>
+        </div>
+
+        {/* ── SECTION 2 & 3 CONTAINER ── */}
+        <div className="flex-1 flex flex-col min-h-0 bg-card/30">
+          
+          {/* SECTION 2: PORTS & PROCESSES */}
+          <div className="flex-1 flex flex-col min-h-0 border-b border-border/40">
+            <div className="p-3 shrink-0 border-b border-border/40 bg-popover/20 flex items-center justify-between">
+              <div className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
+                <Activity className="w-3.5 h-3.5" /> Ports
+              </div>
+              <Button variant="ghost" size="icon" className="h-5 w-5" onClick={fetchPorts} disabled={portsLoading || agentOffline}>
+                <RefreshCw className={`w-3 h-3 text-muted-foreground ${portsLoading ? 'animate-spin' : ''}`} />
+              </Button>
+            </div>
+            
+            <ScrollArea className="flex-1 p-3">
+              <div className="space-y-1.5">
+                {ports.length > 0 ? (
+                  ports.map(port => {
+                    const isHttp = [3000, 3001, 8080, 4000, 5000].includes(port);
+                    return (
+                      <div key={port} className="flex items-center justify-between p-2 rounded-lg border border-border/50 bg-black/20 hover:border-primary/30 transition-colors">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
+                          <span className="text-xs font-bold font-mono w-10 text-foreground">{port}</span>
+                          <Badge variant="outline" className="text-[9px] uppercase border-border/60 text-muted-foreground font-mono px-1.5 py-0 h-4">
+                            {KNOWN_PORTS[port] || "Service"}
+                          </Badge>
+                        </div>
+                        {isHttp && (
+                          <Button variant="ghost" size="icon" className="w-6 h-6 hover:bg-primary/20 hover:text-primary rounded-md" onClick={() => window.open(`http://localhost:${port}`, '_blank')}>
+                            <ExternalLink className="w-3 h-3" />
+                          </Button>
+                        )}
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="text-center text-muted-foreground/50 text-[10px] py-4 uppercase tracking-widest">
+                    No active ports detected
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+          </div>
+
+          {/* SECTION 3: QUICK LAUNCHERS */}
+          <div className="shrink-0 p-3 bg-popover/10">
+            <div className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider mb-2 flex items-center gap-1.5">
+              <Play className="w-3.5 h-3.5" /> Quick Launch
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <Button variant="outline" size="sm" className="h-8 text-[10px] justify-start bg-card hover:bg-white/5 border-border/60" onClick={() => handleLaunch("VS Code")} disabled={agentOffline}>
+                <Code2 className="w-3 h-3 mr-2 text-blue-400" /> VS Code
+              </Button>
+              <Button variant="outline" size="sm" className="h-8 text-[10px] justify-start bg-card hover:bg-white/5 border-border/60" onClick={() => handleLaunch("Terminal")} disabled={agentOffline}>
+                <Terminal className="w-3 h-3 mr-2 text-green-400" /> Terminal
+              </Button>
+              <Button variant="outline" size="sm" className="h-8 text-[10px] justify-start bg-card hover:bg-white/5 border-border/60" onClick={() => handleLaunch("Claude (main)")} disabled={agentOffline}>
+                <Server className="w-3 h-3 mr-2 text-purple-400" /> Claude Main
+              </Button>
+              <Button variant="outline" size="sm" className="h-8 text-[10px] justify-start bg-card hover:bg-white/5 border-border/60" onClick={() => handleLaunch("Claude (work)")} disabled={agentOffline}>
+                <Server className="w-3 h-3 mr-2 text-orange-400" /> Claude Work
+              </Button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  );
+}
