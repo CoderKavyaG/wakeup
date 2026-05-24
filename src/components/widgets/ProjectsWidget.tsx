@@ -74,11 +74,13 @@ export function ProjectsWidget() {
           <h2 className="text-sm font-semibold tracking-wider uppercase text-secondary-foreground">Project Registry</h2>
         </div>
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
-          <DialogTrigger asChild>
-            <Button size="icon" variant="ghost" className="w-8 h-8 rounded-lg border border-border bg-popover/30">
-              <Plus className="w-4 h-4 text-muted-foreground hover:text-foreground" />
-            </Button>
-          </DialogTrigger>
+          <DialogTrigger
+            render={
+              <Button size="icon" variant="ghost" className="w-8 h-8 rounded-lg border border-border bg-popover/30">
+                <Plus className="w-4 h-4 text-muted-foreground hover:text-foreground" />
+              </Button>
+            }
+          />
           <DialogContent className="bg-popover border border-border text-foreground">
             <DialogHeader>
               <DialogTitle className="text-lg font-bold text-foreground">Register New Project</DialogTitle>
