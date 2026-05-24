@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
 
 export interface Note {
   id: string;
@@ -9,45 +8,77 @@ export interface Note {
 
 interface NoteState {
   notes: Note[];
-  addNote: (content: string) => void;
-  deleteNote: (id: string) => void;
+  loading: boolean;
+  error: string | null;
+  fetchNotes: () => Promise<void>;
+  addNote: (content: string) => Promise<void>;
+  deleteNote: (id: string) => Promise<void>;
 }
 
-const defaultNotes: Note[] = [
-  {
-    id: "note-1",
-    content: "Need to investigate ICE connection negotiation failure in real-time WebRTC app. Try ICE restart.",
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: "note-2",
-    content: "Optimize News平台 RSS aggregation: set strict quota limits of 60 top feeds + reserved slots.",
-    createdAt: new Date(Date.now() - 24 * 3600 * 1000).toISOString()
-  }
-];
+export const useNoteStore = create<NoteState>((set, get) => ({
+  notes: [],
+  loading: false,
+  error: null,
 
-export const useNoteStore = create<NoteState>()(
-  persist(
-    (set) => ({
-      notes: defaultNotes,
-      addNote: (content) => {
-        const newNote: Note = {
-          id: `note-${Date.now()}`,
-          content,
-          createdAt: new Date().toISOString()
-        };
-        set((state) => ({
-          notes: [newNote, ...state.notes]
-        }));
-      },
-      deleteNote: (id) => {
-        set((state) => ({
-          notes: state.notes.filter((n) => n.id !== id)
-        }));
-      }
-    }),
-    {
-      name: "devos-notes-storage"
+  fetchNotes: async () => {
+    set({ loading: true, error: null });
+    try {
+      const res = await fetch("/api/notes");
+      if (!res.ok) throw new Error("Failed to fetch notes");
+      const data = await res.json();
+      set({ notes: data, loading: false });
+    } catch (err: any) {
+      set({ error: err.message, loading: false });
     }
-  )
-);
+  },
+
+  addNote: async (content) => {
+    const tempId = `temp-${Date.now()}`;
+    const newNote: Note = {
+      id: tempId,
+      content,
+      createdAt: new Date().toISOString(),
+    };
+
+    // Optimistic update
+    const previousNotes = get().notes;
+    set({ notes: [newNote, ...previousNotes] });
+
+    try {
+      const res = await fetch("/api/notes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      });
+
+      if (!res.ok) throw new Error("Failed to add note");
+      const savedNote = await res.json();
+
+      // Replace temp note with real saved note
+      set((state) => ({
+        notes: state.notes.map((n) => (n.id === tempId ? savedNote : n)),
+      }));
+    } catch (err: any) {
+      // Revert optimistic update
+      set({ notes: previousNotes, error: err.message });
+    }
+  },
+
+  deleteNote: async (id) => {
+    const previousNotes = get().notes;
+
+    // Optimistic update
+    set({ notes: previousNotes.filter((n) => n.id !== id) });
+
+    try {
+      const res = await fetch(`/api/notes?id=${id}`, {
+        method: "DELETE",
+      });
+
+      if (!res.ok) throw new Error("Failed to delete note");
+    } catch (err: any) {
+      // Revert
+      set({ notes: previousNotes, error: err.message });
+    }
+  },
+}));

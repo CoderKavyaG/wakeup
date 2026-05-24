@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
 
 export interface ResourceUrl {
   id: string;
@@ -10,52 +9,76 @@ export interface ResourceUrl {
 
 interface UrlState {
   urls: ResourceUrl[];
-  addUrl: (url: Omit<ResourceUrl, "id">) => void;
-  deleteUrl: (id: string) => void;
+  loading: boolean;
+  error: string | null;
+  fetchUrls: () => Promise<void>;
+  addUrl: (url: Omit<ResourceUrl, "id">) => Promise<void>;
+  deleteUrl: (id: string) => Promise<void>;
 }
 
-const defaultUrls: ResourceUrl[] = [
-  {
-    id: "url-1",
-    label: "DevOS Live Dev Server",
-    url: "http://localhost:3000",
-    category: "deployment"
-  },
-  {
-    id: "url-2",
-    label: "Next.js App Router Docs",
-    url: "https://nextjs.org/docs",
-    category: "docs"
-  },
-  {
-    id: "url-3",
-    label: "DevOS GitHub Repo",
-    url: "https://github.com/TPAteeq/wake-up",
-    category: "github"
-  }
-];
+export const useUrlStore = create<UrlState>((set, get) => ({
+  urls: [],
+  loading: false,
+  error: null,
 
-export const useUrlStore = create<UrlState>()(
-  persist(
-    (set) => ({
-      urls: defaultUrls,
-      addUrl: (url) => {
-        const newUrl: ResourceUrl = {
-          ...url,
-          id: `url-${Date.now()}`
-        };
-        set((state) => ({
-          urls: [newUrl, ...state.urls]
-        }));
-      },
-      deleteUrl: (id) => {
-        set((state) => ({
-          urls: state.urls.filter((u) => u.id !== id)
-        }));
-      }
-    }),
-    {
-      name: "devos-urls-storage"
+  fetchUrls: async () => {
+    set({ loading: true, error: null });
+    try {
+      const res = await fetch("/api/urls");
+      if (!res.ok) throw new Error("Failed to fetch URLs");
+      const data = await res.json();
+      set({ urls: data, loading: false });
+    } catch (err: any) {
+      set({ error: err.message, loading: false });
     }
-  )
-);
+  },
+
+  addUrl: async (url) => {
+    const tempId = `temp-${Date.now()}`;
+    const newUrl: ResourceUrl = {
+      ...url,
+      id: tempId,
+    };
+
+    // Optimistic update
+    const previousUrls = get().urls;
+    set({ urls: [newUrl, ...previousUrls] });
+
+    try {
+      const res = await fetch("/api/urls", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(url),
+      });
+
+      if (!res.ok) throw new Error("Failed to add URL");
+      const savedUrl = await res.json();
+
+      // Replace temp URL with real saved URL
+      set((state) => ({
+        urls: state.urls.map((u) => (u.id === tempId ? savedUrl : u)),
+      }));
+    } catch (err: any) {
+      // Revert optimistic update
+      set({ urls: previousUrls, error: err.message });
+    }
+  },
+
+  deleteUrl: async (id) => {
+    const previousUrls = get().urls;
+
+    // Optimistic update
+    set({ urls: previousUrls.filter((u) => u.id !== id) });
+
+    try {
+      const res = await fetch(`/api/urls?id=${id}`, {
+        method: "DELETE",
+      });
+
+      if (!res.ok) throw new Error("Failed to delete URL");
+    } catch (err: any) {
+      // Revert
+      set({ urls: previousUrls, error: err.message });
+    }
+  },
+}));

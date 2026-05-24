@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
 import { Layout } from "react-grid-layout/legacy";
 
 export type WidgetType = 
@@ -19,9 +18,13 @@ export interface WidgetInstance {
 interface LayoutState {
   layouts: { [key: string]: Layout };
   widgets: WidgetInstance[];
-  setLayouts: (layouts: { [key: string]: Layout }) => void;
-  addWidget: (type: WidgetType) => void;
-  removeWidget: (id: string) => void;
+  loading: boolean;
+  error: string | null;
+  fetchLayout: () => Promise<void>;
+  setLayouts: (layouts: { [key: string]: Layout }) => Promise<void>;
+  addWidget: (type: WidgetType) => Promise<void>;
+  removeWidget: (id: string) => Promise<void>;
+  resetLayout: () => Promise<void>;
 }
 
 const defaultLayouts: { [key: string]: Layout } = {
@@ -46,49 +49,133 @@ const defaultWidgets: WidgetInstance[] = [
   { id: "health-1", type: "health" },
 ];
 
-export const useLayoutStore = create<LayoutState>()(
-  persist(
-    (set, get) => ({
-      layouts: defaultLayouts,
-      widgets: defaultWidgets,
-      setLayouts: (layouts) => set({ layouts }),
-      addWidget: (type) => {
-        const id = `${type}-${Date.now()}`;
-        const newWidget = { id, type };
-        
-        // Add a default layout position for the new widget
-        const currentLayouts = { ...get().layouts };
-        const lgLayout = [...(currentLayouts.lg || [])];
-        
-        // Simple placement logic - append at bottom
-        let maxY = 0;
-        lgLayout.forEach(l => {
-          if (l.y + l.h > maxY) maxY = l.y + l.h;
+export const useLayoutStore = create<LayoutState>((set, get) => ({
+  layouts: defaultLayouts,
+  widgets: defaultWidgets,
+  loading: false,
+  error: null,
+
+  fetchLayout: async () => {
+    set({ loading: true, error: null });
+    try {
+      const res = await fetch("/api/layouts");
+      if (!res.ok) throw new Error("Failed to fetch layout");
+      const data = await res.json();
+      
+      if (data) {
+        set({
+          layouts: (data.layouts as { [key: string]: Layout }) || defaultLayouts,
+          widgets: (data.widgets as WidgetInstance[]) || defaultWidgets,
+          loading: false
         });
-        
-        lgLayout.push({ i: id, x: 0, y: maxY, w: 4, h: 3 });
-        currentLayouts.lg = lgLayout;
-        
-        set((state) => ({
-          widgets: [...state.widgets, newWidget],
-          layouts: currentLayouts
-        }));
-      },
-      removeWidget: (id) => {
-        set((state) => {
-          const currentLayouts = { ...state.layouts };
-          if (currentLayouts.lg) {
-             currentLayouts.lg = currentLayouts.lg.filter((l) => l.i !== id);
-          }
-          return {
-            widgets: state.widgets.filter((w) => w.id !== id),
-            layouts: currentLayouts
-          };
+      } else {
+        // Create initial default on backend
+        await fetch("/api/layouts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ layouts: defaultLayouts, widgets: defaultWidgets }),
         });
-      },
-    }),
-    {
-      name: "devos-layout-storage",
+        set({ loading: false });
+      }
+    } catch (err: any) {
+      set({ error: err.message, loading: false });
     }
-  )
-);
+  },
+
+  setLayouts: async (layouts) => {
+    set({ layouts });
+
+    try {
+      const res = await fetch("/api/layouts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ layouts, widgets: get().widgets }),
+      });
+
+      if (!res.ok) throw new Error("Failed to save layout");
+    } catch (err: any) {
+      set({ error: err.message });
+    }
+  },
+
+  addWidget: async (type) => {
+    const id = `${type}-${Date.now()}`;
+    const newWidget = { id, type };
+    
+    const currentLayouts = { ...get().layouts };
+    const lgLayout = [...(currentLayouts.lg || [])];
+    
+    let maxY = 0;
+    lgLayout.forEach(l => {
+      if (l.y + l.h > maxY) maxY = l.y + l.h;
+    });
+    
+    lgLayout.push({ i: id, x: 0, y: maxY, w: 4, h: 3 });
+    currentLayouts.lg = lgLayout;
+
+    const previousWidgets = get().widgets;
+    const previousLayouts = get().layouts;
+
+    set({
+      widgets: [...previousWidgets, newWidget],
+      layouts: currentLayouts
+    });
+
+    try {
+      const res = await fetch("/api/layouts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ layouts: currentLayouts, widgets: [...previousWidgets, newWidget] }),
+      });
+
+      if (!res.ok) throw new Error("Failed to save widget layout");
+    } catch (err: any) {
+      set({ widgets: previousWidgets, layouts: previousLayouts, error: err.message });
+    }
+  },
+
+  removeWidget: async (id) => {
+    const previousWidgets = get().widgets;
+    const previousLayouts = get().layouts;
+
+    const updatedWidgets = previousWidgets.filter((w) => w.id !== id);
+    const updatedLayouts = { ...previousLayouts };
+    if (updatedLayouts.lg) {
+      updatedLayouts.lg = updatedLayouts.lg.filter((l) => l.i !== id);
+    }
+
+    set({
+      widgets: updatedWidgets,
+      layouts: updatedLayouts
+    });
+
+    try {
+      const res = await fetch("/api/layouts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ layouts: updatedLayouts, widgets: updatedWidgets }),
+      });
+
+      if (!res.ok) throw new Error("Failed to remove widget");
+    } catch (err: any) {
+      set({ widgets: previousWidgets, layouts: previousLayouts, error: err.message });
+    }
+  },
+
+  resetLayout: async () => {
+    set({
+      layouts: defaultLayouts,
+      widgets: defaultWidgets
+    });
+
+    try {
+      await fetch("/api/layouts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ layouts: defaultLayouts, widgets: defaultWidgets }),
+      });
+    } catch (err: any) {
+      set({ error: err.message });
+    }
+  }
+}));

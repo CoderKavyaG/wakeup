@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
 
 export interface Task {
   id: string;
@@ -11,64 +10,106 @@ export interface Task {
 
 interface TaskState {
   tasks: Task[];
-  addTask: (task: Omit<Task, "id" | "completed">) => void;
-  toggleTask: (id: string) => void;
-  deleteTask: (id: string) => void;
+  loading: boolean;
+  error: string | null;
+  fetchTasks: () => Promise<void>;
+  addTask: (task: Omit<Task, "id" | "completed">) => Promise<void>;
+  toggleTask: (id: string) => Promise<void>;
+  deleteTask: (id: string) => Promise<void>;
 }
 
-const defaultTasks: Task[] = [
-  {
-    id: "task-1",
-    title: "Implement widget layout save & restore state",
-    dueDate: new Date().toISOString().split("T")[0],
-    completed: true,
-    priority: "high"
-  },
-  {
-    id: "task-2",
-    title: "Fix ICE negotiation race conditions in stranger chat",
-    dueDate: new Date(Date.now() + 24 * 3600 * 1000).toISOString().split("T")[0],
-    completed: false,
-    priority: "high"
-  },
-  {
-    id: "task-3",
-    title: "Write documentation for editorial scraping quotas",
-    dueDate: new Date(Date.now() + 3 * 24 * 3600 * 1000).toISOString().split("T")[0],
-    completed: false,
-    priority: "medium"
-  }
-];
+export const useTaskStore = create<TaskState>((set, get) => ({
+  tasks: [],
+  loading: false,
+  error: null,
 
-export const useTaskStore = create<TaskState>()(
-  persist(
-    (set) => ({
-      tasks: defaultTasks,
-      addTask: (task) => {
-        const newTask: Task = {
-          ...task,
-          id: `task-${Date.now()}`,
-          completed: false
-        };
-        set((state) => ({
-          tasks: [newTask, ...state.tasks]
-        }));
-      },
-      toggleTask: (id) => {
-        set((state) => ({
-          tasks: state.tasks.map((t) => 
-            t.id === id ? { ...t, completed: !t.completed } : t
-          )
-        }));
-      },
-      deleteTask: (id) => {
-        set((state) => ({
-          tasks: state.tasks.filter((t) => t.id !== id)
-        }));
-      }
-    }),
-    {
-      name: "devos-tasks-storage"
+  fetchTasks: async () => {
+    set({ loading: true, error: null });
+    try {
+      const res = await fetch("/api/tasks");
+      if (!res.ok) throw new Error("Failed to fetch tasks");
+      const data = await res.json();
+      set({ tasks: data, loading: false });
+    } catch (err: any) {
+      set({ error: err.message, loading: false });
     }
-  )
-);
+  },
+
+  addTask: async (task) => {
+    const tempId = `temp-${Date.now()}`;
+    const newTask: Task = {
+      ...task,
+      id: tempId,
+      completed: false,
+    };
+
+    // Optimistic update
+    const previousTasks = get().tasks;
+    set({ tasks: [newTask, ...previousTasks] });
+
+    try {
+      const res = await fetch("/api/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(task),
+      });
+
+      if (!res.ok) throw new Error("Failed to add task");
+      const savedTask = await res.json();
+
+      // Replace temp task with real saved task
+      set((state) => ({
+        tasks: state.tasks.map((t) => (t.id === tempId ? savedTask : t)),
+      }));
+    } catch (err: any) {
+      // Revert optimistic update
+      set({ tasks: previousTasks, error: err.message });
+    }
+  },
+
+  toggleTask: async (id) => {
+    const previousTasks = get().tasks;
+    const taskToToggle = previousTasks.find((t) => t.id === id);
+    if (!taskToToggle) return;
+
+    const updatedCompleted = !taskToToggle.completed;
+
+    // Optimistic update
+    set({
+      tasks: previousTasks.map((t) =>
+        t.id === id ? { ...t, completed: updatedCompleted } : t
+      ),
+    });
+
+    try {
+      const res = await fetch("/api/tasks", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, completed: updatedCompleted }),
+      });
+
+      if (!res.ok) throw new Error("Failed to toggle task");
+    } catch (err: any) {
+      // Revert
+      set({ tasks: previousTasks, error: err.message });
+    }
+  },
+
+  deleteTask: async (id) => {
+    const previousTasks = get().tasks;
+
+    // Optimistic update
+    set({ tasks: previousTasks.filter((t) => t.id !== id) });
+
+    try {
+      const res = await fetch(`/api/tasks?id=${id}`, {
+        method: "DELETE",
+      });
+
+      if (!res.ok) throw new Error("Failed to delete task");
+    } catch (err: any) {
+      // Revert
+      set({ tasks: previousTasks, error: err.message });
+    }
+  },
+}));

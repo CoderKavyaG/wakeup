@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
 
 export type ProjectStatus = "planning" | "active" | "completed" | "stale";
 
@@ -11,76 +10,130 @@ export interface Project {
   tags: string[];
   githubUrl?: string;
   liveUrl?: string;
+  
+  // Project Intelligence & Developer Memory Fields
+  summary?: string;
+  architectureNotes?: string;
+  deploymentInfo?: string;
+  screenshots?: string[];
+  techStack?: string[];
+  resumeBullet?: string;
+  interviewNotes?: string;
+  projectHealth?: number;
+  momentumScore?: number;
+  nextAction?: string;
+  completionPercentage?: number;
+
   updatedAt: string;
 }
 
 interface ProjectState {
   projects: Project[];
-  addProject: (project: Omit<Project, "id" | "updatedAt">) => void;
-  updateProject: (id: string, updates: Partial<Project>) => void;
-  deleteProject: (id: string) => void;
+  loading: boolean;
+  error: string | null;
+  fetchProjects: () => Promise<void>;
+  addProject: (project: Omit<Project, "id" | "updatedAt">) => Promise<void>;
+  updateProject: (id: string, updates: Partial<Project>) => Promise<void>;
+  deleteProject: (id: string) => Promise<void>;
 }
 
-const defaultProjects: Project[] = [
-  {
-    id: "proj-1",
-    name: "DevOS Dashboard",
-    description: "A customizable, draggable developer cockpit dashboard to centralize workflow and reduce context switching.",
-    status: "active",
-    tags: ["Next.js", "React Grid Layout", "Tailwind CSS", "Zustand"],
-    githubUrl: "https://github.com/TPAteeq/wake-up",
-    liveUrl: "http://localhost:3000",
-    updatedAt: new Date().toISOString()
-  },
-  {
-    id: "proj-2",
-    name: "WebRTC Chat Platform",
-    description: "Multi-user real-time stranger video chat using TURN relay server infrastructure and ICE restart negotiation.",
-    status: "completed",
-    tags: ["WebRTC", "Express", "Socket.io", "React"],
-    githubUrl: "https://github.com/example/webrtc-chat",
-    updatedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
-  },
-  {
-    id: "proj-3",
-    name: "News Editorial Scraper",
-    description: "A strict quota-based RSS editorial scraping platform with automated category tagging.",
-    status: "stale",
-    tags: ["Python", "BeautifulSoup", "PostgreSQL", "Redis"],
-    githubUrl: "https://github.com/example/news-scraper",
-    updatedAt: new Date(Date.now() - 40 * 24 * 60 * 60 * 1000).toISOString() // stale
-  }
-];
+export const useProjectStore = create<ProjectState>((set, get) => ({
+  projects: [],
+  loading: false,
+  error: null,
 
-export const useProjectStore = create<ProjectState>()(
-  persist(
-    (set) => ({
-      projects: defaultProjects,
-      addProject: (project) => {
-        const newProject: Project = {
-          ...project,
-          id: `proj-${Date.now()}`,
-          updatedAt: new Date().toISOString()
-        };
-        set((state) => ({
-          projects: [newProject, ...state.projects]
-        }));
-      },
-      updateProject: (id, updates) => {
-        set((state) => ({
-          projects: state.projects.map((p) => 
-            p.id === id ? { ...p, ...updates, updatedAt: new Date().toISOString() } : p
-          )
-        }));
-      },
-      deleteProject: (id) => {
-        set((state) => ({
-          projects: state.projects.filter((p) => p.id !== id)
-        }));
-      }
-    }),
-    {
-      name: "devos-project-storage"
+  fetchProjects: async () => {
+    set({ loading: true, error: null });
+    try {
+      const res = await fetch("/api/projects");
+      if (!res.ok) throw new Error("Failed to fetch projects");
+      const data = await res.json();
+      set({ projects: data, loading: false });
+    } catch (err: any) {
+      set({ error: err.message, loading: false });
     }
-  )
-);
+  },
+
+  addProject: async (project) => {
+    const tempId = `temp-${Date.now()}`;
+    const newProject: Project = {
+      ...project,
+      id: tempId,
+      updatedAt: new Date().toISOString(),
+      projectHealth: 100.0,
+      momentumScore: 0.0,
+      completionPercentage: 0.0,
+    };
+
+    // Optimistic update
+    const previousProjects = get().projects;
+    set({ projects: [newProject, ...previousProjects] });
+
+    try {
+      const res = await fetch("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(project),
+      });
+
+      if (!res.ok) throw new Error("Failed to add project");
+      const savedProject = await res.json();
+
+      // Replace temp project with real saved project
+      set((state) => ({
+        projects: state.projects.map((p) => (p.id === tempId ? savedProject : p)),
+      }));
+    } catch (err: any) {
+      // Revert optimistic update
+      set({ projects: previousProjects, error: err.message });
+    }
+  },
+
+  updateProject: async (id, updates) => {
+    const previousProjects = get().projects;
+
+    // Optimistic update
+    set({
+      projects: previousProjects.map((p) =>
+        p.id === id ? { ...p, ...updates, updatedAt: new Date().toISOString() } : p
+      ),
+    });
+
+    try {
+      const res = await fetch("/api/projects", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, ...updates }),
+      });
+
+      if (!res.ok) throw new Error("Failed to update project");
+      const savedProject = await res.json();
+
+      // Update with exact server payload
+      set((state) => ({
+        projects: state.projects.map((p) => (p.id === id ? savedProject : p)),
+      }));
+    } catch (err: any) {
+      // Revert
+      set({ projects: previousProjects, error: err.message });
+    }
+  },
+
+  deleteProject: async (id) => {
+    const previousProjects = get().projects;
+
+    // Optimistic update
+    set({ projects: previousProjects.filter((p) => p.id !== id) });
+
+    try {
+      const res = await fetch(`/api/projects?id=${id}`, {
+        method: "DELETE",
+      });
+
+      if (!res.ok) throw new Error("Failed to delete project");
+    } catch (err: any) {
+      // Revert
+      set({ projects: previousProjects, error: err.message });
+    }
+  },
+}));

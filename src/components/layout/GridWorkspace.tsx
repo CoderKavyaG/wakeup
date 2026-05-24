@@ -26,7 +26,9 @@ export function GridWorkspace() {
   }, []);
 
   const onLayoutChange = (layout: Layout, allLayouts: Partial<Record<string, Layout>>) => {
-    setLayouts(allLayouts as { [key: string]: Layout });
+    if (JSON.stringify(layouts) !== JSON.stringify(allLayouts)) {
+      setLayouts(allLayouts as { [key: string]: Layout });
+    }
   };
 
   const renderWidgetContent = (type: WidgetType) => {
