@@ -3,11 +3,15 @@
 import React from "react";
 import { CockpitCommand } from "./CockpitCommand";
 import { useLayoutStore } from "@/store/useLayoutStore";
-import { Lock, Unlock } from "lucide-react";
+import { useUrlStore } from "@/store/useUrlStore";
+import { Lock, Unlock, Link2, X } from "lucide-react";
 import { Button } from "../ui/button";
+import { QuickLinksWidget } from "../widgets/QuickLinksWidget";
+import { AnimatePresence, motion } from "framer-motion";
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const { isLocked, toggleLock, resetLayout, clearLayout, setLayouts } = useLayoutStore();
+  const { isQuickLinksOpen, toggleQuickLinks } = useUrlStore();
 
   // Removed switchProfile logic as per request
 
@@ -83,8 +87,33 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       </div>
 
       {/* Main Workspace */}
-      <main className="flex-1 overflow-y-auto p-6">
+      <main className="flex-1 overflow-y-auto p-6 relative">
         {children}
+
+        {/* ── QUICK LINKS FAB & PANEL ── */}
+        <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-3 pointer-events-none">
+          <AnimatePresence>
+            {isQuickLinksOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 20, scale: 0.95 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
+                className="w-72 h-96 shadow-2xl rounded-xl border border-white/10 overflow-hidden pointer-events-auto bg-[#0f0f11]"
+              >
+                <QuickLinksWidget />
+              </motion.div>
+            )}
+          </AnimatePresence>
+          
+          <button
+            onClick={toggleQuickLinks}
+            className="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-white shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all pointer-events-auto"
+            title="Quick Links"
+          >
+            {isQuickLinksOpen ? <X className="w-5 h-5" /> : <Link2 className="w-5 h-5" />}
+          </button>
+        </div>
       </main>
     </div>
   );

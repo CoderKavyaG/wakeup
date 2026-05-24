@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useUrlStore, ResourceUrl } from "@/store/useUrlStore";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Link2, Search, Copy, Loader2, GripVertical, Trash2, Check } from "lucide-react";
+import { Link2, Search, Copy, Loader2, GripVertical, Trash2, Check, Plus } from "lucide-react";
 import {
   DndContext,
   closestCenter,
@@ -153,34 +153,34 @@ export function QuickLinksWidget() {
     return "other";
   };
 
-  const handleAddSubmit = async (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && newUrlInput.trim()) {
-      e.preventDefault();
-      const rawUrl = newUrlInput.trim();
-      const validUrl = rawUrl.startsWith("http") ? rawUrl : `https://${rawUrl}`;
-      setIsAdding(true);
-      
-      try {
-        const res = await fetch(`/api/urls/meta?url=${encodeURIComponent(validUrl)}`);
-        let title = validUrl;
-        if (res.ok) {
-          const data = await res.json();
-          if (data.title) title = data.title;
-        }
-        
-        await addUrl({
-          url: validUrl,
-          label: title,
-          category: guessCategory(validUrl)
-        });
-        setNewUrlInput("");
-      } catch (err) {
-        // Fallback
-        await addUrl({ url: validUrl, label: validUrl, category: guessCategory(validUrl) });
-        setNewUrlInput("");
-      } finally {
-        setIsAdding(false);
+  const handleAddSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newUrlInput.trim()) return;
+
+    const rawUrl = newUrlInput.trim();
+    const validUrl = rawUrl.startsWith("http") ? rawUrl : `https://${rawUrl}`;
+    setIsAdding(true);
+    
+    try {
+      const res = await fetch(`/api/urls/meta?url=${encodeURIComponent(validUrl)}`);
+      let title = validUrl;
+      if (res.ok) {
+        const data = await res.json();
+        if (data.title) title = data.title;
       }
+      
+      await addUrl({
+        url: validUrl,
+        label: title,
+        category: guessCategory(validUrl)
+      });
+      setNewUrlInput("");
+    } catch (err) {
+      // Fallback
+      await addUrl({ url: validUrl, label: validUrl, category: guessCategory(validUrl) });
+      setNewUrlInput("");
+    } finally {
+      setIsAdding(false);
     }
   };
 
@@ -240,16 +240,28 @@ export function QuickLinksWidget() {
       </ScrollArea>
 
       {/* Add Row */}
-      <div className="p-2 shrink-0 bg-[#0f0f11] relative">
-        <Input 
-          value={newUrlInput}
-          onChange={e => setNewUrlInput(e.target.value)}
-          onKeyDown={handleAddSubmit}
-          disabled={isAdding}
-          placeholder="+ Add URL (Enter to save)"
-          className="h-6 text-[10px] bg-[#1a1a1d] border-white/10 focus-visible:ring-1 focus-visible:ring-primary/50 pr-6"
-        />
-        {isAdding && <Loader2 className="w-2.5 h-2.5 absolute right-4 top-3.5 animate-spin text-muted-foreground" />}
+      <div className="p-3 shrink-0 bg-[#0f0f11] relative border-t border-border/40">
+        <form onSubmit={handleAddSubmit} className="relative flex items-center group">
+          <div className="absolute left-3 text-muted-foreground group-focus-within:text-primary transition-colors">
+            <Link2 className="w-3.5 h-3.5" />
+          </div>
+          <Input 
+            value={newUrlInput}
+            onChange={e => setNewUrlInput(e.target.value)}
+            disabled={isAdding}
+            placeholder="Paste URL..."
+            className="h-9 pl-9 pr-10 text-[11px] bg-[#1a1a1d] border border-white/10 rounded-lg focus-visible:ring-1 focus-visible:ring-primary/50 placeholder:text-muted-foreground/60 w-full transition-all"
+          />
+          <div className="absolute right-1">
+            <button
+              type="submit"
+              disabled={isAdding || !newUrlInput.trim()}
+              className="w-7 h-7 rounded-md flex items-center justify-center bg-primary hover:bg-primary/90 text-white disabled:opacity-50 disabled:hover:bg-primary transition-all shadow-sm"
+            >
+              {isAdding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

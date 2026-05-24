@@ -9,7 +9,6 @@ import { ProjectsWidget } from "../widgets/ProjectsWidget";
 import { GithubWidget } from "../widgets/GithubWidget";
 import { FocusPanelWidget } from "../widgets/FocusPanelWidget";
 import { MachineControlWidget } from "../widgets/MachineControlWidget";
-import { QuickLinksWidget } from "../widgets/QuickLinksWidget";
 import { X, GripHorizontal } from "lucide-react";
 import { Button } from "../ui/button";
 
@@ -50,8 +49,6 @@ export function GridWorkspace() {
         return <FocusPanelWidget />;
       case "machine":
         return <MachineControlWidget />;
-      case "quicklinks":
-        return <QuickLinksWidget />;
       default:
         return <p className="text-muted-foreground text-sm">Unknown widget: {type}</p>;
     }

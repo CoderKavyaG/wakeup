@@ -5,8 +5,7 @@ export type WidgetType =
   | "projects" 
   | "github" 
   | "focus" 
-  | "machine"
-  | "quicklinks";
+  | "machine";
 
 export interface WidgetInstance {
   id: string;
@@ -123,11 +122,6 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
       minH = 9;
       defaultW = 10;
       defaultH = 9;
-    } else if (type === "quicklinks") {
-      minW = 2;
-      minH = 4;
-      defaultW = 2;
-      defaultH = 5;
     }
     
     lgLayout.push({ i: id, x: 0, y: maxY, w: defaultW, h: defaultH, minW, minH });
