@@ -10,6 +10,8 @@ export interface Project {
   tags: string[];
   githubUrl?: string;
   liveUrl?: string;
+  folderPath?: string;
+  feedback?: { id: string; text: string; date: string }[];
   
   // Project Intelligence & Developer Memory Fields
   summary?: string;

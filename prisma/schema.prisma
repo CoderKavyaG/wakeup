@@ -18,6 +18,8 @@ model Project {
   tags                 String[] @default([])
   githubUrl            String?
   liveUrl              String?
+  folderPath           String?
+  feedback             Json     @default("[]")
   
   // Project Intelligence & Developer Memory Fields
   summary              String?  @db.Text
