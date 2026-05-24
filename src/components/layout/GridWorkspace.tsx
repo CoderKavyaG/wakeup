@@ -7,11 +7,8 @@ import "react-resizable/css/styles.css";
 import { useLayoutStore, WidgetType } from "@/store/useLayoutStore";
 import { ProjectsWidget } from "../widgets/ProjectsWidget";
 import { GithubWidget } from "../widgets/GithubWidget";
-import { NotesWidget } from "../widgets/NotesWidget";
-import { TasksWidget } from "../widgets/TasksWidget";
-import { UrlManagerWidget } from "../widgets/UrlManagerWidget";
-import { DeploymentHealthWidget } from "../widgets/DeploymentHealthWidget";
-import { ProjectIntelligenceWidget } from "../widgets/ProjectIntelligenceWidget";
+import { FocusPanelWidget } from "../widgets/FocusPanelWidget";
+import { MachineControlWidget } from "../widgets/MachineControlWidget";
 import { X, GripHorizontal } from "lucide-react";
 import { Button } from "../ui/button";
 
@@ -44,20 +41,14 @@ export function GridWorkspace() {
 
   const renderWidgetContent = (type: WidgetType) => {
     switch (type) {
-      case "project-intel":
-        return <ProjectIntelligenceWidget />;
       case "projects":
         return <ProjectsWidget />;
       case "github":
         return <GithubWidget />;
-      case "notes":
-        return <NotesWidget />;
-      case "tasks":
-        return <TasksWidget />;
-      case "urls":
-        return <UrlManagerWidget />;
-      case "health":
-        return <DeploymentHealthWidget />;
+      case "focus":
+        return <FocusPanelWidget />;
+      case "machine":
+        return <MachineControlWidget />;
       default:
         return <p className="text-muted-foreground text-sm">Unknown widget: {type}</p>;
     }

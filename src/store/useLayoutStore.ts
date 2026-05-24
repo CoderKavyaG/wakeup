@@ -4,11 +4,8 @@ import { Layout } from "react-grid-layout/legacy";
 export type WidgetType = 
   | "projects" 
   | "github" 
-  | "notes" 
-  | "tasks" 
-  | "urls" 
-  | "health" 
-  | "project-intel";
+  | "focus" 
+  | "machine";
 
 export interface WidgetInstance {
   id: string;
@@ -34,24 +31,18 @@ interface LayoutState {
 
 const defaultLayouts: { [key: string]: Layout } = {
   lg: [
-    { i: "project-intel-1", x: 0, y: 0, w: 4, h: 4, minW: 3, minH: 3 },
     { i: "projects-1", x: 4, y: 0, w: 5, h: 4, minW: 4, minH: 3 },
     { i: "github-1", x: 9, y: 0, w: 3, h: 4, minW: 3, minH: 3 },
-    { i: "tasks-1", x: 0, y: 4, w: 4, h: 4, minW: 3, minH: 3 },
-    { i: "notes-1", x: 4, y: 4, w: 4, h: 4, minW: 3, minH: 3 },
-    { i: "urls-1", x: 8, y: 4, w: 2, h: 4, minW: 2, minH: 2 },
-    { i: "health-1", x: 10, y: 4, w: 2, h: 4, minW: 2, minH: 2 },
+    { i: "focus-1", x: 0, y: 4, w: 10, h: 4, minW: 4, minH: 3 },
+    { i: "machine-1", x: 10, y: 4, w: 2, h: 4, minW: 2, minH: 3 },
   ],
 };
 
 const defaultWidgets: WidgetInstance[] = [
-  { id: "project-intel-1", type: "project-intel" },
   { id: "projects-1", type: "projects" },
   { id: "github-1", type: "github" },
-  { id: "tasks-1", type: "tasks" },
-  { id: "notes-1", type: "notes" },
-  { id: "urls-1", type: "urls" },
-  { id: "health-1", type: "health" },
+  { id: "focus-1", type: "focus" },
+  { id: "machine-1", type: "machine" },
 ];
 
 export const useLayoutStore = create<LayoutState>((set, get) => ({
