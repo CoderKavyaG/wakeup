@@ -25,8 +25,8 @@ export function GridWorkspace() {
     setMounted(true);
   }, []);
 
-  const onLayoutChange = (layout: Layout, allLayouts: { [key: string]: Layout }) => {
-    setLayouts(allLayouts);
+  const onLayoutChange = (layout: Layout, allLayouts: Partial<Record<string, Layout>>) => {
+    setLayouts(allLayouts as { [key: string]: Layout });
   };
 
   const renderWidgetContent = (type: WidgetType) => {
