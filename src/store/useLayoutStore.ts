@@ -26,10 +26,13 @@ interface LayoutState {
 
 const defaultLayouts: { [key: string]: Layout[] } = {
   lg: [
-    { i: "projects-1", x: 0, y: 0, w: 6, h: 4 },
-    { i: "daily-1", x: 6, y: 0, w: 6, h: 2 },
-    { i: "github-1", x: 6, y: 2, w: 6, h: 4 },
-    { i: "notes-1", x: 0, y: 4, w: 4, h: 3 },
+    { i: "projects-1", x: 0, y: 0, w: 7, h: 4, minW: 4, minH: 3 },
+    { i: "daily-1", x: 7, y: 0, w: 5, h: 3, minW: 3, minH: 2 },
+    { i: "github-1", x: 0, y: 4, w: 7, h: 4, minW: 4, minH: 3 },
+    { i: "tasks-1", x: 7, y: 3, w: 5, h: 4, minW: 3, minH: 3 },
+    { i: "notes-1", x: 0, y: 8, w: 4, h: 4, minW: 3, minH: 3 },
+    { i: "urls-1", x: 4, y: 8, w: 4, h: 4, minW: 3, minH: 3 },
+    { i: "health-1", x: 8, y: 8, w: 4, h: 4, minW: 3, minH: 3 },
   ],
 };
 
@@ -37,7 +40,10 @@ const defaultWidgets: WidgetInstance[] = [
   { id: "projects-1", type: "projects" },
   { id: "daily-1", type: "daily" },
   { id: "github-1", type: "github" },
+  { id: "tasks-1", type: "tasks" },
   { id: "notes-1", type: "notes" },
+  { id: "urls-1", type: "urls" },
+  { id: "health-1", type: "health" },
 ];
 
 export const useLayoutStore = create<LayoutState>()(
