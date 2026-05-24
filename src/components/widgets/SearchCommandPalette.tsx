@@ -108,8 +108,8 @@ export function SearchCommandPalette() {
 
   return (
     <Dialog open={isOpen} onOpenChange={closeSearch}>
-      <DialogContent className="max-w-2xl p-0 gap-0 overflow-hidden bg-popover border-border">
-        <div className="flex items-center border-b border-border px-3 py-2">
+      <DialogContent className="max-w-2xl p-0 gap-0 overflow-hidden bg-[#0f0f11] border-white/10">
+        <div className="flex items-center border-b border-white/10 px-3 py-2">
           <Search className="w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="Search projects, tasks, notes... (Cmd+K)"
@@ -132,7 +132,7 @@ export function SearchCommandPalette() {
         <ScrollArea className="max-h-96">
           {/* Recent Searches */}
           {inputValue.trim() === "" && recentSearches.length > 0 && (
-            <div className="p-3 border-b border-border/50">
+            <div className="p-3 border-b border-white/10">
               <div className="text-xs font-semibold text-muted-foreground uppercase mb-2">
                 Recent Searches
               </div>
@@ -141,7 +141,7 @@ export function SearchCommandPalette() {
                   <button
                     key={recent}
                     onClick={() => handleInputChange(recent)}
-                    className="px-2 py-1 text-xs bg-background border border-border rounded hover:bg-card transition-colors text-foreground"
+                    className="px-2 py-1 text-xs bg-[#0f0f11] border border-white/10 rounded hover:bg-[#0f0f11] transition-colors text-foreground"
                   >
                     {recent}
                   </button>
@@ -180,7 +180,7 @@ export function SearchCommandPalette() {
                     className={`w-full text-left p-2 rounded transition-colors border ${
                       selectedIndex === idx
                         ? "bg-primary/10 border-primary/20"
-                        : "border-transparent hover:bg-card"
+                        : "border-transparent hover:bg-[#0f0f11]"
                     }`}
                   >
                     <div className="flex items-start gap-2">
@@ -194,7 +194,7 @@ export function SearchCommandPalette() {
                           </span>
                           <Badge
                             variant="outline"
-                            className={`text-[10px] shrink-0 ${getRelevanceColor(result.relevanceScore)} bg-background`}
+                            className={`text-[10px] shrink-0 ${getRelevanceColor(result.relevanceScore)} bg-[#0f0f11]`}
                           >
                             {Math.round(result.relevanceScore)}%
                           </Badge>
@@ -210,7 +210,7 @@ export function SearchCommandPalette() {
                               <Badge
                                 key={tag}
                                 variant="outline"
-                                className="text-[8px] bg-background"
+                                className="text-[8px] bg-[#0f0f11]"
                               >
                                 {tag}
                               </Badge>
@@ -238,17 +238,17 @@ export function SearchCommandPalette() {
         </ScrollArea>
 
         {/* Footer */}
-        <div className="border-t border-border/50 px-3 py-2 text-[10px] text-muted-foreground flex items-center justify-between">
+        <div className="border-t border-white/10 px-3 py-2 text-[10px] text-muted-foreground flex items-center justify-between">
           <div>
-            <kbd className="px-1 bg-background border border-border rounded text-[9px]">
+            <kbd className="px-1 bg-[#0f0f11] border border-white/10 rounded text-[9px]">
               ↑↓
             </kbd>{" "}
             <span>to navigate</span>
-            <kbd className="px-1 bg-background border border-border rounded text-[9px] ml-2">
+            <kbd className="px-1 bg-[#0f0f11] border border-white/10 rounded text-[9px] ml-2">
               ⏎
             </kbd>{" "}
             <span>to select</span>
-            <kbd className="px-1 bg-background border border-border rounded text-[9px] ml-2">
+            <kbd className="px-1 bg-[#0f0f11] border border-white/10 rounded text-[9px] ml-2">
               esc
             </kbd>{" "}
             <span>to close</span>

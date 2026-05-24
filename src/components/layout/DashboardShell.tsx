@@ -12,11 +12,11 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   // Removed switchProfile logic as per request
 
   return (
-    <div className="h-screen w-full flex flex-col overflow-hidden bg-background text-foreground">
+    <div className="h-screen w-full flex flex-col overflow-hidden bg-[#0f0f11] text-[#E8E9EB]">
       <CockpitCommand />
 
       {/* Top Controls Bar */}
-      <div className="shrink-0 px-6 pt-6 pb-2 flex items-center justify-between gap-4 select-none bg-transparent">
+      <div className="shrink-0 px-6 pt-6 pb-2 flex items-center justify-between gap-4 select-none bg-[#0f0f11]">
         <div className="flex items-center space-x-2">
           <div className="w-6 h-6 rounded-md bg-primary flex items-center justify-center font-bold text-white text-xs shadow-sm shadow-primary/20">
             D
@@ -62,10 +62,10 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               const event = new KeyboardEvent('keydown', { key: 'k', metaKey: true });
               window.dispatchEvent(event);
             }}
-            className="flex items-center gap-1.5 h-7 px-3 rounded-lg border border-border/80 hover:bg-muted text-muted-foreground transition-colors text-[11px] font-semibold"
+            className="flex items-center gap-1.5 h-7 px-3 rounded-lg border border-white/10 hover:bg-white/5 text-muted-foreground transition-colors text-[11px] font-semibold"
           >
             <span>Cockpit</span>
-            <kbd className="bg-muted px-1 rounded text-[9px] font-mono border border-border">⌘K</kbd>
+            <kbd className="bg-white/5 px-1 rounded text-[9px] font-mono border border-white/10">⌘K</kbd>
           </button>
 
 
@@ -75,7 +75,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             onClick={clearLayout}
             variant="ghost"
             size="sm"
-            className="h-7 text-[11px] font-semibold px-3 rounded-lg border border-border/80 hover:bg-rose-500/10 hover:text-rose-400 hover:border-rose-500/20 text-muted-foreground"
+            className="h-7 text-[11px] font-semibold px-3 rounded-lg border border-white/10 hover:bg-rose-500/10 hover:text-rose-400 hover:border-rose-500/20 text-muted-foreground"
           >
             Clear Workspace
           </Button>

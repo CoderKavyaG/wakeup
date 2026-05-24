@@ -124,7 +124,7 @@ export function FocusPanelWidget() {
     const firstLine = lines[0];
     const rest = lines.slice(1).join("\n");
     return (
-      <div key={note.id} className="group relative p-3 border border-border bg-card rounded-lg text-sm transition-all hover:border-primary/30">
+      <div key={note.id} className="group relative p-3 border border-white/10 bg-[#0f0f11] rounded-lg text-sm transition-all hover:border-primary/30">
         <div className="font-bold text-foreground line-clamp-1">{firstLine}</div>
         {rest && <div className="text-muted-foreground mt-1 line-clamp-2 text-xs whitespace-pre-wrap">{rest}</div>}
         <div className="mt-2 flex justify-between items-center opacity-40 text-[10px] font-mono">
@@ -186,11 +186,11 @@ export function FocusPanelWidget() {
   const filteredUrls = urlFilter === "All" ? urls : urls.filter(u => u.category === urlFilter);
 
   return (
-    <div className="flex flex-col h-full text-foreground bg-background rounded-xl overflow-hidden divide-y divide-border/40">
+    <div className="flex flex-col h-full text-foreground bg-[#0f0f11] rounded-xl overflow-hidden divide-y divide-border/40">
       
       {/* ── TASKS SECTION ── */}
       <div className="flex-1 flex flex-col min-h-0">
-        <div className="px-4 py-3 flex items-center justify-between shrink-0 bg-popover/30">
+        <div className="px-4 py-3 flex items-center justify-between shrink-0 bg-[#0f0f11]">
           <div className="flex items-center gap-2">
             <ListTodo className="w-4 h-4 text-primary" />
             <h3 className="text-sm font-semibold tracking-tight">Today's Focus</h3>
@@ -205,7 +205,7 @@ export function FocusPanelWidget() {
             onChange={e => setTaskInput(e.target.value)}
             onKeyDown={handleAddTask}
             placeholder="Press / to add task (e.g. 'Deploy app tomorrow urgent')"
-            className="h-8 text-xs bg-card border-border/80 focus-visible:ring-1 focus-visible:ring-primary/50"
+            className="h-8 text-xs bg-[#0f0f11] border-white/10 focus-visible:ring-1 focus-visible:ring-primary/50"
           />
         </div>
 
@@ -220,7 +220,7 @@ export function FocusPanelWidget() {
                 />
                 <div className="flex-1 min-w-0">
                   <span className="text-sm text-foreground/90 leading-tight">{t.title}</span>
-                  {t.dueDate && <span className="ml-2 text-[10px] text-muted-foreground font-mono bg-popover px-1 rounded">{t.dueDate}</span>}
+                  {t.dueDate && <span className="ml-2 text-[10px] text-muted-foreground font-mono bg-[#0f0f11] px-1 rounded">{t.dueDate}</span>}
                 </div>
                 <div className="flex items-center gap-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                   <div className={`w-1.5 h-1.5 rounded-full ${getPriorityColor(t.priority)}`} title={`Priority: ${t.priority}`} />
@@ -232,7 +232,7 @@ export function FocusPanelWidget() {
             ))}
 
             {completedTasks.length > 0 && (
-              <div className="mt-4 pt-2 border-t border-border/30">
+              <div className="mt-4 pt-2 border-t border-white/10">
                 <button 
                   onClick={() => setShowDone(!showDone)}
                   className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-semibold uppercase tracking-wider hover:text-foreground transition-colors"
@@ -262,7 +262,7 @@ export function FocusPanelWidget() {
 
       {/* ── NOTES SECTION ── */}
       <div className="flex-1 flex flex-col min-h-0">
-        <div className="px-4 py-3 flex items-center justify-between shrink-0 bg-popover/30">
+        <div className="px-4 py-3 flex items-center justify-between shrink-0 bg-[#0f0f11]">
           <div className="flex items-center gap-2">
             <BrainCircuit className="w-4 h-4 text-purple-400" />
             <h3 className="text-sm font-semibold tracking-tight">Brain Dump</h3>
@@ -276,7 +276,7 @@ export function FocusPanelWidget() {
             onChange={e => setNoteInput(e.target.value)}
             onKeyDown={handleAddNote}
             placeholder="Type your thoughts... (Ctrl+Enter to save)"
-            className="min-h-[60px] text-xs resize-none bg-card border-border/80 focus-visible:ring-1 focus-visible:ring-purple-500/50"
+            className="min-h-[60px] text-xs resize-none bg-[#0f0f11] border-white/10 focus-visible:ring-1 focus-visible:ring-purple-500/50"
           />
         </div>
 
@@ -289,7 +289,7 @@ export function FocusPanelWidget() {
 
       {/* ── URLS SECTION ── */}
       <div className="flex-1 flex flex-col min-h-0">
-        <div className="px-4 py-3 flex items-center justify-between shrink-0 bg-popover/30">
+        <div className="px-4 py-3 flex items-center justify-between shrink-0 bg-[#0f0f11]">
           <div className="flex items-center gap-2">
             <Link2 className="w-4 h-4 text-blue-400" />
             <h3 className="text-sm font-semibold tracking-tight">Quick Links</h3>
@@ -315,7 +315,7 @@ export function FocusPanelWidget() {
             onKeyDown={handleAddUrl}
             disabled={urlLoading}
             placeholder="Paste URL and hit Enter..."
-            className="h-8 text-xs bg-card border-border/80 focus-visible:ring-1 focus-visible:ring-blue-500/50 pr-8"
+            className="h-8 text-xs bg-[#0f0f11] border-white/10 focus-visible:ring-1 focus-visible:ring-blue-500/50 pr-8"
           />
           {urlLoading && <Loader2 className="w-3 h-3 absolute right-7 top-2.5 animate-spin text-muted-foreground" />}
         </div>
@@ -326,7 +326,7 @@ export function FocusPanelWidget() {
               let domain = "";
               try { domain = new URL(u.url).hostname; } catch {}
               return (
-                <div key={u.id} className="group flex items-center gap-3 p-2 border border-border/50 bg-card rounded hover:bg-white/5 transition-colors">
+                <div key={u.id} className="group flex items-center gap-3 p-2 border border-white/10 bg-[#0f0f11] rounded hover:bg-white/5 transition-colors">
                   <img 
                     src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`} 
                     alt="favicon" 
@@ -338,7 +338,7 @@ export function FocusPanelWidget() {
                       {u.label}
                     </a>
                     {u.category && u.category !== "other" && (
-                      <Badge variant="outline" className="text-[8px] uppercase px-1 py-0 h-4 border-border/60 shrink-0">{u.category}</Badge>
+                      <Badge variant="outline" className="text-[8px] uppercase px-1 py-0 h-4 border-white/10 shrink-0">{u.category}</Badge>
                     )}
                   </div>
                   <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">

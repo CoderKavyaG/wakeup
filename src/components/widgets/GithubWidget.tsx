@@ -142,9 +142,9 @@ export function GithubWidget() {
               value={inputUsername}
               onChange={(e) => setInputUsername(e.target.value)}
               placeholder="Username"
-              className="h-6 w-24 text-xs bg-popover border-border text-foreground placeholder:text-muted-foreground"
+              className="h-6 w-24 text-xs bg-[#0f0f11] border-white/10 text-foreground placeholder:text-muted-foreground"
             />
-            <Button size="icon" type="submit" variant="ghost" className="w-6 h-6 border border-border" disabled={loading}>
+            <Button size="icon" type="submit" variant="ghost" className="w-6 h-6 border border-white/10" disabled={loading}>
               <RefreshCw className={`w-3 h-3 text-muted-foreground ${loading ? 'animate-spin' : ''}`} />
             </Button>
           </form>
@@ -152,7 +152,7 @@ export function GithubWidget() {
       </div>
 
       {showSettings && (
-        <div className="mb-3 p-3 bg-card border border-border rounded-lg shrink-0 flex flex-col gap-2">
+        <div className="mb-3 p-3 bg-[#0f0f11] border border-white/10 rounded-lg shrink-0 flex flex-col gap-2">
           <p className="text-[10px] font-semibold text-muted-foreground uppercase">GitHub Access Token (PAT)</p>
           <div className="flex gap-2">
             <Input
@@ -178,19 +178,19 @@ export function GithubWidget() {
       {/* Stats Grid */}
       {stats && (
         <div className="grid grid-cols-4 gap-1.5 mb-3 shrink-0">
-          <div className="p-2 border border-border bg-card rounded text-center flex flex-col justify-center">
+          <div className="p-2 border border-white/10 bg-[#0f0f11] rounded text-center flex flex-col justify-center">
             <div className="text-[8px] uppercase font-bold text-muted-foreground">Streak</div>
             <div className="text-xs font-mono font-semibold text-primary">{stats.currentStreak}d</div>
           </div>
-          <div className="p-2 border border-border bg-card rounded text-center flex flex-col justify-center">
+          <div className="p-2 border border-white/10 bg-[#0f0f11] rounded text-center flex flex-col justify-center">
             <div className="text-[8px] uppercase font-bold text-muted-foreground">Contribs</div>
             <div className="text-xs font-mono font-semibold text-foreground">{stats.totalContributions}</div>
           </div>
-          <div className="p-2 border border-border bg-card rounded text-center flex flex-col justify-center">
+          <div className="p-2 border border-white/10 bg-[#0f0f11] rounded text-center flex flex-col justify-center">
             <div className="text-[8px] uppercase font-bold text-muted-foreground">Active</div>
             <div className="text-xs font-mono font-semibold text-foreground">{stats.activeReposCount}</div>
           </div>
-          <div className="p-2 border border-border bg-card rounded text-center flex flex-col justify-center">
+          <div className="p-2 border border-white/10 bg-[#0f0f11] rounded text-center flex flex-col justify-center">
             <div className="text-[8px] uppercase font-bold text-muted-foreground">Stale</div>
             <div className="text-xs font-mono font-semibold text-orange-400">{stats.staleReposCount}</div>
           </div>
@@ -229,13 +229,13 @@ export function GithubWidget() {
           )}
 
           <div className="text-[9px] font-bold uppercase text-muted-foreground tracking-wider shrink-0 mt-2">Latest Commits</div>
-          <ScrollArea className="flex-1 border border-border bg-popover rounded p-2 min-h-0 h-full w-full overflow-y-auto">
+          <ScrollArea className="flex-1 border border-white/10 bg-[#0f0f11] rounded p-2 min-h-0 h-full w-full overflow-y-auto">
             <div className="space-y-2">
               {commits.length === 0 ? (
                 <div className="text-center py-4 text-[9px] text-muted-foreground">No recent activity</div>
               ) : (
                 commits.map((commit, i) => (
-                  <div key={commit.sha + i} className="flex items-start space-x-1.5 text-[9px] pb-1.5 border-b border-border/30 last:border-0">
+                  <div key={commit.sha + i} className="flex items-start space-x-1.5 text-[9px] pb-1.5 border-b border-white/10 last:border-0">
                     <div className="mt-0.5 p-1 bg-primary/10 rounded shrink-0">
                       <GitCommit className="w-2.5 h-2.5 text-primary" />
                     </div>
@@ -259,7 +259,7 @@ export function GithubWidget() {
         {/* Right Column: Repositories */}
         <div className="flex flex-col h-full overflow-hidden space-y-2">
           <div className="text-[9px] font-bold uppercase text-muted-foreground tracking-wider shrink-0">Repositories</div>
-          <ScrollArea className="flex-1 border border-border bg-popover rounded p-2 min-h-0 h-full w-full overflow-y-auto">
+          <ScrollArea className="flex-1 border border-white/10 bg-[#0f0f11] rounded p-2 min-h-0 h-full w-full overflow-y-auto">
             <div className="space-y-1.5">
               {repos.length === 0 ? (
                 <div className="text-center py-4 text-[9px] text-muted-foreground">No repositories</div>
@@ -267,7 +267,7 @@ export function GithubWidget() {
                 repos.map((repo) => {
                   const isStale = new Date(repo.updated_at) < new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
                   return (
-                    <div key={repo.id} className="p-2 border border-border bg-popover rounded flex flex-col justify-between gap-1">
+                    <div key={repo.id} className="p-2 border border-white/10 bg-[#0f0f11] rounded flex flex-col justify-between gap-1">
                       <div className="flex items-start justify-between gap-1">
                         <a href={repo.html_url} target="_blank" rel="noopener noreferrer" className="font-bold text-sm text-foreground hover:text-primary truncate flex items-center gap-1">
                           {repo.name}

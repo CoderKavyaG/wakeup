@@ -149,10 +149,10 @@ export function MachineControlWidget() {
   };
 
   return (
-    <div className="flex flex-col h-full text-foreground bg-background rounded-xl overflow-hidden divide-y divide-border/40">
+    <div className="flex flex-col h-full text-foreground bg-[#0f0f11] rounded-xl overflow-hidden divide-y divide-border/40">
       
       {/* ── HEADER ── */}
-      <div className="px-4 py-3 shrink-0 flex items-center justify-between bg-popover/30">
+      <div className="px-4 py-3 shrink-0 flex items-center justify-between bg-[#0f0f11]">
         <div className="flex items-center gap-2">
           <Server className="w-4 h-4 text-primary" />
           <h3 className="text-sm font-semibold tracking-tight">Machine Control</h3>
@@ -172,8 +172,8 @@ export function MachineControlWidget() {
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden divide-y md:divide-y-0 md:divide-x divide-border/40">
         
         {/* ── SECTION 1: WORKSPACE ── */}
-        <div className="flex-1 flex flex-col min-h-0 bg-card/30">
-          <div className="p-3 shrink-0 border-b border-border/40 bg-popover/20 flex items-center justify-between">
+        <div className="flex-1 flex flex-col min-h-0 bg-[#0f0f11]">
+          <div className="p-3 shrink-0 border-b border-white/10 bg-[#0f0f11] flex items-center justify-between">
             <div className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
               <FolderCode className="w-3.5 h-3.5" /> Workspace
             </div>
@@ -191,13 +191,13 @@ export function MachineControlWidget() {
                   value={workspacePath}
                   onChange={e => setWorkspacePath(e.target.value)}
                   placeholder="C:\Users\Kavya\Projects..."
-                  className="h-7 text-xs bg-card border-border/80"
+                  className="h-7 text-xs bg-[#0f0f11] border-white/10"
                 />
                 <Button size="sm" className="h-7 px-3 text-xs" onClick={handleSaveWorkspace}>Save</Button>
               </div>
             ) : (
               <div className="flex flex-col gap-2">
-                <div className="text-xs font-mono text-muted-foreground break-all bg-black/20 p-1.5 rounded border border-border/40">
+                <div className="text-xs font-mono text-muted-foreground break-all bg-black/20 p-1.5 rounded border border-white/10">
                   {workspacePath}
                 </div>
                 <Button size="sm" variant="secondary" className="h-7 text-xs w-full bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20" onClick={handleOpenVSCode} disabled={agentOffline}>
@@ -230,11 +230,11 @@ export function MachineControlWidget() {
         </div>
 
         {/* ── SECTION 2 & 3 CONTAINER ── */}
-        <div className="flex-1 flex flex-col min-h-0 bg-card/30">
+        <div className="flex-1 flex flex-col min-h-0 bg-[#0f0f11]">
           
           {/* SECTION 2: PORTS & PROCESSES */}
-          <div className="flex-1 flex flex-col min-h-0 border-b border-border/40">
-            <div className="p-3 shrink-0 border-b border-border/40 bg-popover/20 flex items-center justify-between">
+          <div className="flex-1 flex flex-col min-h-0 border-b border-white/10">
+            <div className="p-3 shrink-0 border-b border-white/10 bg-[#0f0f11] flex items-center justify-between">
               <div className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
                 <Activity className="w-3.5 h-3.5" /> Ports
               </div>
@@ -249,11 +249,11 @@ export function MachineControlWidget() {
                   ports.map(port => {
                     const isHttp = [3000, 3001, 8080, 4000, 5000].includes(port);
                     return (
-                      <div key={port} className="flex items-center justify-between p-2 rounded-lg border border-border/50 bg-black/20 hover:border-primary/30 transition-colors">
+                      <div key={port} className="flex items-center justify-between p-2 rounded-lg border border-white/10 bg-black/20 hover:border-primary/30 transition-colors">
                         <div className="flex items-center gap-2">
                           <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
                           <span className="text-xs font-bold font-mono w-10 text-foreground">{port}</span>
-                          <Badge variant="outline" className="text-[9px] uppercase border-border/60 text-muted-foreground font-mono px-1.5 py-0 h-4">
+                          <Badge variant="outline" className="text-[9px] uppercase border-white/10 text-muted-foreground font-mono px-1.5 py-0 h-4">
                             {KNOWN_PORTS[port] || "Service"}
                           </Badge>
                         </div>
@@ -275,7 +275,7 @@ export function MachineControlWidget() {
           </div>
 
           {/* SECTION 3: QUICK LAUNCHERS */}
-          <div className="shrink-0 p-3 bg-popover/10 border-t border-border/40">
+          <div className="shrink-0 p-3 bg-[#0f0f11] border-t border-white/10">
             <div className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider mb-2 flex items-center justify-between">
               <span className="flex items-center gap-1.5"><Play className="w-3.5 h-3.5" /> Quick Launch</span>
               <Button variant="ghost" size="sm" className="h-5 text-[9px] px-1.5 text-muted-foreground" onClick={() => setIsEditingLaunchers(!isEditingLaunchers)}>
@@ -310,7 +310,7 @@ export function MachineControlWidget() {
             ) : (
               <div className="grid grid-cols-2 gap-2">
                 {customLaunchers.map((l, i) => (
-                  <Button key={i} variant="outline" size="sm" className="h-8 text-[10px] justify-start bg-card hover:bg-white/5 border-border/60" onClick={() => handleLaunch(l.command)} disabled={agentOffline}>
+                  <Button key={i} variant="outline" size="sm" className="h-8 text-[10px] justify-start bg-[#0f0f11] hover:bg-white/5 border-white/10" onClick={() => handleLaunch(l.command)} disabled={agentOffline}>
                     <Terminal className="w-3 h-3 mr-2 text-primary" /> {l.name}
                   </Button>
                 ))}

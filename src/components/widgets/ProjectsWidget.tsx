@@ -83,13 +83,13 @@ export function ProjectsWidget() {
   const getStatusColor = (status: ProjectStatus) => {
     switch (status) {
       case "active":
-        return "bg-popover text-foreground border-green-500/20";
+        return "bg-[#0f0f11] text-foreground border-green-500/20";
       case "planning":
-        return "bg-popover text-foreground border-yellow-500/20";
+        return "bg-[#0f0f11] text-foreground border-yellow-500/20";
       case "completed":
-        return "bg-popover text-foreground border-purple-500/20";
+        return "bg-[#0f0f11] text-foreground border-purple-500/20";
       case "stale":
-        return "bg-popover text-foreground border-red-500/20";
+        return "bg-[#0f0f11] text-foreground border-red-500/20";
       default:
         return "bg-zinc-500/10 text-zinc-400 border-zinc-500/20";
     }
@@ -132,9 +132,9 @@ export function ProjectsWidget() {
   const nextFocusProject = [...projects].filter(p => p.nextAction && p.status === 'active').sort((a, b) => b.projectHealth! - a.projectHealth!)[0];
 
   return (
-    <div className="flex h-full w-full overflow-hidden text-foreground bg-background rounded-xl">
+    <div className="flex h-full w-full overflow-hidden text-foreground bg-[#0f0f11] rounded-xl">
       {/* ── COLLAPSED VIEW (Always visible) ── */}
-      <div className={`flex flex-col h-full overflow-hidden transition-all duration-300 ${selectedProject ? "w-1/3 border-r border-border/60 pr-3" : "w-full"}`}>
+      <div className={`flex flex-col h-full overflow-hidden transition-all duration-300 ${selectedProject ? "w-1/3 border-r border-white/10 pr-3" : "w-full"}`}>
         <div className="flex items-center justify-between mb-4 shrink-0 px-1 pt-1">
           <div className="flex items-center space-x-2">
             <Folder className="w-4 h-4 text-primary" />
@@ -163,7 +163,7 @@ export function ProjectsWidget() {
                 }
               }}
               placeholder="Project Name & Enter..."
-              className="h-8 text-xs bg-card border-border/80"
+              className="h-8 text-xs bg-[#0f0f11] border-white/10"
               autoFocus
             />
           </div>
@@ -203,7 +203,7 @@ export function ProjectsWidget() {
                     <div 
                       key={project.id} 
                       className={`p-2.5 rounded-lg border flex flex-col gap-2 cursor-pointer transition-all duration-200 
-                        ${isSelected ? "bg-primary/5 border-primary/40 shadow-sm" : "bg-card border-border/60 hover:border-primary/30"}`}
+                        ${isSelected ? "bg-primary/5 border-primary/40 shadow-sm" : "bg-[#0f0f11] border-white/10 hover:border-primary/30"}`}
                       onClick={() => {
                         setSelectedProject(project);
                         if (!activeTab) setActiveTab("overview");
@@ -246,7 +246,7 @@ export function ProjectsWidget() {
                     <div 
                       key={project.id} 
                       className={`p-2.5 rounded-lg border flex flex-col gap-2 cursor-pointer transition-all duration-200 
-                        ${isSelected ? "bg-primary/5 border-primary/40 shadow-sm" : "bg-card border-border/60 hover:border-primary/30"}`}
+                        ${isSelected ? "bg-primary/5 border-primary/40 shadow-sm" : "bg-[#0f0f11] border-white/10 hover:border-primary/30"}`}
                       onClick={() => {
                         setSelectedProject(project);
                         if (!activeTab) setActiveTab("overview");
@@ -291,7 +291,7 @@ export function ProjectsWidget() {
       {/* ── DETAIL VIEW (Slides in) ── */}
       {selectedProject && (
         <div className="w-2/3 flex flex-col h-full overflow-hidden pl-3">
-          <div className="flex items-center justify-between mb-3 shrink-0 bg-card p-3 rounded-xl border border-border/60">
+          <div className="flex items-center justify-between mb-3 shrink-0 bg-[#0f0f11] p-3 rounded-xl border border-white/10">
             <div className="flex-1 min-w-0 pr-4 space-y-1">
               <div className="flex items-center gap-2">
                 <h3 className="text-base font-bold text-foreground truncate">{selectedProject.name}</h3>
@@ -319,7 +319,7 @@ export function ProjectsWidget() {
           </div>
 
           {/* detail navigation tabs */}
-          <div className="flex space-x-1 border-b border-border/60 pb-1.5 mb-3 shrink-0 overflow-x-auto no-scrollbar">
+          <div className="flex space-x-1 border-b border-white/10 pb-1.5 mb-3 shrink-0 overflow-x-auto no-scrollbar">
             {["overview", "notes", "feedback"].map((tab) => (
               <Button 
                 key={tab}
@@ -338,7 +338,7 @@ export function ProjectsWidget() {
             {activeTab === "overview" && (
               <div className="space-y-4 pb-4">
                 {/* Folder Path & VS Code */}
-                <div className="p-3 border border-border/80 bg-popover/30 rounded-xl flex items-center gap-3">
+                <div className="p-3 border border-white/10 bg-[#0f0f11] rounded-xl flex items-center gap-3">
                   <div className="flex-1 space-y-1.5">
                     <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Local Folder Path</label>
                     <Input 
@@ -348,7 +348,7 @@ export function ProjectsWidget() {
                         setSelectedProject({ ...selectedProject, folderPath: e.target.value });
                       }}
                       placeholder="C:\Users\Kavya\Projects\..."
-                      className="bg-card border-border text-xs text-foreground h-7"
+                      className="bg-[#0f0f11] border-white/10 text-xs text-foreground h-7"
                     />
                   </div>
                   {selectedProject.folderPath && (
@@ -364,7 +364,7 @@ export function ProjectsWidget() {
 
                 {/* Progress bars */}
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5 p-3 border border-border/80 bg-popover/30 rounded-xl">
+                  <div className="space-y-1.5 p-3 border border-white/10 bg-[#0f0f11] rounded-xl">
                     <div className="flex justify-between text-[10px] uppercase font-bold text-muted-foreground"><span>Health</span><span className="text-green-500">{selectedProject.projectHealth}%</span></div>
                     <input type="range" min="0" max="100" value={selectedProject.projectHealth || 0} onChange={(e) => {
                       const val = parseInt(e.target.value);
@@ -372,7 +372,7 @@ export function ProjectsWidget() {
                       setSelectedProject({ ...selectedProject, projectHealth: val });
                     }} className="w-full h-1 bg-muted rounded-lg appearance-none cursor-pointer accent-green-500" />
                   </div>
-                  <div className="space-y-1.5 p-3 border border-border/80 bg-popover/30 rounded-xl">
+                  <div className="space-y-1.5 p-3 border border-white/10 bg-[#0f0f11] rounded-xl">
                     <div className="flex justify-between text-[10px] uppercase font-bold text-muted-foreground"><span>Completion</span><span className="text-primary">{selectedProject.completionPercentage || 0}%</span></div>
                     <input type="range" min="0" max="100" value={selectedProject.completionPercentage || 0} onChange={(e) => {
                       const val = parseInt(e.target.value);
@@ -387,7 +387,7 @@ export function ProjectsWidget() {
                   <Input value={selectedProject.nextAction || ""} onChange={(e) => {
                       updateProject(selectedProject.id, { nextAction: e.target.value });
                       setSelectedProject({ ...selectedProject, nextAction: e.target.value });
-                    }} placeholder="e.g. Set up auth middleware..." className="bg-card border-border text-xs h-8" />
+                    }} placeholder="e.g. Set up auth middleware..." className="bg-[#0f0f11] border-white/10 text-xs h-8" />
                 </div>
               </div>
             )}
@@ -401,19 +401,19 @@ export function ProjectsWidget() {
                     setSelectedProject({ ...selectedProject, architectureNotes: e.target.value });
                   }}
                   placeholder="Project-specific notes, architecture, ideas..."
-                  className="bg-card border-border font-mono text-xs text-foreground placeholder:text-muted-foreground/60 min-h-[300px] p-3 flex-1"
+                  className="bg-[#0f0f11] border-white/10 font-mono text-xs text-foreground placeholder:text-muted-foreground/60 min-h-[300px] p-3 flex-1"
                 />
               </div>
             )}
 
             {activeTab === "feedback" && (
               <div className="space-y-4 pb-4">
-                <div className="p-3 border border-border/80 bg-popover/30 rounded-xl space-y-3">
+                <div className="p-3 border border-white/10 bg-[#0f0f11] rounded-xl space-y-3">
                   <Textarea 
                     value={newFeedback}
                     onChange={(e) => setNewFeedback(e.target.value)}
                     placeholder="Paste received feedback here..."
-                    className="bg-card border-border text-xs min-h-[80px]"
+                    className="bg-[#0f0f11] border-white/10 text-xs min-h-[80px]"
                   />
                   <div className="flex justify-end">
                     <Button size="sm" onClick={saveFeedback} className="h-7 text-[10px]">Save Feedback</Button>
@@ -422,7 +422,7 @@ export function ProjectsWidget() {
 
                 <div className="space-y-3">
                   {selectedProject.feedback?.map((fb) => (
-                    <div key={fb.id} className="p-3 border border-border bg-card rounded-lg flex flex-col gap-2">
+                    <div key={fb.id} className="p-3 border border-white/10 bg-[#0f0f11] rounded-lg flex flex-col gap-2">
                       <p className="text-[9px] text-muted-foreground font-mono">{new Date(fb.date).toLocaleString()}</p>
                       <p className="text-xs leading-relaxed text-foreground whitespace-pre-wrap">{fb.text}</p>
                       {selectedProject.githubUrl && (
