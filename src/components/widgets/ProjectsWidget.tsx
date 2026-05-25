@@ -250,6 +250,12 @@ export function ProjectsWidget() {
           <div className="flex items-center space-x-2">
             <Folder className="w-4 h-4 text-primary" />
             <h2 className="text-sm font-semibold tracking-wider uppercase text-secondary-foreground">Projects</h2>
+            {!selectedProject && staleWarningCount > 0 && (
+              <div className="ml-2 px-1.5 py-0.5 bg-orange-500/10 border border-orange-500/20 rounded flex items-center space-x-1">
+                <AlertCircle className="w-2.5 h-2.5 text-orange-400" />
+                <span className="text-[9px] text-orange-400 font-bold">{staleWarningCount} Stale</span>
+              </div>
+            )}
           </div>
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger className="w-6 h-6 hover:bg-white/5 inline-flex items-center justify-center rounded-md text-muted-foreground transition-colors" onClick={() => {
@@ -301,14 +307,7 @@ export function ProjectsWidget() {
           </TabsList>
 
           <ScrollArea className="flex-1 px-2 [&_[data-radix-scroll-area-scrollbar]]:hidden">
-
-            {!selectedProject && staleWarningCount > 0 && (
-              <div className="mb-4 p-1.5 bg-orange-500/10 border border-orange-500/20 rounded-md flex items-center space-x-1.5 w-max mx-auto">
-                <AlertCircle className="w-3 h-3 text-orange-400 shrink-0" />
-                <p className="text-[9px] text-orange-400 font-medium">You have {staleWarningCount} stale projects (&gt;45d without commits).</p>
-              </div>
-            )}
-                 <TabsContent value="github" className="m-0 space-y-2 pb-4">
+                 <TabsContent value="github" className="m-0 space-y-1.5 pb-4">
               {projects.filter(p => p.githubUrl).length === 0 && (
                 <div className="text-center py-6 text-xs text-muted-foreground">No GitHub repositories synced yet.</div>
               )}
@@ -325,22 +324,18 @@ export function ProjectsWidget() {
                 return (
                   <div 
                     key={project.id} 
-                    className={`p-2.5 rounded-lg border flex flex-col gap-2 cursor-pointer transition-all duration-200 
-                      ${isSelected ? "bg-primary/10 border-primary/40 shadow-sm" : "bg-transparent border-white/5 hover:bg-white/5 hover:border-white/10"}`}
+                    className={`px-3 py-2.5 rounded-lg flex items-center justify-between cursor-pointer transition-all duration-200 border border-transparent 
+                      ${isSelected ? "bg-primary/10 border-primary/20 shadow-sm" : "bg-transparent hover:bg-white/5 hover:border-white/10"}`}
                     onClick={() => setSelectedProject(project)}
                   >
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className={`text-[8px] font-semibold py-0 px-1 uppercase border ${getStatusColor(project.status)} shrink-0`}>
-                        {project.status}
-                      </Badge>
-                      <div className="flex items-center gap-2 overflow-hidden flex-1">
-                        <span className="text-xs font-bold text-foreground truncate">{project.name}</span>
-                        {stats && stats.stars > 0 && (
-                          <Badge variant="secondary" className="text-[8px] px-1 py-0 bg-yellow-500/10 text-yellow-500 border-yellow-500/20">
-                            ★ {stats.stars}
-                          </Badge>
-                        )}
-                      </div>
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      <div className={`w-2 h-2 rounded-full shrink-0 shadow-sm ${stats && (new Date().getTime() - new Date(stats.lastCommit).getTime() > 45*24*3600*1000) ? "bg-orange-500 shadow-orange-500/50" : "bg-green-500 shadow-green-500/50"}`} />
+                      <span className={`text-sm font-semibold truncate ${isSelected ? 'text-primary' : 'text-foreground'}`}>{project.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {!selectedProject && stats && (
+                        <span className="text-[10px] text-muted-foreground font-mono opacity-80">{new Date(stats.lastCommit).toLocaleDateString()}</span>
+                      )}
                       {project.folderPath && (
                         <Button 
                           variant="ghost" 
@@ -356,19 +351,12 @@ export function ProjectsWidget() {
                         </Button>
                       )}
                     </div>
-                    
-                    {!selectedProject && stats && (
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        <span className={`w-1.5 h-1.5 rounded-full ${new Date().getTime() - new Date(stats.lastCommit).getTime() > 14*24*3600*1000 ? "bg-orange-500" : "bg-green-500"}`} />
-                        <span className="text-[9px] text-muted-foreground font-mono">Last commit: {new Date(stats.lastCommit).toLocaleDateString()}</span>
-                      </div>
-                    )}
                   </div>
                 );
               })}
             </TabsContent>
 
-            <TabsContent value="local" className="m-0 space-y-2 pb-4">
+            <TabsContent value="local" className="m-0 space-y-1.5 pb-4">
               {projects.filter(p => !p.githubUrl).length === 0 && (
                 <div className="text-center py-6 text-xs text-muted-foreground">No local workspaces found.</div>
               )}
@@ -379,24 +367,19 @@ export function ProjectsWidget() {
                 return (
                   <div 
                     key={project.id} 
-                    className={`p-2.5 rounded-lg border flex flex-col gap-2 cursor-pointer transition-all duration-200 
-                      ${isSelected ? "bg-primary/10 border-primary/40 shadow-sm" : "bg-transparent border-white/5 hover:bg-white/5 hover:border-white/10"}`}
+                    className={`px-3 py-2.5 rounded-lg flex items-center justify-between cursor-pointer transition-all duration-200 border border-transparent 
+                      ${isSelected ? "bg-primary/10 border-primary/20 shadow-sm" : "bg-transparent hover:bg-white/5 hover:border-white/10"}`}
                     onClick={() => setSelectedProject(project)}
                   >
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className={`text-[8px] font-semibold py-0 px-1 uppercase border ${getStatusColor(project.status)} shrink-0`}>
-                        {project.status}
-                      </Badge>
-                      <div className="flex items-center gap-1.5 overflow-hidden flex-1">
-                        {healthScore !== undefined && (
-                          <div 
-                            className={`w-2 h-2 rounded-full shrink-0 ${healthScore >= 70 ? 'bg-green-500' : healthScore >= 40 ? 'bg-amber-500' : 'bg-red-500'}`} 
-                            title="Health Status"
-                          />
-                        )}
-                        <span className="text-xs font-bold text-foreground truncate">{project.name}</span>
-                      </div>
-                      {project.folderPath && (
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      <div 
+                        className={`w-2 h-2 rounded-full shrink-0 shadow-sm ${(healthScore ?? 100) >= 70 ? 'bg-green-500 shadow-green-500/50' : (healthScore ?? 100) >= 40 ? 'bg-amber-500 shadow-amber-500/50' : 'bg-red-500 shadow-red-500/50'}`} 
+                        title="Health Status"
+                      />
+                      <span className={`text-sm font-semibold truncate ${isSelected ? 'text-primary' : 'text-foreground'}`}>{project.name}</span>
+                    </div>
+                    {project.folderPath && (
+                      <div className="flex items-center gap-2 shrink-0">
                         <Button 
                           variant="ghost" 
                           size="icon" 
@@ -409,8 +392,8 @@ export function ProjectsWidget() {
                         >
                           <Code2 className="w-3.5 h-3.5" />
                         </Button>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}

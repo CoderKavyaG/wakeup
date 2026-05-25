@@ -79,7 +79,26 @@ export function FocusPanelWidget() {
   };
 
   const handleUnifiedEnter = async (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
+    if (e.key === "Escape") {
+      setShowProjectDropdown(false);
+      setTaggedProject(null);
+      return;
+    }
+
+    if (e.key === "Enter" && !e.shiftKey) {
+      if (showProjectDropdown) {
+        const matches = projects.filter(p => p.name.toLowerCase().includes(projectSearch.toLowerCase()));
+        if (matches.length > 0) {
+          e.preventDefault();
+          setTaggedProject(matches[0]);
+          setShowProjectDropdown(false);
+          setUnifiedInput(prev => prev.slice(0, prev.lastIndexOf("@")) + `@${matches[0].name} `);
+          return;
+        } else {
+          setShowProjectDropdown(false);
+        }
+      }
+
       // If a project is tagged, auto-route to project feedback/note regardless of mode
       if (taggedProject) {
         e.preventDefault();
@@ -113,6 +132,7 @@ export function FocusPanelWidget() {
           const parsed = parseTaskInput(unifiedInput);
           addTask({ title: parsed.title, priority: parsed.priority, dueDate: parsed.dueDate });
           setUnifiedInput("");
+          setShowProjectDropdown(false);
         }
       } else if (inputMode === "note") {
         if (e.ctrlKey || e.metaKey) {
@@ -120,6 +140,7 @@ export function FocusPanelWidget() {
           if (unifiedInput.trim()) {
             addNote(unifiedInput.trim());
             setUnifiedInput("");
+            setShowProjectDropdown(false);
           }
         }
       }
