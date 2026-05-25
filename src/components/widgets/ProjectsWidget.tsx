@@ -27,7 +27,8 @@ import {
   Folder, GitBranch, ExternalLink, Trash2, 
   Brain, CheckCircle2, Sparkles, Plus,
   HelpCircle, Activity, ChevronRight, X, Heart, 
-  Code2, Play, AlertCircle, Pencil
+  Code2, Play, AlertCircle, Pencil,
+  Eye,
 } from "lucide-react";
 
 export function ProjectsWidget() {
@@ -35,7 +36,6 @@ export function ProjectsWidget() {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   
   // New Feedback State
-  const [newFeedback, setNewFeedback] = useState("");
   
   // Add/Edit Project State
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -55,6 +55,8 @@ export function ProjectsWidget() {
 
   // Local Health Stats
   const [localHealthStats, setLocalHealthStats] = useState<Record<string, number>>({});
+
+  const [viewNote, setViewNote] = useState<any>(null);
 
   // Auto-Sync GitHub Repos on Mount
   useEffect(() => {
@@ -181,34 +183,6 @@ export function ProjectsWidget() {
       default: return "bg-zinc-500 shadow-zinc-500/50";
     }
   };
-
-  const [isSavingFeedback, setIsSavingFeedback] = useState(false);
-
-  const saveFeedback = async () => {
-    if (!newFeedback.trim() || !selectedProject) return;
-    setIsSavingFeedback(true);
-    try {
-      const res = await fetch("/api/ai/classify-note", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: newFeedback.trim() })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const items = data.items || [];
-        for (const item of items) {
-          await notesStoreAddNote(item.content, selectedProject.id, item.category);
-        }
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setIsSavingFeedback(false);
-      setNewFeedback("");
-    }
-  };
-
-
 
   const createGitHubIssue = async (feedbackText: string) => {
     if (!selectedProject?.githubUrl) return alert("No GitHub URL for this project.");
@@ -549,21 +523,8 @@ export function ProjectsWidget() {
 
               {/* Unified Feedback Feed */}
               <div className="pt-4 border-t border-white/10 space-y-4">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between pb-2">
                   <h3 className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest px-1">Next Feedbacks</h3>
-                </div>
-                <div className="p-3 border border-white/5 bg-[#0f0f11]/50 rounded-xl space-y-3">
-                  <Textarea 
-                    value={newFeedback}
-                    onChange={(e) => setNewFeedback(e.target.value)}
-                    placeholder="Paste multiple bugs, ideas, or feedback points here... AI will split them up!"
-                    className="bg-transparent border-white/10 text-xs min-h-[80px] custom-scrollbar focus-visible:ring-1 focus-visible:ring-primary/50"
-                  />
-                  <div className="flex justify-end">
-                    <Button size="sm" onClick={saveFeedback} disabled={isSavingFeedback} className="h-7 text-[10px] bg-white text-black hover:bg-zinc-200">
-                      {isSavingFeedback ? "Parsing..." : "Save Feedback"}
-                    </Button>
-                  </div>
                 </div>
 
                 <ScrollArea className="h-[250px] custom-scrollbar pr-2">
@@ -584,14 +545,17 @@ export function ProjectsWidget() {
                               </Button>
                             </div>
                           </div>
-                          <p className="text-xs leading-relaxed text-foreground whitespace-pre-wrap pr-6">{note.content}</p>
-                          {selectedProject.githubUrl && (
-                            <div className="flex justify-end mt-1">
+                          <p className="text-xs leading-relaxed text-foreground whitespace-pre-wrap pr-6 line-clamp-3">{note.content}</p>
+                          <div className="flex justify-end gap-2 mt-2">
+                            <Button size="sm" variant="outline" className="h-6 text-[9px] px-2 bg-transparent border-white/10 hover:bg-white/5" onClick={() => setViewNote(note)}>
+                              <Eye className="w-3 h-3 mr-1.5" /> Open
+                            </Button>
+                            {selectedProject.githubUrl && (
                               <Button size="sm" variant="outline" className="h-6 text-[9px] px-2 bg-transparent border-white/10 hover:bg-white/5" onClick={() => createGitHubIssue(note.content)}>
                                 <GitBranch className="w-3 h-3 mr-1.5" /> Open as Issue
                               </Button>
-                            </div>
-                          )}
+                            )}
+                          </div>
                         </div>
                       ))
                     ) : (
@@ -604,6 +568,36 @@ export function ProjectsWidget() {
           </ScrollArea>
         </div>
       )}
+
+      {/* View Note Dialog */}
+      {viewNote && (
+        <Dialog open={!!viewNote} onOpenChange={(o) => !o && setViewNote(null)}>
+          <DialogContent className="bg-[#0f0f11] border-white/10 text-foreground max-w-lg max-h-[80vh] flex flex-col">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                Feedback Details
+                {viewNote.category && (
+                  <Badge variant="secondary" className="text-[10px] py-0 px-1.5 uppercase bg-primary/10 text-primary border-primary/20">
+                    {viewNote.category}
+                  </Badge>
+                )}
+              </DialogTitle>
+            </DialogHeader>
+            <ScrollArea className="flex-1 mt-4 text-sm whitespace-pre-wrap leading-relaxed custom-scrollbar">
+              {viewNote.content}
+            </ScrollArea>
+            <DialogFooter className="mt-6 border-t border-white/10 pt-4">
+              <Button variant="outline" onClick={() => setViewNote(null)} className="border-white/10 bg-transparent">Close</Button>
+              {selectedProject?.githubUrl && (
+                <Button onClick={() => createGitHubIssue(viewNote.content)}>
+                  <GitBranch className="w-4 h-4 mr-2" /> Open as Issue
+                </Button>
+              )}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
     </div>
   );
 }

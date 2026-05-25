@@ -228,7 +228,7 @@ export function FocusPanelWidget() {
     );
   };
 
-  const wordCount = notes.reduce((acc, note) => acc + (note.content.match(/\b\w+\b/g)?.length || 0), 0);
+  const wordCount = notes.filter(n => !n.projectId).reduce((acc, note) => acc + (note.content.match(/\b\w+\b/g)?.length || 0), 0);
 
   return (
     <div className="flex flex-col h-full text-foreground bg-[#0f0f11] rounded-xl overflow-hidden divide-y divide-border/40">
@@ -367,7 +367,7 @@ export function FocusPanelWidget() {
 
           <ScrollArea className="flex-1 px-4 pb-2 min-h-0 h-full w-full overflow-y-auto custom-scrollbar">
             <div className="space-y-2">
-              {notes.map(renderNoteCard)}
+              {notes.filter(n => !n.projectId).map(renderNoteCard)}
             </div>
           </ScrollArea>
         </div>
