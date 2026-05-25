@@ -335,7 +335,7 @@ export function ProjectsWidget() {
                     onClick={() => setSelectedProject(project)}
                   >
                     <div className="flex items-center gap-3 overflow-hidden">
-                      <div className={`w-2 h-2 rounded-full shrink-0 shadow-sm ${getStatusColor(project.status)}`} />
+                      <div className={`w-2 h-2 rounded-full shrink-0 shadow-sm ${(!stats || (new Date().getTime() - new Date(stats.lastCommit).getTime() <= 45*24*3600*1000)) ? "bg-green-500 shadow-green-500/50" : "bg-yellow-500 shadow-yellow-500/50"}`} />
                       <span className={`text-sm font-semibold truncate ${isSelected ? 'text-primary' : 'text-foreground'}`}>{project.name}</span>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
@@ -414,7 +414,7 @@ export function ProjectsWidget() {
           <div className="flex items-center justify-between mb-3 shrink-0 bg-[#0f0f11] p-3 rounded-xl border border-white/10">
             <div className="flex-1 min-w-0 pr-4 space-y-1">
               <div className="flex items-center gap-3">
-                <div className={`w-2.5 h-2.5 rounded-full shadow-sm ${getStatusColor(selectedProject.status)}`} />
+                <div className={`w-2.5 h-2.5 rounded-full shadow-sm ${selectedProject.githubUrl ? ((!githubStats[selectedProject.githubUrl.toLowerCase()] || (new Date().getTime() - new Date(githubStats[selectedProject.githubUrl.toLowerCase()].lastCommit).getTime() <= 45*24*3600*1000)) ? "bg-green-500 shadow-green-500/50" : "bg-yellow-500 shadow-yellow-500/50") : getStatusColor(selectedProject.status)}`} />
                 <h3 className="text-base font-bold text-foreground truncate">{selectedProject.name}</h3>
               </div>
               <div className="flex items-center gap-3 text-[10px] font-mono text-muted-foreground">
@@ -548,7 +548,7 @@ export function ProjectsWidget() {
               {/* Unified Feedback Feed */}
               <div className="pt-4 border-t border-white/10 space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest px-1">Feedback & Brain Dump</h3>
+                  <h3 className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest px-1">Next Feedbacks</h3>
                 </div>
                 <div className="p-3 border border-white/5 bg-[#0f0f11]/50 rounded-xl space-y-3">
                   <Textarea 
@@ -564,37 +564,39 @@ export function ProjectsWidget() {
                   </div>
                 </div>
 
-                <div className="space-y-3">
-                  {notes.filter(n => n.projectId === selectedProject.id).length > 0 ? (
-                    notes.filter(n => n.projectId === selectedProject.id).map(note => (
-                      <div key={note.id} className="group p-3 border border-white/5 bg-transparent hover:bg-white/5 transition-colors rounded-lg flex flex-col gap-2 relative">
-                        <div className="flex justify-between items-center">
-                          <p className="text-[9px] text-muted-foreground font-mono">{new Date(note.createdAt).toLocaleString()}</p>
-                          <div className="flex items-center gap-2">
-                            {note.category && (
-                              <Badge variant="secondary" className="text-[8px] py-0 px-1.5 uppercase bg-primary/10 text-primary border-primary/20">
-                                {note.category}
-                              </Badge>
-                            )}
-                            <Button variant="ghost" size="icon" className="w-5 h-5 opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-400" onClick={() => notesStoreDeleteNote(note.id)}>
-                              <Trash2 className="w-3 h-3" />
-                            </Button>
+                <ScrollArea className="h-[250px] custom-scrollbar pr-2">
+                  <div className="space-y-3">
+                    {notes.filter(n => n.projectId === selectedProject.id).length > 0 ? (
+                      notes.filter(n => n.projectId === selectedProject.id).map(note => (
+                        <div key={note.id} className="group p-3 border border-white/5 bg-transparent hover:bg-white/5 transition-colors rounded-lg flex flex-col gap-2 relative">
+                          <div className="flex justify-between items-center">
+                            <p className="text-[9px] text-muted-foreground font-mono">{new Date(note.createdAt).toLocaleString()}</p>
+                            <div className="flex items-center gap-2">
+                              {note.category && (
+                                <Badge variant="secondary" className="text-[8px] py-0 px-1.5 uppercase bg-primary/10 text-primary border-primary/20">
+                                  {note.category}
+                                </Badge>
+                              )}
+                              <Button variant="ghost" size="icon" className="w-5 h-5 opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-400" onClick={() => notesStoreDeleteNote(note.id)}>
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </div>
                           </div>
+                          <p className="text-xs leading-relaxed text-foreground whitespace-pre-wrap pr-6">{note.content}</p>
+                          {selectedProject.githubUrl && (
+                            <div className="flex justify-end mt-1">
+                              <Button size="sm" variant="outline" className="h-6 text-[9px] px-2 bg-transparent border-white/10 hover:bg-white/5" onClick={() => createGitHubIssue(note.content)}>
+                                <GitBranch className="w-3 h-3 mr-1.5" /> Open as Issue
+                              </Button>
+                            </div>
+                          )}
                         </div>
-                        <p className="text-xs leading-relaxed text-foreground whitespace-pre-wrap pr-6">{note.content}</p>
-                        {selectedProject.githubUrl && (
-                          <div className="flex justify-end mt-1">
-                            <Button size="sm" variant="outline" className="h-6 text-[9px] px-2 bg-transparent border-white/10 hover:bg-white/5" onClick={() => createGitHubIssue(note.content)}>
-                              <GitBranch className="w-3 h-3 mr-1.5" /> Open as Issue
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-6 text-xs text-muted-foreground">No notes or feedback recorded yet.</div>
-                  )}
-                </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-6 text-xs text-muted-foreground">No notes or feedback recorded yet.</div>
+                    )}
+                  </div>
+                </ScrollArea>
               </div>
             </div>
           </ScrollArea>

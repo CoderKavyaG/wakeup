@@ -92,7 +92,7 @@ export function FocusPanelWidget() {
           e.preventDefault();
           setTaggedProject(matches[0]);
           setShowProjectDropdown(false);
-          setUnifiedInput(prev => prev.slice(0, prev.lastIndexOf("@")) + `@${matches[0].name} `);
+          setUnifiedInput(prev => prev.slice(0, prev.lastIndexOf("@")));
           return;
         } else {
           setShowProjectDropdown(false);
@@ -236,7 +236,7 @@ export function FocusPanelWidget() {
                 onClick={() => {
                   setTaggedProject(p);
                   setShowProjectDropdown(false);
-                  setUnifiedInput(prev => prev.slice(0, prev.lastIndexOf("@")) + `@${p.name} `);
+                  setUnifiedInput(prev => prev.slice(0, prev.lastIndexOf("@")));
                   unifiedInputRef.current?.focus();
                 }}
               >
