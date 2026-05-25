@@ -22,12 +22,25 @@ import {
   Loader2,
   X,
   CornerDownLeft,
+  GitBranch,
+  Crosshair,
+  Clock,
 } from "lucide-react";
 
 // ─────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────
-type Mode = "command" | "search";
+type Mode = "command" | "search" | "add";
+
+const ADD_WIDGET_OPTIONS = [
+  { type: "projects", name: "Projects", desc: "All your repos and local workspaces", icon: <FolderOpen className="w-4 h-4 text-primary" /> },
+  { type: "github", name: "GitHub Monitor", desc: "Commits, streaks, and repo health", icon: <GitBranch className="w-4 h-4 text-primary" /> },
+  { type: "focus", name: "Focus Panel", desc: "Tasks and brain dump", icon: <Crosshair className="w-4 h-4 text-primary" /> },
+  { type: "machine", name: "Machine Control", desc: "Ports, launcher, workspace files", icon: <Terminal className="w-4 h-4 text-primary" /> },
+  { type: "quicklinks", name: "Quick Links", desc: "Social links and bookmarks", icon: <LinkIcon className="w-4 h-4 text-primary" /> },
+  { type: "clock", name: "Clock & Time", desc: "IST + US time zones", icon: <Clock className="w-4 h-4 text-primary" /> },
+];
+
 
 interface SearchResult {
   id: string;
@@ -159,6 +172,13 @@ export function CockpitCommand() {
     if (!val) {
       setMode("command");
       setSearchResults([]);
+      return;
+    }
+
+    if (val.toLowerCase() === "add") {
+      setMode("add");
+      setSearchResults([]);
+      setSelectedIndex(0);
       return;
     }
 
@@ -394,6 +414,13 @@ export function CockpitCommand() {
       return;
     }
 
+    // In add mode with a selected widget
+    if (mode === "add" && ADD_WIDGET_OPTIONS[selectedIndex]) {
+      addWidget(ADD_WIDGET_OPTIONS[selectedIndex].type as any);
+      closeOverlay();
+      return;
+    }
+
     // Ask AI
     setInput("");
     askCockpit(val);
@@ -418,10 +445,25 @@ export function CockpitCommand() {
       e.preventDefault();
       if (mode === "search")
         setSelectedIndex((i) => Math.min(i + 1, searchResults.length - 1));
+      if (mode === "add")
+        setSelectedIndex((i) => Math.min(i + 2, ADD_WIDGET_OPTIONS.length - 1));
     }
     if (e.key === "ArrowUp") {
       e.preventDefault();
       if (mode === "search") setSelectedIndex((i) => Math.max(i - 1, 0));
+      if (mode === "add") setSelectedIndex((i) => Math.max(i - 2, 0));
+    }
+    if (e.key === "ArrowRight") {
+      if (mode === "add") {
+        e.preventDefault();
+        setSelectedIndex((i) => Math.min(i + 1, ADD_WIDGET_OPTIONS.length - 1));
+      }
+    }
+    if (e.key === "ArrowLeft") {
+      if (mode === "add") {
+        e.preventDefault();
+        setSelectedIndex((i) => Math.max(i - 1, 0));
+      }
     }
   };
 
@@ -588,7 +630,42 @@ export function CockpitCommand() {
                   </div>
                 )}
 
-                {/* MODE: COMMAND — suggestions */}
+                {/* MODE: ADD WIDGET */}
+                {!isStreaming && !streamedAnswer && mode === "add" && (
+                  <div className="p-4 space-y-4">
+                    <p className="text-[10px] font-bold uppercase text-muted-foreground/40 tracking-widest px-2 font-mono">
+                      Select a widget to add
+                    </p>
+                    <div className="grid grid-cols-2 gap-2 px-2">
+                      {ADD_WIDGET_OPTIONS.map((w, i) => (
+                        <button
+                          key={w.type}
+                          onClick={() => {
+                            addWidget(w.type as any);
+                            closeOverlay();
+                          }}
+                          className={`flex items-start gap-3 p-3 rounded-xl border text-left transition-all ${
+                            selectedIndex === i
+                              ? "bg-primary/10 border-primary/30 ring-1 ring-primary/50"
+                              : "bg-[#0f0f11]/50 border-white/5 hover:bg-white/5 hover:border-white/10"
+                          }`}
+                        >
+                          <div className="mt-0.5 shrink-0">{w.icon}</div>
+                          <div className="flex-1 min-w-0">
+                            <h4 className={`text-sm font-bold truncate ${selectedIndex === i ? "text-primary" : "text-foreground"}`}>
+                              {w.name}
+                            </h4>
+                            <p className="text-[10px] text-muted-foreground line-clamp-1 mt-0.5">
+                              {w.desc}
+                            </p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* MODE: COMMAND — local search */}
                 {!isStreaming && !streamedAnswer && mode === "command" && (
                   <div className="p-3 space-y-1">
                     <p className="text-[9px] font-bold uppercase text-muted-foreground/40 tracking-widest px-2 pb-1 font-mono">
