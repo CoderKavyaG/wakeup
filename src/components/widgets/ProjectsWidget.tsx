@@ -453,18 +453,20 @@ export function ProjectsWidget() {
                       <label className="text-xs font-semibold text-muted-foreground">Title</label>
                       <Input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="bg-transparent border-white/10" placeholder="Project name" />
                     </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-semibold text-muted-foreground">Color Indicator</label>
-                      <div className="flex gap-3">
-                        {['green', 'yellow', 'red'].map(color => (
-                          <button
-                            key={color}
-                            onClick={() => setFormData({...formData, status: color})}
-                            className={`w-5 h-5 rounded-full ${color === 'green' ? 'bg-green-500' : color === 'yellow' ? 'bg-yellow-500' : 'bg-red-500'} ${formData.status === color ? 'ring-2 ring-white ring-offset-2 ring-offset-[#0f0f11]' : 'opacity-50 hover:opacity-100'}`}
-                          />
-                        ))}
+                    {!selectedProject.githubUrl && (
+                      <div className="space-y-2">
+                        <label className="text-xs font-semibold text-muted-foreground">Color Indicator</label>
+                        <div className="flex gap-3">
+                          {['green', 'yellow', 'red'].map(color => (
+                            <button
+                              key={color}
+                              onClick={() => setFormData({...formData, status: color})}
+                              className={`w-5 h-5 rounded-full ${color === 'green' ? 'bg-green-500' : color === 'yellow' ? 'bg-yellow-500' : 'bg-red-500'} ${formData.status === color ? 'ring-2 ring-white ring-offset-2 ring-offset-[#0f0f11]' : 'opacity-50 hover:opacity-100'}`}
+                            />
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    )}
                     <div className="space-y-2">
                       <label className="text-xs font-semibold text-muted-foreground">Description</label>
                       <Input value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="bg-transparent border-white/10" placeholder="Brief description" />

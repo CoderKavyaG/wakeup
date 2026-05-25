@@ -99,11 +99,26 @@ export function FocusPanelWidget() {
         }
       }
 
+      let currentTaggedProject = taggedProject;
+      let finalInput = unifiedInput;
+
+      if (!currentTaggedProject) {
+        const match = unifiedInput.match(/@([a-zA-Z0-9_-]+)/);
+        if (match) {
+          const possibleProjectName = match[1];
+          const matchedProject = projects.find(p => p.name.toLowerCase() === possibleProjectName.toLowerCase());
+          if (matchedProject) {
+            currentTaggedProject = matchedProject;
+            finalInput = unifiedInput.replace(`@${possibleProjectName}`, "").trim();
+          }
+        }
+      }
+
       // If a project is tagged, auto-route to project feedback/note regardless of mode
-      if (taggedProject) {
+      if (currentTaggedProject) {
         e.preventDefault();
-        if (unifiedInput.trim()) {
-          const content = unifiedInput.trim();
+        if (finalInput.trim()) {
+          const content = finalInput.trim();
           setUnifiedInput("");
           
           setIsClassifying(true);
@@ -114,9 +129,17 @@ export function FocusPanelWidget() {
               body: JSON.stringify({ text: content })
             });
             const data = await res.json();
-            addNote(content, taggedProject.id, data.category || "general note");
+            
+            // Handle array response from classify-note
+            if (data.items && Array.isArray(data.items)) {
+              for (const item of data.items) {
+                await addNote(item.content, currentTaggedProject.id, item.category);
+              }
+            } else {
+              await addNote(content, currentTaggedProject.id, data.category || "general note");
+            }
           } catch (e) {
-            addNote(content, taggedProject.id, "general note");
+            addNote(content, currentTaggedProject.id, "general note");
           } finally {
             setIsClassifying(false);
             setTaggedProject(null);
