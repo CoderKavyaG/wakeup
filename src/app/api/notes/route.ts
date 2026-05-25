@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const projectId = searchParams.get("projectId");
+
     const notes = await prisma.note.findMany({
+      where: projectId ? { projectId } : undefined,
       orderBy: { createdAt: "desc" },
     });
     return NextResponse.json(notes);
@@ -16,14 +20,14 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { content } = body;
+    const { content, projectId, category } = body;
 
     if (!content || content.trim() === "") {
       return NextResponse.json({ error: "Content is required" }, { status: 400 });
     }
 
     const note = await prisma.note.create({
-      data: { content },
+      data: { content, projectId, category },
     });
 
     return NextResponse.json(note);

@@ -6,6 +6,7 @@ export interface Task {
   dueDate?: string;
   completed: boolean;
   priority: "low" | "medium" | "high";
+  projectId?: string;
 }
 
 interface TaskState {

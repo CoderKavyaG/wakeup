@@ -3,6 +3,8 @@ import { create } from "zustand";
 export interface Note {
   id: string;
   content: string;
+  projectId?: string;
+  category?: string;
   createdAt: string;
 }
 
@@ -11,7 +13,7 @@ interface NoteState {
   loading: boolean;
   error: string | null;
   fetchNotes: () => Promise<void>;
-  addNote: (content: string) => Promise<void>;
+  addNote: (content: string, projectId?: string, category?: string) => Promise<void>;
   deleteNote: (id: string) => Promise<void>;
 }
 
@@ -33,11 +35,13 @@ export const useNoteStore = create<NoteState>((set, get) => ({
     }
   },
 
-  addNote: async (content) => {
+  addNote: async (content, projectId, category) => {
     const tempId = `temp-${Date.now()}`;
     const newNote: Note = {
       id: tempId,
       content,
+      projectId,
+      category,
       createdAt: new Date().toISOString(),
     };
 
@@ -49,7 +53,7 @@ export const useNoteStore = create<NoteState>((set, get) => ({
       const res = await fetch("/api/notes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ content, projectId, category }),
       });
 
       if (!res.ok) throw new Error("Failed to add note");

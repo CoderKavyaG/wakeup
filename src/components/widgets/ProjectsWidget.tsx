@@ -2,12 +2,26 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useProjectStore, Project, ProjectStatus } from "@/store/useProjectStore";
+import { useNoteStore } from "@/store/useNoteStore";
+import { useTaskStore } from "@/store/useTaskStore";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { 
   Folder, GitBranch, ExternalLink, Trash2, 
   Brain, CheckCircle2, Sparkles, Plus,
@@ -16,9 +30,8 @@ import {
 } from "lucide-react";
 
 export function ProjectsWidget() {
-  const { projects, deleteProject, updateProject, addProject } = useProjectStore();
+  const { projects, deleteProject, updateProject, addProject, loading } = useProjectStore();
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
-  const [activeTab, setActiveTab] = useState<"overview" | "notes" | "feedback">("overview");
   
   // New Feedback State
   const [newFeedback, setNewFeedback] = useState("");
@@ -27,9 +40,87 @@ export function ProjectsWidget() {
   const [isAddingProject, setIsAddingProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
 
+  const { tasks } = useTaskStore();
+  const { notes, fetchNotes, addNote: notesStoreAddNote, deleteNote: notesStoreDeleteNote } = useNoteStore();
+
+  useEffect(() => {
+    fetchNotes();
+  }, []);
+
   // GitHub Stats State
   const [githubStats, setGithubStats] = useState<Record<string, { lastCommit: string, issues: number, stars: number }>>({});
   const [staleWarningCount, setStaleWarningCount] = useState(0);
+
+  // Local Health Stats
+  const [localHealthStats, setLocalHealthStats] = useState<Record<string, number>>({});
+
+  // Auto-Sync GitHub Repos on Mount
+  useEffect(() => {
+    let isMounted = true;
+    const syncGithub = async () => {
+      try {
+        const res = await fetch("/api/github?username=CoderKavyaG");
+        if (!res.ok) return;
+        const data = await res.json();
+        
+        if (data && data.repos) {
+          // get existing github urls
+          const existingUrls = new Set(projects.map(p => p.githubUrl).filter(Boolean));
+          
+          for (const repo of data.repos) {
+            if (!existingUrls.has(repo.html_url) && isMounted) {
+              await addProject({
+                name: repo.name,
+                description: repo.description || "",
+                status: "planning",
+                tags: [repo.language].filter(Boolean),
+                githubUrl: repo.html_url,
+              });
+              existingUrls.add(repo.html_url); // add to set so we don't duplicate within same loop
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Auto-sync failed", err);
+      }
+    };
+    if (projects.length > 0 || !loading) {
+       syncGithub();
+    }
+    return () => { isMounted = false; };
+  }, []); // Run once on mount
+
+  useEffect(() => {
+    const fetchLocalStats = async () => {
+      const stats: Record<string, number> = {};
+      
+      for (const proj of projects.filter(p => !p.githubUrl && p.folderPath)) {
+        let score = 100;
+        try {
+          const res = await fetch(`/api/machine/files?path=${encodeURIComponent(proj.folderPath!)}`);
+          if (res.ok) {
+            const data = await res.json();
+            const lastMod = new Date(data.lastModified);
+            const daysAgo = (Date.now() - lastMod.getTime()) / (1000 * 3600 * 24);
+            
+            if (daysAgo <= 3) score = 100;
+            else if (daysAgo <= 7) score = 70;
+            else if (daysAgo <= 14) score = 40;
+            else score = 20;
+          }
+        } catch (e) {}
+
+        const projTasks = tasks.filter(t => t.projectId === proj.id && !t.completed);
+        const overdueTasks = projTasks.filter(t => t.dueDate && new Date(t.dueDate).getTime() < Date.now());
+        score -= (overdueTasks.length * 10);
+        
+        stats[proj.id] = Math.max(0, score);
+      }
+      setLocalHealthStats(stats);
+    };
+
+    fetchLocalStats();
+  }, [projects, tasks]);
 
   // Fetch GitHub stats on mount
   useEffect(() => {
@@ -95,14 +186,30 @@ export function ProjectsWidget() {
     }
   };
 
-  const saveFeedback = () => {
+  const [isSavingFeedback, setIsSavingFeedback] = useState(false);
+
+  const saveFeedback = async () => {
     if (!newFeedback.trim() || !selectedProject) return;
-    const currentFeedback = selectedProject.feedback || [];
-    const newEntry = { id: Date.now().toString(), text: newFeedback.trim(), date: new Date().toISOString() };
-    const updatedFeedback = [newEntry, ...currentFeedback];
-    updateProject(selectedProject.id, { feedback: updatedFeedback });
-    setSelectedProject({ ...selectedProject, feedback: updatedFeedback });
-    setNewFeedback("");
+    setIsSavingFeedback(true);
+    try {
+      const res = await fetch("/api/ai/classify-note", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: newFeedback.trim() })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const items = data.items || [];
+        for (const item of items) {
+          await notesStoreAddNote(item.content, selectedProject.id, item.category);
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsSavingFeedback(false);
+      setNewFeedback("");
+    }
   };
 
 
@@ -120,7 +227,10 @@ export function ProjectsWidget() {
         body: JSON.stringify({ repo, title: "Feedback Review", body: feedbackText })
       });
       if (res.ok) {
-        alert("GitHub Issue created successfully!");
+        const data = await res.json();
+        if (data.html_url) {
+          window.open(data.html_url, '_blank');
+        }
       } else {
         alert("Failed to create GitHub Issue.");
       }
@@ -129,7 +239,6 @@ export function ProjectsWidget() {
     }
   };
 
-  const nextFocusProject = [...projects].filter(p => p.nextAction && p.status === 'active').sort((a, b) => b.projectHealth! - a.projectHealth!)[0];
 
   return (
     <div className="flex h-full w-full overflow-hidden text-foreground bg-[#0f0f11] rounded-xl">
@@ -169,123 +278,123 @@ export function ProjectsWidget() {
           </div>
         )}
 
-        <ScrollArea className="flex-1 -mx-2 px-2">
-          {!selectedProject && nextFocusProject && (
-            <div className="mb-4 p-3 bg-primary/10 border border-primary/20 rounded-xl relative overflow-hidden group">
-              <div className="absolute top-0 right-0 p-2 opacity-20"><Play className="w-12 h-12 text-primary" /></div>
-              <h3 className="text-[10px] font-bold text-primary uppercase tracking-widest mb-1 relative z-10">Next Focus</h3>
-              <p className="text-sm font-bold text-foreground relative z-10">{nextFocusProject.name}</p>
-              <p className="text-[11px] text-muted-foreground mt-1 relative z-10 line-clamp-2">{nextFocusProject.nextAction}</p>
-              <Button size="sm" variant="ghost" className="h-6 px-2 mt-2 text-[10px] text-primary bg-primary/10 hover:bg-primary/20 relative z-10" onClick={() => setSelectedProject(nextFocusProject)}>
-                Open Project
-              </Button>
-            </div>
-          )}
+        <Tabs defaultValue="github" className="flex-1 flex flex-col min-h-0">
+          <TabsList className="mx-2 mb-2 bg-[#0f0f11] border border-white/10">
+            <TabsTrigger value="github" className="flex-1 text-[10px] uppercase font-bold tracking-wider data-[state=active]:bg-primary/20 data-[state=active]:text-primary">GitHub</TabsTrigger>
+            <TabsTrigger value="local" className="flex-1 text-[10px] uppercase font-bold tracking-wider data-[state=active]:bg-primary/20 data-[state=active]:text-primary">Local</TabsTrigger>
+          </TabsList>
 
-          {!selectedProject && staleWarningCount > 0 && (
-            <div className="mb-4 p-2 bg-orange-500/10 border border-orange-500/20 rounded-lg flex items-center space-x-2">
-              <AlertCircle className="w-4 h-4 text-orange-400 shrink-0" />
-              <p className="text-[11px] text-orange-400 font-medium">You have {staleWarningCount} stale projects with no commits in 14 days.</p>
-            </div>
-          )}
+          <ScrollArea className="flex-1 px-2 custom-scrollbar">
 
-          <div className="space-y-4 pb-4">
-            
-            {/* GitHub Repositories Section */}
-            {projects.filter(p => p.githubUrl).length > 0 && (
-              <div className="space-y-2">
-                <h3 className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest px-1 flex items-center gap-1.5"><GitBranch className="w-3 h-3" /> GitHub Repositories</h3>
-                {projects.filter(p => p.githubUrl).map((project) => {
-                  const stats = githubStats[project.githubUrl!.toLowerCase()];
-                  const isSelected = selectedProject?.id === project.id;
-                  
-                  return (
-                    <div 
-                      key={project.id} 
-                      className={`p-2.5 rounded-lg border flex flex-col gap-2 cursor-pointer transition-all duration-200 
-                        ${isSelected ? "bg-primary/5 border-primary/40 shadow-sm" : "bg-[#0f0f11] border-white/10 hover:border-primary/30"}`}
-                      onClick={() => {
-                        setSelectedProject(project);
-                        if (!activeTab) setActiveTab("overview");
-                      }}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 overflow-hidden">
-                          <span className="text-xs font-bold text-foreground truncate">{project.name}</span>
-                          {stats && stats.stars > 0 && (
-                            <Badge variant="secondary" className="text-[8px] px-1 py-0 bg-yellow-500/10 text-yellow-500 border-yellow-500/20">
-                              ★ {stats.stars}
-                            </Badge>
-                          )}
-                        </div>
-                        <Badge variant="outline" className={`text-[8px] font-semibold py-0 px-1 uppercase border ${getStatusColor(project.status)} shrink-0`}>
-                          {project.status}
-                        </Badge>
-                      </div>
-                      
-                      {!selectedProject && stats && (
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className={`w-1.5 h-1.5 rounded-full ${new Date().getTime() - new Date(stats.lastCommit).getTime() > 14*24*3600*1000 ? "bg-orange-500" : "bg-green-500"}`} />
-                          <span className="text-[9px] text-muted-foreground font-mono">Last commit: {new Date(stats.lastCommit).toLocaleDateString()}</span>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+            {!selectedProject && staleWarningCount > 0 && (
+              <div className="mb-4 p-2 bg-orange-500/10 border border-orange-500/20 rounded-lg flex items-center space-x-2">
+                <AlertCircle className="w-4 h-4 text-orange-400 shrink-0" />
+                <p className="text-[11px] text-orange-400 font-medium">You have {staleWarningCount} stale projects with no commits in 14 days.</p>
               </div>
             )}
-
-            {/* Local Workspaces Section */}
-            {projects.filter(p => !p.githubUrl).length > 0 && (
-              <div className="space-y-2">
-                <h3 className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest px-1 flex items-center gap-1.5"><Folder className="w-3 h-3" /> Local Workspaces</h3>
-                {projects.filter(p => !p.githubUrl).map((project) => {
-                  const isSelected = selectedProject?.id === project.id;
-                  
-                  return (
-                    <div 
-                      key={project.id} 
-                      className={`p-2.5 rounded-lg border flex flex-col gap-2 cursor-pointer transition-all duration-200 
-                        ${isSelected ? "bg-primary/5 border-primary/40 shadow-sm" : "bg-[#0f0f11] border-white/10 hover:border-primary/30"}`}
-                      onClick={() => {
-                        setSelectedProject(project);
-                        if (!activeTab) setActiveTab("overview");
-                      }}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 overflow-hidden">
-                          <span className="text-xs font-bold text-foreground truncate">{project.name}</span>
-                        </div>
-                        <Badge variant="outline" className={`text-[8px] font-semibold py-0 px-1 uppercase border ${getStatusColor(project.status)} shrink-0`}>
-                          {project.status}
-                        </Badge>
+                 <TabsContent value="github" className="m-0 space-y-2 pb-4">
+              {projects.filter(p => p.githubUrl).length === 0 && (
+                <div className="text-center py-6 text-xs text-muted-foreground">No GitHub repositories synced yet.</div>
+              )}
+              {projects.filter(p => p.githubUrl).map((project) => {
+                const stats = githubStats[project.githubUrl!.toLowerCase()];
+                const isSelected = selectedProject?.id === project.id;
+                
+                return (
+                  <div 
+                    key={project.id} 
+                    className={`p-2.5 rounded-lg border flex flex-col gap-2 cursor-pointer transition-all duration-200 
+                      ${isSelected ? "bg-primary/10 border-primary/40 shadow-sm" : "bg-transparent border-white/5 hover:bg-white/5 hover:border-white/10"}`}
+                    onClick={() => setSelectedProject(project)}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className={`text-[8px] font-semibold py-0 px-1 uppercase border ${getStatusColor(project.status)} shrink-0`}>
+                        {project.status}
+                      </Badge>
+                      <div className="flex items-center gap-2 overflow-hidden flex-1">
+                        <span className="text-xs font-bold text-foreground truncate">{project.name}</span>
+                        {stats && stats.stars > 0 && (
+                          <Badge variant="secondary" className="text-[8px] px-1 py-0 bg-yellow-500/10 text-yellow-500 border-yellow-500/20">
+                            ★ {stats.stars}
+                          </Badge>
+                        )}
                       </div>
-                      
-                      {!selectedProject && (
-                        <div className="flex items-center gap-3">
-                          <div className="flex-1 space-y-1">
-                            <div className="flex justify-between text-[8px] uppercase text-muted-foreground font-semibold">
-                              <span>Health</span>
-                              <span>{project.projectHealth}%</span>
-                            </div>
-                            <div className="h-1 bg-muted rounded-full overflow-hidden"><div className="h-full bg-green-500" style={{ width: `${project.projectHealth}%` }} /></div>
-                          </div>
-                          <div className="flex-1 space-y-1">
-                            <div className="flex justify-between text-[8px] uppercase text-muted-foreground font-semibold">
-                              <span>Momentum</span>
-                              <span>{project.momentumScore}%</span>
-                            </div>
-                            <div className="h-1 bg-muted rounded-full overflow-hidden"><div className="h-full bg-primary" style={{ width: `${project.momentumScore}%` }} /></div>
-                          </div>
-                        </div>
+                      {project.folderPath && (
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="w-6 h-6 shrink-0 hover:bg-[#007acc]/10 text-[#007acc]"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.open(`vscode://file/${project.folderPath}`);
+                          }}
+                          title="Open in VS Code"
+                        >
+                          <Code2 className="w-3.5 h-3.5" />
+                        </Button>
                       )}
                     </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </ScrollArea>
+                    
+                    {!selectedProject && stats && (
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className={`w-1.5 h-1.5 rounded-full ${new Date().getTime() - new Date(stats.lastCommit).getTime() > 14*24*3600*1000 ? "bg-orange-500" : "bg-green-500"}`} />
+                        <span className="text-[9px] text-muted-foreground font-mono">Last commit: {new Date(stats.lastCommit).toLocaleDateString()}</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </TabsContent>
+
+            <TabsContent value="local" className="m-0 space-y-2 pb-4">
+              {projects.filter(p => !p.githubUrl).length === 0 && (
+                <div className="text-center py-6 text-xs text-muted-foreground">No local workspaces found.</div>
+              )}
+              {projects.filter(p => !p.githubUrl).map((project) => {
+                const isSelected = selectedProject?.id === project.id;
+                const healthScore = localHealthStats[project.id];
+                
+                return (
+                  <div 
+                    key={project.id} 
+                    className={`p-2.5 rounded-lg border flex flex-col gap-2 cursor-pointer transition-all duration-200 
+                      ${isSelected ? "bg-primary/10 border-primary/40 shadow-sm" : "bg-transparent border-white/5 hover:bg-white/5 hover:border-white/10"}`}
+                    onClick={() => setSelectedProject(project)}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className={`text-[8px] font-semibold py-0 px-1 uppercase border ${getStatusColor(project.status)} shrink-0`}>
+                        {project.status}
+                      </Badge>
+                      <div className="flex items-center gap-1.5 overflow-hidden flex-1">
+                        {healthScore !== undefined && (
+                          <div 
+                            className={`w-2 h-2 rounded-full shrink-0 ${healthScore >= 70 ? 'bg-green-500' : healthScore >= 40 ? 'bg-amber-500' : 'bg-red-500'}`} 
+                            title="Health Status"
+                          />
+                        )}
+                        <span className="text-xs font-bold text-foreground truncate">{project.name}</span>
+                      </div>
+                      {project.folderPath && (
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="w-6 h-6 shrink-0 hover:bg-[#007acc]/10 text-[#007acc]"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.open(`vscode://file/${project.folderPath}`);
+                          }}
+                          title="Open in VS Code"
+                        >
+                          <Code2 className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </TabsContent>
+          </ScrollArea>
+        </Tabs>
       </div>
 
       {/* ── DETAIL VIEW (Slides in) ── */}
@@ -313,135 +422,158 @@ export function ProjectsWidget() {
                 )}
               </div>
             </div>
-            <Button size="icon" variant="ghost" className="w-7 h-7 shrink-0" onClick={() => setSelectedProject(null)}>
-              <X className="w-4 h-4 text-muted-foreground hover:text-foreground" />
-            </Button>
-          </div>
-
-          {/* detail navigation tabs */}
-          <div className="flex space-x-1 border-b border-white/10 pb-1.5 mb-3 shrink-0 overflow-x-auto no-scrollbar">
-            {["overview", "notes", "feedback"].map((tab) => (
-              <Button 
-                key={tab}
-                size="sm" 
-                variant={activeTab === tab ? "secondary" : "ghost"}
-                className="text-[10px] h-7 px-2.5 font-semibold uppercase tracking-wider shrink-0"
-                onClick={() => setActiveTab(tab as any)}
-              >
-                {tab}
-              </Button>
-            ))}
-          </div>
-
-          {/* Drawer Content */}
-          <ScrollArea className="flex-1 pr-2">
-            {activeTab === "overview" && (
-              <div className="space-y-4 pb-4">
-                {/* Folder Path & VS Code */}
-                <div className="p-3 border border-white/10 bg-[#0f0f11] rounded-xl flex items-center gap-3">
-                  <div className="flex-1 space-y-1.5">
-                    <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Local Folder Path</label>
-                    <Input 
-                      value={selectedProject.folderPath || ""}
-                      onChange={(e) => {
-                        updateProject(selectedProject.id, { folderPath: e.target.value });
-                        setSelectedProject({ ...selectedProject, folderPath: e.target.value });
+            
+            <div className="flex items-center gap-1 shrink-0">
+              <AlertDialog>
+                <AlertDialogTrigger className="w-7 h-7 hover:bg-red-500/10 hover:text-red-500 text-muted-foreground transition-colors rounded-md inline-flex items-center justify-center">
+                  <Trash2 className="w-4 h-4" />
+                </AlertDialogTrigger>
+                <AlertDialogContent className="bg-[#0f0f11] border-white/10 text-foreground">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete Project?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will permanently delete the project from your workspace. This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel className="bg-transparent border-white/10 hover:bg-white/5">Cancel</AlertDialogCancel>
+                    <AlertDialogAction 
+                      className="bg-red-500 hover:bg-red-600 text-white"
+                      onClick={() => {
+                        deleteProject(selectedProject.id);
+                        setSelectedProject(null);
                       }}
-                      placeholder="C:\Users\Kavya\Projects\..."
-                      className="bg-[#0f0f11] border-white/10 text-xs text-foreground h-7"
+                    >
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+
+              <Button size="icon" variant="ghost" className="w-7 h-7" onClick={() => setSelectedProject(null)}>
+                <X className="w-4 h-4 text-muted-foreground hover:text-foreground" />
+              </Button>
+            </div>
+          </div>
+          {/* Drawer Content */}
+          <ScrollArea className="flex-1 pr-2 custom-scrollbar">
+            <div className="space-y-4 pb-4">
+              {/* Folder Path & VS Code */}
+              <div className="p-3 bg-transparent rounded-xl flex items-center gap-3">
+                <div className="flex-1 space-y-1.5">
+                  <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Local Folder Path</label>
+                  <Input 
+                    value={selectedProject.folderPath || ""}
+                    onChange={(e) => {
+                      updateProject(selectedProject.id, { folderPath: e.target.value });
+                      setSelectedProject({ ...selectedProject, folderPath: e.target.value });
+                    }}
+                    placeholder="C:\Users\Kavya\Projects\..."
+                    className="bg-[#0f0f11] border-white/10 text-xs text-foreground h-7"
+                  />
+                </div>
+                {selectedProject.folderPath && (
+                  <Button 
+                    size="sm" 
+                    onClick={() => window.open(`vscode://file/${selectedProject.folderPath}`)}
+                    className="h-7 mt-4 text-[10px] bg-[#007acc]/10 text-[#007acc] hover:bg-[#007acc]/20 border border-[#007acc]/20"
+                  >
+                    <Code2 className="w-3.5 h-3.5 mr-1.5" /> VS Code
+                  </Button>
+                )}
+              </div>
+
+              {/* Progress bars / Metrics */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5 p-3 bg-transparent rounded-xl flex items-center">
+                  <div className="flex justify-between w-full items-center text-[10px] uppercase font-bold text-muted-foreground">
+                    <span>Project Health</span>
+                    <div 
+                      className={`w-3 h-3 rounded-full shadow-sm ${(localHealthStats[selectedProject.id] ?? 100) >= 70 ? 'bg-green-500 shadow-green-500/50' : (localHealthStats[selectedProject.id] ?? 100) >= 40 ? 'bg-amber-500 shadow-amber-500/50' : 'bg-red-500 shadow-red-500/50'}`} 
                     />
                   </div>
-                  {selectedProject.folderPath && (
-                    <Button 
-                      size="sm" 
-                      onClick={() => window.open(`vscode://file/${selectedProject.folderPath}`)}
-                      className="h-7 mt-4 text-[10px] bg-[#007acc]/10 text-[#007acc] hover:bg-[#007acc]/20 border border-[#007acc]/20"
-                    >
-                      <Code2 className="w-3.5 h-3.5 mr-1.5" /> VS Code
-                    </Button>
-                  )}
                 </div>
-
-                {/* Progress bars */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5 p-3 border border-white/10 bg-[#0f0f11] rounded-xl">
-                    <div className="flex justify-between text-[10px] uppercase font-bold text-muted-foreground"><span>Health</span><span className="text-green-500">{selectedProject.projectHealth}%</span></div>
-                    <input type="range" min="0" max="100" value={selectedProject.projectHealth || 0} onChange={(e) => {
-                      const val = parseInt(e.target.value);
-                      updateProject(selectedProject.id, { projectHealth: val });
-                      setSelectedProject({ ...selectedProject, projectHealth: val });
-                    }} className="w-full h-1 bg-muted rounded-lg appearance-none cursor-pointer accent-green-500" />
-                  </div>
-                  <div className="space-y-1.5 p-3 border border-white/10 bg-[#0f0f11] rounded-xl">
-                    <div className="flex justify-between text-[10px] uppercase font-bold text-muted-foreground"><span>Completion</span><span className="text-primary">{selectedProject.completionPercentage || 0}%</span></div>
-                    <input type="range" min="0" max="100" value={selectedProject.completionPercentage || 0} onChange={(e) => {
-                      const val = parseInt(e.target.value);
-                      updateProject(selectedProject.id, { completionPercentage: val });
-                      setSelectedProject({ ...selectedProject, completionPercentage: val });
-                    }} className="w-full h-1 bg-muted rounded-lg appearance-none cursor-pointer accent-primary" />
+                <div className="space-y-2 p-3 bg-transparent rounded-xl">
+                  <div className="flex justify-between text-[10px] uppercase font-bold text-muted-foreground"><span>Completion</span><span className="text-primary">{selectedProject.completionPercentage || 0}%</span></div>
+                  <div className="flex gap-1 h-6">
+                    {[
+                      { label: 'Not started', val: 0 },
+                      { label: 'Early', val: 25 },
+                      { label: 'Mid', val: 50 },
+                      { label: 'Almost', val: 75 },
+                      { label: 'Done', val: 100 }
+                    ].map((step) => {
+                      const isActive = (selectedProject.completionPercentage || 0) === step.val;
+                      return (
+                        <button
+                          key={step.val}
+                          onClick={() => {
+                            updateProject(selectedProject.id, { completionPercentage: step.val });
+                            setSelectedProject({ ...selectedProject, completionPercentage: step.val });
+                          }}
+                          title={step.label}
+                          className={`flex-1 rounded flex items-center justify-center text-[8px] font-bold uppercase transition-colors border ${isActive ? 'bg-white text-black border-white' : 'bg-transparent border-white/5 text-muted-foreground hover:bg-white/5'}`}
+                        >
+                          {step.val === 100 && isActive ? <CheckCircle2 className="w-3 h-3" /> : step.label.slice(0, 3)}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
+              </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Next Action</label>
-                  <Input value={selectedProject.nextAction || ""} onChange={(e) => {
-                      updateProject(selectedProject.id, { nextAction: e.target.value });
-                      setSelectedProject({ ...selectedProject, nextAction: e.target.value });
-                    }} placeholder="e.g. Set up auth middleware..." className="bg-[#0f0f11] border-white/10 text-xs h-8" />
+              {/* Unified Feedback Feed */}
+              <div className="pt-4 border-t border-white/10 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest px-1">Feedback & Brain Dump</h3>
                 </div>
-              </div>
-            )}
-
-            {activeTab === "notes" && (
-              <div className="space-y-4 pb-4 h-full flex flex-col">
-                <Textarea 
-                  value={selectedProject.architectureNotes || ""}
-                  onChange={(e) => {
-                    updateProject(selectedProject.id, { architectureNotes: e.target.value });
-                    setSelectedProject({ ...selectedProject, architectureNotes: e.target.value });
-                  }}
-                  placeholder="Project-specific notes, architecture, ideas..."
-                  className="bg-[#0f0f11] border-white/10 font-mono text-xs text-foreground placeholder:text-muted-foreground/60 min-h-[300px] p-3 flex-1"
-                />
-              </div>
-            )}
-
-            {activeTab === "feedback" && (
-              <div className="space-y-4 pb-4">
-                <div className="p-3 border border-white/10 bg-[#0f0f11] rounded-xl space-y-3">
+                <div className="p-3 border border-white/5 bg-[#0f0f11]/50 rounded-xl space-y-3">
                   <Textarea 
                     value={newFeedback}
                     onChange={(e) => setNewFeedback(e.target.value)}
-                    placeholder="Paste received feedback here..."
-                    className="bg-[#0f0f11] border-white/10 text-xs min-h-[80px]"
+                    placeholder="Paste multiple bugs, ideas, or feedback points here... AI will split them up!"
+                    className="bg-transparent border-white/10 text-xs min-h-[80px] custom-scrollbar focus-visible:ring-1 focus-visible:ring-primary/50"
                   />
                   <div className="flex justify-end">
-                    <Button size="sm" onClick={saveFeedback} className="h-7 text-[10px]">Save Feedback</Button>
+                    <Button size="sm" onClick={saveFeedback} disabled={isSavingFeedback} className="h-7 text-[10px]">
+                      {isSavingFeedback ? "Parsing..." : "Save Feedback"}
+                    </Button>
                   </div>
                 </div>
 
                 <div className="space-y-3">
-                  {selectedProject.feedback?.map((fb) => (
-                    <div key={fb.id} className="p-3 border border-white/10 bg-[#0f0f11] rounded-lg flex flex-col gap-2">
-                      <p className="text-[9px] text-muted-foreground font-mono">{new Date(fb.date).toLocaleString()}</p>
-                      <p className="text-xs leading-relaxed text-foreground whitespace-pre-wrap">{fb.text}</p>
-                      {selectedProject.githubUrl && (
-                        <div className="flex justify-end mt-1">
-                          <Button size="sm" variant="outline" className="h-6 text-[9px] px-2" onClick={() => createGitHubIssue(fb.text)}>
-                            <GitBranch className="w-3 h-3 mr-1.5" /> Open as Issue
-                          </Button>
+                  {notes.filter(n => n.projectId === selectedProject.id).length > 0 ? (
+                    notes.filter(n => n.projectId === selectedProject.id).map(note => (
+                      <div key={note.id} className="group p-3 border border-white/5 bg-transparent hover:bg-white/5 transition-colors rounded-lg flex flex-col gap-2 relative">
+                        <div className="flex justify-between items-center">
+                          <p className="text-[9px] text-muted-foreground font-mono">{new Date(note.createdAt).toLocaleString()}</p>
+                          <div className="flex items-center gap-2">
+                            {note.category && (
+                              <Badge variant="secondary" className="text-[8px] py-0 px-1.5 uppercase bg-primary/10 text-primary border-primary/20">
+                                {note.category}
+                              </Badge>
+                            )}
+                            <Button variant="ghost" size="icon" className="w-5 h-5 opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-400" onClick={() => notesStoreDeleteNote(note.id)}>
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </div>
                         </div>
-                      )}
-                    </div>
-                  ))}
-                  {(!selectedProject.feedback || selectedProject.feedback.length === 0) && (
-                    <div className="text-center py-6 text-xs text-muted-foreground">No feedback recorded yet.</div>
+                        <p className="text-xs leading-relaxed text-foreground whitespace-pre-wrap pr-6">{note.content}</p>
+                        {selectedProject.githubUrl && (
+                          <div className="flex justify-end mt-1">
+                            <Button size="sm" variant="outline" className="h-6 text-[9px] px-2 bg-transparent border-white/10 hover:bg-white/5" onClick={() => createGitHubIssue(note.content)}>
+                              <GitBranch className="w-3 h-3 mr-1.5" /> Open as Issue
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-6 text-xs text-muted-foreground">No notes or feedback recorded yet.</div>
                   )}
                 </div>
               </div>
-            )}
-
-
+            </div>
           </ScrollArea>
         </div>
       )}

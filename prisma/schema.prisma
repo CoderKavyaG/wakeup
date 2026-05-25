@@ -49,6 +49,7 @@ model Task {
   completed Boolean  @default(false)
   priority  String   @default("medium") // "low" | "medium" | "high"
   dueDate   String?
+  projectId String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -56,6 +57,8 @@ model Task {
 model Note {
   id        String   @id @default(uuid())
   content   String   @db.Text
+  projectId String?
+  category  String?  // e.g., "general feedback", "bug report", "feature idea", "general note"
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

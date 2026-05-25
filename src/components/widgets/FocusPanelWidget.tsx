@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useTaskStore, Task } from "@/store/useTaskStore";
 import { useNoteStore, Note } from "@/store/useNoteStore";
 import { useUrlStore, ResourceUrl } from "@/store/useUrlStore";
+import { useProjectStore, Project } from "@/store/useProjectStore";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,7 +18,9 @@ import {
   Pencil,
   Trash2,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  X,
+  Loader2
 } from "lucide-react";
 
 export function FocusPanelWidget() {
@@ -27,6 +30,12 @@ export function FocusPanelWidget() {
   const [inputMode, setInputMode] = useState<"task" | "note">("task");
   const [unifiedInput, setUnifiedInput] = useState("");
   const unifiedInputRef = useRef<HTMLTextAreaElement>(null);
+
+  const { projects } = useProjectStore();
+  const [showProjectDropdown, setShowProjectDropdown] = useState(false);
+  const [projectSearch, setProjectSearch] = useState("");
+  const [taggedProject, setTaggedProject] = useState<Project | null>(null);
+  const [isClassifying, setIsClassifying] = useState(false);
 
   // Tasks State
   const [showDone, setShowDone] = useState(false);
@@ -69,7 +78,7 @@ export function FocusPanelWidget() {
     return { title: title || text, priority, dueDate };
   };
 
-  const handleUnifiedEnter = (e: React.KeyboardEvent) => {
+  const handleUnifiedEnter = async (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
       if (inputMode === "task") {
         e.preventDefault();
@@ -82,10 +91,44 @@ export function FocusPanelWidget() {
         if (e.ctrlKey || e.metaKey) {
           e.preventDefault();
           if (unifiedInput.trim()) {
-            addNote(unifiedInput.trim());
+            const content = unifiedInput.trim();
             setUnifiedInput("");
+            
+            if (taggedProject) {
+              setIsClassifying(true);
+              try {
+                const res = await fetch("/api/ai/classify-note", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ text: content })
+                });
+                const data = await res.json();
+                addNote(content, taggedProject.id, data.category || "general note");
+              } catch (e) {
+                addNote(content, taggedProject.id, "general note");
+              } finally {
+                setIsClassifying(false);
+                setTaggedProject(null);
+              }
+            } else {
+              addNote(content);
+            }
           }
         }
+      }
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    setUnifiedInput(val);
+    if (inputMode === "note") {
+      const atIndex = val.lastIndexOf("@");
+      if (atIndex !== -1 && !taggedProject) {
+        setShowProjectDropdown(true);
+        setProjectSearch(val.slice(atIndex + 1));
+      } else {
+        setShowProjectDropdown(false);
       }
     }
   };
@@ -146,11 +189,47 @@ export function FocusPanelWidget() {
         <Textarea 
           ref={unifiedInputRef as any}
           value={unifiedInput}
-          onChange={e => setUnifiedInput(e.target.value)}
+          onChange={handleInputChange}
           onKeyDown={handleUnifiedEnter}
-          placeholder={inputMode === "task" ? "Add a task... (try 'fix bug tomorrow')" : "Brain dump... (Ctrl+Enter to save)"}
+          placeholder={inputMode === "task" ? "Add a task... (try 'fix bug tomorrow')" : "Brain dump... (Type @ to tag project, Ctrl+Enter to save)"}
           className="min-h-[60px] text-sm resize-none bg-[#0f0f11] border-white/10 focus-visible:ring-1 focus-visible:ring-primary/50 p-3 pr-10 custom-scrollbar"
         />
+        
+        {isClassifying && (
+          <div className="absolute bottom-2 right-12 flex items-center text-[10px] text-primary gap-1">
+            <Loader2 className="w-3 h-3 animate-spin" /> Classifying...
+          </div>
+        )}
+
+        {showProjectDropdown && (
+          <div className="absolute top-full left-4 right-4 mt-1 bg-[#1a1a1d] border border-white/10 rounded-lg shadow-xl z-50 max-h-40 overflow-y-auto">
+            {projects.filter(p => p.name.toLowerCase().includes(projectSearch.toLowerCase())).map(p => (
+              <div 
+                key={p.id} 
+                className="px-3 py-2 text-xs hover:bg-white/10 cursor-pointer text-foreground"
+                onClick={() => {
+                  setTaggedProject(p);
+                  setShowProjectDropdown(false);
+                  setUnifiedInput(prev => prev.slice(0, prev.lastIndexOf("@")) + `@${p.name} `);
+                  unifiedInputRef.current?.focus();
+                }}
+              >
+                {p.name}
+              </div>
+            ))}
+            {projects.filter(p => p.name.toLowerCase().includes(projectSearch.toLowerCase())).length === 0 && (
+              <div className="px-3 py-2 text-xs text-muted-foreground">No projects found</div>
+            )}
+          </div>
+        )}
+
+        {taggedProject && (
+          <div className="absolute bottom-2 left-5 flex items-center gap-1 bg-primary/20 text-primary text-[10px] px-2 py-0.5 rounded-full font-bold z-10">
+            @{taggedProject.name}
+            <button onClick={() => setTaggedProject(null)}><X className="w-3 h-3 hover:text-white" /></button>
+          </div>
+        )}
+
         <button
           onClick={() => setInputMode(m => m === "task" ? "note" : "task")}
           className="absolute top-5 right-6 transition-all flex items-center justify-center w-6 h-6 rounded hover:bg-white/5"
