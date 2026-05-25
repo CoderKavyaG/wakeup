@@ -114,12 +114,13 @@ export function FocusPanelWidget() {
         }
       }
 
-      // If a project is tagged, auto-route to project feedback/note regardless of mode
-      if (currentTaggedProject) {
+      // If it's note mode OR there's a tagged project, we treat it as a note to be classified
+      if (currentTaggedProject || (inputMode === "note" && (e.ctrlKey || e.metaKey))) {
         e.preventDefault();
         if (finalInput.trim()) {
           const content = finalInput.trim();
           setUnifiedInput("");
+          setShowProjectDropdown(false);
           
           setIsClassifying(true);
           try {
@@ -133,13 +134,13 @@ export function FocusPanelWidget() {
             // Handle array response from classify-note
             if (data.items && Array.isArray(data.items)) {
               for (const item of data.items) {
-                await addNote(item.content, currentTaggedProject.id, item.category);
+                await addNote(item.content, currentTaggedProject?.id, item.category);
               }
             } else {
-              await addNote(content, currentTaggedProject.id, data.category || "general note");
+              await addNote(content, currentTaggedProject?.id, data.category || "general note");
             }
           } catch (e) {
-            addNote(content, currentTaggedProject.id, "general note");
+            addNote(content, currentTaggedProject?.id, "general note");
           } finally {
             setIsClassifying(false);
             setTaggedProject(null);
@@ -156,15 +157,6 @@ export function FocusPanelWidget() {
           addTask({ title: parsed.title, priority: parsed.priority, dueDate: parsed.dueDate });
           setUnifiedInput("");
           setShowProjectDropdown(false);
-        }
-      } else if (inputMode === "note") {
-        if (e.ctrlKey || e.metaKey) {
-          e.preventDefault();
-          if (unifiedInput.trim()) {
-            addNote(unifiedInput.trim());
-            setUnifiedInput("");
-            setShowProjectDropdown(false);
-          }
         }
       }
     }
@@ -241,7 +233,7 @@ export function FocusPanelWidget() {
           onChange={handleInputChange}
           onKeyDown={handleUnifiedEnter}
           placeholder={inputMode === "task" ? "Add a task... (try 'fix bug tomorrow')" : "Brain dump... (Type @ to tag project, Ctrl+Enter to save)"}
-          className="min-h-[60px] text-sm resize-none bg-[#0f0f11] border-white/10 focus-visible:ring-1 focus-visible:ring-primary/50 p-3 pr-10 custom-scrollbar"
+          className="min-h-[60px] max-h-[140px] overflow-y-auto text-sm resize-none bg-[#0f0f11] border-white/10 focus-visible:ring-1 focus-visible:ring-primary/50 p-3 pr-10 custom-scrollbar"
         />
         
         {isClassifying && (

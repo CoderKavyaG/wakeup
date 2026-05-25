@@ -583,7 +583,7 @@ export function ProjectsWidget() {
                 )}
               </DialogTitle>
             </DialogHeader>
-            <ScrollArea className="flex-1 mt-4 text-sm whitespace-pre-wrap leading-relaxed custom-scrollbar">
+            <ScrollArea className="flex-1 mt-4 text-sm whitespace-pre-wrap leading-relaxed custom-scrollbar max-h-[60vh] overflow-y-auto pr-3">
               {viewNote.content}
             </ScrollArea>
             <DialogFooter className="mt-6 border-t border-white/10 pt-4">
