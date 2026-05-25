@@ -22,11 +22,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { 
   Folder, GitBranch, ExternalLink, Trash2, 
   Brain, CheckCircle2, Sparkles, Plus,
   HelpCircle, Activity, ChevronRight, X, Heart, 
-  Code2, Play, AlertCircle
+  Code2, Play, AlertCircle, Pencil
 } from "lucide-react";
 
 export function ProjectsWidget() {
@@ -36,9 +37,10 @@ export function ProjectsWidget() {
   // New Feedback State
   const [newFeedback, setNewFeedback] = useState("");
   
-  // Add Project State
-  const [isAddingProject, setIsAddingProject] = useState(false);
-  const [newProjectName, setNewProjectName] = useState("");
+  // Add/Edit Project State
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [formData, setFormData] = useState({ name: "", description: "", folderPath: "" });
 
   const { tasks } = useTaskStore();
   const { notes, fetchNotes, addNote: notesStoreAddNote, deleteNote: notesStoreDeleteNote } = useNoteStore();
@@ -141,10 +143,10 @@ export function ProjectsWidget() {
                 stars: repo.stargazers_count || 0
               };
 
-              // Check staleness (older than 14 days)
+              // Check staleness (older than 45 days)
               const updated = new Date(repo.updated_at);
               const daysAgo = (Date.now() - updated.getTime()) / (1000 * 3600 * 24);
-              if (daysAgo > 14) {
+              if (daysAgo > 45) {
                 staleCount++;
               }
             });
@@ -158,7 +160,7 @@ export function ProjectsWidget() {
               const repo = stats[proj.githubUrl.toLowerCase()];
               const updated = new Date(repo.lastCommit);
               const daysAgo = (Date.now() - updated.getTime()) / (1000 * 3600 * 24);
-              if (daysAgo > 14 && proj.status !== "stale" && proj.status !== "completed") {
+              if (daysAgo > 45 && proj.status !== "stale" && proj.status !== "completed") {
                 updateProject(proj.id, { status: "stale" });
               }
             }
@@ -249,34 +251,48 @@ export function ProjectsWidget() {
             <Folder className="w-4 h-4 text-primary" />
             <h2 className="text-sm font-semibold tracking-wider uppercase text-secondary-foreground">Projects</h2>
           </div>
-          <Button variant="ghost" size="icon" className="w-6 h-6 hover:bg-white/5" onClick={() => setIsAddingProject(!isAddingProject)}>
-            <Plus className="w-4 h-4 text-muted-foreground" />
-          </Button>
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogTrigger className="w-6 h-6 hover:bg-white/5 inline-flex items-center justify-center rounded-md text-muted-foreground transition-colors" onClick={() => {
+              setFormData({ name: "", description: "", folderPath: "" });
+            }}>
+              <Plus className="w-4 h-4" />
+            </DialogTrigger>
+            <DialogContent className="bg-[#0f0f11] border-white/10 text-foreground">
+              <DialogHeader>
+                <DialogTitle>Add Local Project</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-muted-foreground">Title</label>
+                  <Input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="bg-transparent border-white/10" placeholder="Project name" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-muted-foreground">Description</label>
+                  <Input value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="bg-transparent border-white/10" placeholder="Brief description" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-muted-foreground">Folder Path</label>
+                  <Input value={formData.folderPath} onChange={e => setFormData({...formData, folderPath: e.target.value})} className="bg-transparent border-white/10" placeholder="C:\Projects\..." />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsAddDialogOpen(false)} className="border-white/10 bg-transparent">Cancel</Button>
+                <Button onClick={() => {
+                  if (formData.name.trim()) {
+                    addProject({
+                      name: formData.name.trim(),
+                      description: formData.description.trim() || "New Project",
+                      folderPath: formData.folderPath.trim() || undefined,
+                      status: "planning",
+                      tags: [],
+                    });
+                    setIsAddDialogOpen(false);
+                  }
+                }}>Add Project</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
-        
-        {isAddingProject && (
-          <div className="mb-4 px-1 shrink-0">
-            <Input 
-              value={newProjectName}
-              onChange={(e) => setNewProjectName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && newProjectName.trim()) {
-                  addProject({
-                    name: newProjectName.trim(),
-                    description: "New Project",
-                    status: "planning",
-                    tags: [],
-                  });
-                  setNewProjectName("");
-                  setIsAddingProject(false);
-                }
-              }}
-              placeholder="Project Name & Enter..."
-              className="h-8 text-xs bg-[#0f0f11] border-white/10"
-              autoFocus
-            />
-          </div>
-        )}
 
         <Tabs defaultValue="github" className="flex-1 flex flex-col min-h-0">
           <TabsList className="mx-2 mb-2 bg-[#0f0f11] border border-white/10">
@@ -284,19 +300,25 @@ export function ProjectsWidget() {
             <TabsTrigger value="local" className="flex-1 text-[10px] uppercase font-bold tracking-wider data-[state=active]:bg-primary/20 data-[state=active]:text-primary">Local</TabsTrigger>
           </TabsList>
 
-          <ScrollArea className="flex-1 px-2 custom-scrollbar">
+          <ScrollArea className="flex-1 px-2 [&_[data-radix-scroll-area-scrollbar]]:hidden">
 
             {!selectedProject && staleWarningCount > 0 && (
-              <div className="mb-4 p-2 bg-orange-500/10 border border-orange-500/20 rounded-lg flex items-center space-x-2">
-                <AlertCircle className="w-4 h-4 text-orange-400 shrink-0" />
-                <p className="text-[11px] text-orange-400 font-medium">You have {staleWarningCount} stale projects with no commits in 14 days.</p>
+              <div className="mb-4 p-1.5 bg-orange-500/10 border border-orange-500/20 rounded-md flex items-center space-x-1.5 w-max mx-auto">
+                <AlertCircle className="w-3 h-3 text-orange-400 shrink-0" />
+                <p className="text-[9px] text-orange-400 font-medium">You have {staleWarningCount} stale projects (&gt;45d without commits).</p>
               </div>
             )}
                  <TabsContent value="github" className="m-0 space-y-2 pb-4">
               {projects.filter(p => p.githubUrl).length === 0 && (
                 <div className="text-center py-6 text-xs text-muted-foreground">No GitHub repositories synced yet.</div>
               )}
-              {projects.filter(p => p.githubUrl).map((project) => {
+              {projects.filter(p => p.githubUrl).sort((a, b) => {
+                const aCommit = githubStats[a.githubUrl!.toLowerCase()]?.lastCommit;
+                const bCommit = githubStats[b.githubUrl!.toLowerCase()]?.lastCommit;
+                if (!aCommit) return 1;
+                if (!bCommit) return -1;
+                return new Date(bCommit).getTime() - new Date(aCommit).getTime();
+              }).map((project) => {
                 const stats = githubStats[project.githubUrl!.toLowerCase()];
                 const isSelected = selectedProject?.id === project.id;
                 
@@ -407,6 +429,12 @@ export function ProjectsWidget() {
                 <Badge variant="outline" className={`text-[9px] font-semibold py-0 uppercase border ${getStatusColor(selectedProject.status)}`}>
                   {selectedProject.status}
                 </Badge>
+                {!selectedProject.githubUrl && (
+                  <div 
+                    className={`w-2 h-2 rounded-full shadow-sm ml-1 ${(localHealthStats[selectedProject.id] ?? 100) >= 70 ? 'bg-green-500 shadow-green-500/50' : (localHealthStats[selectedProject.id] ?? 100) >= 40 ? 'bg-amber-500 shadow-amber-500/50' : 'bg-red-500 shadow-red-500/50'}`} 
+                    title="Project Health"
+                  />
+                )}
               </div>
               <div className="flex items-center gap-3 text-[10px] font-mono text-muted-foreground">
                 <span>Updated: {new Date(selectedProject.updatedAt).toLocaleDateString()}</span>
@@ -424,6 +452,56 @@ export function ProjectsWidget() {
             </div>
             
             <div className="flex items-center gap-1 shrink-0">
+              <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+                <DialogTrigger className="w-7 h-7 text-muted-foreground hover:text-foreground transition-colors inline-flex items-center justify-center rounded-md" onClick={() => {
+                  setFormData({
+                    name: selectedProject.name,
+                    description: selectedProject.description,
+                    folderPath: selectedProject.folderPath || ""
+                  });
+                }}>
+                  <Pencil className="w-3.5 h-3.5" />
+                </DialogTrigger>
+                <DialogContent className="bg-[#0f0f11] border-white/10 text-foreground">
+                  <DialogHeader>
+                    <DialogTitle>Edit Project</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <label className="text-xs font-semibold text-muted-foreground">Title</label>
+                      <Input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="bg-transparent border-white/10" placeholder="Project name" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-semibold text-muted-foreground">Description</label>
+                      <Input value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="bg-transparent border-white/10" placeholder="Brief description" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-semibold text-muted-foreground">Folder Path</label>
+                      <Input value={formData.folderPath} onChange={e => setFormData({...formData, folderPath: e.target.value})} className="bg-transparent border-white/10" placeholder="C:\Projects\..." />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsEditDialogOpen(false)} className="border-white/10 bg-transparent">Cancel</Button>
+                    <Button onClick={() => {
+                      if (formData.name.trim()) {
+                        updateProject(selectedProject.id, {
+                          name: formData.name.trim(),
+                          description: formData.description.trim(),
+                          folderPath: formData.folderPath.trim() || undefined,
+                        });
+                        setSelectedProject({ 
+                          ...selectedProject, 
+                          name: formData.name.trim(),
+                          description: formData.description.trim(),
+                          folderPath: formData.folderPath.trim() || undefined
+                        });
+                        setIsEditDialogOpen(false);
+                      }
+                    }}>Save Changes</Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+
               <AlertDialog>
                 <AlertDialogTrigger className="w-7 h-7 hover:bg-red-500/10 hover:text-red-500 text-muted-foreground transition-colors rounded-md inline-flex items-center justify-center">
                   <Trash2 className="w-4 h-4" />
@@ -458,69 +536,18 @@ export function ProjectsWidget() {
           {/* Drawer Content */}
           <ScrollArea className="flex-1 pr-2 custom-scrollbar">
             <div className="space-y-4 pb-4">
-              {/* Folder Path & VS Code */}
-              <div className="p-3 bg-transparent rounded-xl flex items-center gap-3">
-                <div className="flex-1 space-y-1.5">
-                  <label className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Local Folder Path</label>
-                  <Input 
-                    value={selectedProject.folderPath || ""}
-                    onChange={(e) => {
-                      updateProject(selectedProject.id, { folderPath: e.target.value });
-                      setSelectedProject({ ...selectedProject, folderPath: e.target.value });
-                    }}
-                    placeholder="C:\Users\Kavya\Projects\..."
-                    className="bg-[#0f0f11] border-white/10 text-xs text-foreground h-7"
-                  />
-                </div>
-                {selectedProject.folderPath && (
+              
+              {selectedProject.folderPath && (
+                <div className="flex items-center justify-end">
                   <Button 
                     size="sm" 
                     onClick={() => window.open(`vscode://file/${selectedProject.folderPath}`)}
-                    className="h-7 mt-4 text-[10px] bg-[#007acc]/10 text-[#007acc] hover:bg-[#007acc]/20 border border-[#007acc]/20"
+                    className="h-7 text-[10px] bg-[#007acc]/10 text-[#007acc] hover:bg-[#007acc]/20 border border-[#007acc]/20"
                   >
-                    <Code2 className="w-3.5 h-3.5 mr-1.5" /> VS Code
+                    <Code2 className="w-3.5 h-3.5 mr-1.5" /> Open in VS Code
                   </Button>
-                )}
-              </div>
-
-              {/* Progress bars / Metrics */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5 p-3 bg-transparent rounded-xl flex items-center">
-                  <div className="flex justify-between w-full items-center text-[10px] uppercase font-bold text-muted-foreground">
-                    <span>Project Health</span>
-                    <div 
-                      className={`w-3 h-3 rounded-full shadow-sm ${(localHealthStats[selectedProject.id] ?? 100) >= 70 ? 'bg-green-500 shadow-green-500/50' : (localHealthStats[selectedProject.id] ?? 100) >= 40 ? 'bg-amber-500 shadow-amber-500/50' : 'bg-red-500 shadow-red-500/50'}`} 
-                    />
-                  </div>
                 </div>
-                <div className="space-y-2 p-3 bg-transparent rounded-xl">
-                  <div className="flex justify-between text-[10px] uppercase font-bold text-muted-foreground"><span>Completion</span><span className="text-primary">{selectedProject.completionPercentage || 0}%</span></div>
-                  <div className="flex gap-1 h-6">
-                    {[
-                      { label: 'Not started', val: 0 },
-                      { label: 'Early', val: 25 },
-                      { label: 'Mid', val: 50 },
-                      { label: 'Almost', val: 75 },
-                      { label: 'Done', val: 100 }
-                    ].map((step) => {
-                      const isActive = (selectedProject.completionPercentage || 0) === step.val;
-                      return (
-                        <button
-                          key={step.val}
-                          onClick={() => {
-                            updateProject(selectedProject.id, { completionPercentage: step.val });
-                            setSelectedProject({ ...selectedProject, completionPercentage: step.val });
-                          }}
-                          title={step.label}
-                          className={`flex-1 rounded flex items-center justify-center text-[8px] font-bold uppercase transition-colors border ${isActive ? 'bg-white text-black border-white' : 'bg-transparent border-white/5 text-muted-foreground hover:bg-white/5'}`}
-                        >
-                          {step.val === 100 && isActive ? <CheckCircle2 className="w-3 h-3" /> : step.label.slice(0, 3)}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
+              )}
 
               {/* Unified Feedback Feed */}
               <div className="pt-4 border-t border-white/10 space-y-4">

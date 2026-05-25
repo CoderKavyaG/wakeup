@@ -80,6 +80,33 @@ export function FocusPanelWidget() {
 
   const handleUnifiedEnter = async (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
+      // If a project is tagged, auto-route to project feedback/note regardless of mode
+      if (taggedProject) {
+        e.preventDefault();
+        if (unifiedInput.trim()) {
+          const content = unifiedInput.trim();
+          setUnifiedInput("");
+          
+          setIsClassifying(true);
+          try {
+            const res = await fetch("/api/ai/classify-note", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ text: content })
+            });
+            const data = await res.json();
+            addNote(content, taggedProject.id, data.category || "general note");
+          } catch (e) {
+            addNote(content, taggedProject.id, "general note");
+          } finally {
+            setIsClassifying(false);
+            setTaggedProject(null);
+          }
+        }
+        return;
+      }
+
+      // Normal task/note logic
       if (inputMode === "task") {
         e.preventDefault();
         if (unifiedInput.trim()) {
@@ -91,28 +118,8 @@ export function FocusPanelWidget() {
         if (e.ctrlKey || e.metaKey) {
           e.preventDefault();
           if (unifiedInput.trim()) {
-            const content = unifiedInput.trim();
+            addNote(unifiedInput.trim());
             setUnifiedInput("");
-            
-            if (taggedProject) {
-              setIsClassifying(true);
-              try {
-                const res = await fetch("/api/ai/classify-note", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ text: content })
-                });
-                const data = await res.json();
-                addNote(content, taggedProject.id, data.category || "general note");
-              } catch (e) {
-                addNote(content, taggedProject.id, "general note");
-              } finally {
-                setIsClassifying(false);
-                setTaggedProject(null);
-              }
-            } else {
-              addNote(content);
-            }
           }
         }
       }
@@ -122,14 +129,12 @@ export function FocusPanelWidget() {
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
     setUnifiedInput(val);
-    if (inputMode === "note") {
-      const atIndex = val.lastIndexOf("@");
-      if (atIndex !== -1 && !taggedProject) {
-        setShowProjectDropdown(true);
-        setProjectSearch(val.slice(atIndex + 1));
-      } else {
-        setShowProjectDropdown(false);
-      }
+    const atIndex = val.lastIndexOf("@");
+    if (atIndex !== -1 && !taggedProject) {
+      setShowProjectDropdown(true);
+      setProjectSearch(val.slice(atIndex + 1));
+    } else {
+      setShowProjectDropdown(false);
     }
   };
 
