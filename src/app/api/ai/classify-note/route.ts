@@ -13,7 +13,7 @@ export async function POST(request: Request) {
 
     const result = await generateObject({
       model: openai("gpt-4o-mini"),
-      system: "You are a specialized parsing assistant. The user will provide a block of text containing feedback, bugs, or ideas. Your job is to split this text into distinct, separate points. For each point, provide the 'content' (the exact or slightly cleaned up text) and the 'category' strictly chosen from: 'general feedback', 'bug report', 'feature idea', or 'general note'.",
+      system: "You are a specialized parsing assistant. The user will provide a block of text containing feedback, bugs, or ideas. Your primary job is to aggressively split this text into distinct, separate points. If the user provides a list (e.g., 'CHANGE 1', 'CHANGE 2', or bullet points), you MUST break each item into its own separate feedback object in the array. Do not group multiple distinct changes or ideas into a single item. For each point, provide the 'content' (the exact text for that specific point) and the 'category' strictly chosen from: 'general feedback', 'bug report', 'feature idea', or 'general note'.",
       prompt: `Parse this text:\n\n${text}`,
       schema: z.object({
         items: z.array(z.object({
