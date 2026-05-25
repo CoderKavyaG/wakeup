@@ -36,7 +36,7 @@ export const useNoteStore = create<NoteState>((set, get) => ({
   },
 
   addNote: async (content, projectId, category) => {
-    const tempId = `temp-${Date.now()}`;
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
     const newNote: Note = {
       id: tempId,
       content,
