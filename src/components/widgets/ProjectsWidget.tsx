@@ -40,7 +40,7 @@ export function ProjectsWidget() {
   // Add/Edit Project State
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [formData, setFormData] = useState({ name: "", description: "", folderPath: "" });
+  const [formData, setFormData] = useState({ name: "", description: "", folderPath: "", status: "green" });
 
   const { tasks } = useTaskStore();
   const { notes, fetchNotes, addNote: notesStoreAddNote, deleteNote: notesStoreDeleteNote } = useNoteStore();
@@ -173,18 +173,12 @@ export function ProjectsWidget() {
     fetchStats();
   }, []);
 
-  const getStatusColor = (status: ProjectStatus) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
-      case "active":
-        return "bg-[#0f0f11] text-foreground border-green-500/20";
-      case "planning":
-        return "bg-[#0f0f11] text-foreground border-yellow-500/20";
-      case "completed":
-        return "bg-[#0f0f11] text-foreground border-purple-500/20";
-      case "stale":
-        return "bg-[#0f0f11] text-foreground border-red-500/20";
-      default:
-        return "bg-zinc-500/10 text-zinc-400 border-zinc-500/20";
+      case "green": return "bg-green-500 shadow-green-500/50";
+      case "yellow": return "bg-yellow-500 shadow-yellow-500/50";
+      case "red": return "bg-red-500 shadow-red-500/50";
+      default: return "bg-zinc-500 shadow-zinc-500/50";
     }
   };
 
@@ -259,7 +253,7 @@ export function ProjectsWidget() {
           </div>
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger className="w-6 h-6 hover:bg-white/5 inline-flex items-center justify-center rounded-md text-muted-foreground transition-colors" onClick={() => {
-              setFormData({ name: "", description: "", folderPath: "" });
+              setFormData({ name: "", description: "", folderPath: "", status: "green" });
             }}>
               <Plus className="w-4 h-4" />
             </DialogTrigger>
@@ -271,6 +265,18 @@ export function ProjectsWidget() {
                 <div className="space-y-2">
                   <label className="text-xs font-semibold text-muted-foreground">Title</label>
                   <Input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="bg-transparent border-white/10" placeholder="Project name" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-muted-foreground">Color Indicator</label>
+                  <div className="flex gap-3">
+                    {['green', 'yellow', 'red'].map(color => (
+                      <button
+                        key={color}
+                        onClick={() => setFormData({...formData, status: color})}
+                        className={`w-5 h-5 rounded-full ${color === 'green' ? 'bg-green-500' : color === 'yellow' ? 'bg-yellow-500' : 'bg-red-500'} ${formData.status === color ? 'ring-2 ring-white ring-offset-2 ring-offset-[#0f0f11]' : 'opacity-50 hover:opacity-100'}`}
+                      />
+                    ))}
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-semibold text-muted-foreground">Description</label>
@@ -289,7 +295,7 @@ export function ProjectsWidget() {
                       name: formData.name.trim(),
                       description: formData.description.trim() || "New Project",
                       folderPath: formData.folderPath.trim() || undefined,
-                      status: "planning",
+                      status: formData.status as any,
                       tags: [],
                     });
                     setIsAddDialogOpen(false);
@@ -306,7 +312,7 @@ export function ProjectsWidget() {
             <TabsTrigger value="local" className="flex-1 text-[10px] uppercase font-bold tracking-wider data-[state=active]:bg-primary/20 data-[state=active]:text-primary">Local</TabsTrigger>
           </TabsList>
 
-          <ScrollArea className="flex-1 px-2 [&_[data-radix-scroll-area-scrollbar]]:hidden">
+          <ScrollArea className="flex-1 px-2 custom-scrollbar">
                  <TabsContent value="github" className="m-0 space-y-1.5 pb-4">
               {projects.filter(p => p.githubUrl).length === 0 && (
                 <div className="text-center py-6 text-xs text-muted-foreground">No GitHub repositories synced yet.</div>
@@ -329,7 +335,7 @@ export function ProjectsWidget() {
                     onClick={() => setSelectedProject(project)}
                   >
                     <div className="flex items-center gap-3 overflow-hidden">
-                      <div className={`w-2 h-2 rounded-full shrink-0 shadow-sm ${stats && (new Date().getTime() - new Date(stats.lastCommit).getTime() > 45*24*3600*1000) ? "bg-orange-500 shadow-orange-500/50" : "bg-green-500 shadow-green-500/50"}`} />
+                      <div className={`w-2 h-2 rounded-full shrink-0 shadow-sm ${getStatusColor(project.status)}`} />
                       <span className={`text-sm font-semibold truncate ${isSelected ? 'text-primary' : 'text-foreground'}`}>{project.name}</span>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
@@ -373,8 +379,8 @@ export function ProjectsWidget() {
                   >
                     <div className="flex items-center gap-3 overflow-hidden">
                       <div 
-                        className={`w-2 h-2 rounded-full shrink-0 shadow-sm ${(healthScore ?? 100) >= 70 ? 'bg-green-500 shadow-green-500/50' : (healthScore ?? 100) >= 40 ? 'bg-amber-500 shadow-amber-500/50' : 'bg-red-500 shadow-red-500/50'}`} 
-                        title="Health Status"
+                        className={`w-2 h-2 rounded-full shrink-0 shadow-sm ${getStatusColor(project.status)}`} 
+                        title="Project Color"
                       />
                       <span className={`text-sm font-semibold truncate ${isSelected ? 'text-primary' : 'text-foreground'}`}>{project.name}</span>
                     </div>
@@ -383,7 +389,7 @@ export function ProjectsWidget() {
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          className="w-6 h-6 shrink-0 hover:bg-[#007acc]/10 text-[#007acc]"
+                          className="w-6 h-6 shrink-0 hover:bg-white/10 text-white/50 hover:text-white"
                           onClick={(e) => {
                             e.stopPropagation();
                             window.open(`vscode://file/${project.folderPath}`);
@@ -407,17 +413,9 @@ export function ProjectsWidget() {
         <div className="w-2/3 flex flex-col h-full overflow-hidden pl-3">
           <div className="flex items-center justify-between mb-3 shrink-0 bg-[#0f0f11] p-3 rounded-xl border border-white/10">
             <div className="flex-1 min-w-0 pr-4 space-y-1">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
+                <div className={`w-2.5 h-2.5 rounded-full shadow-sm ${getStatusColor(selectedProject.status)}`} />
                 <h3 className="text-base font-bold text-foreground truncate">{selectedProject.name}</h3>
-                <Badge variant="outline" className={`text-[9px] font-semibold py-0 uppercase border ${getStatusColor(selectedProject.status)}`}>
-                  {selectedProject.status}
-                </Badge>
-                {!selectedProject.githubUrl && (
-                  <div 
-                    className={`w-2 h-2 rounded-full shadow-sm ml-1 ${(localHealthStats[selectedProject.id] ?? 100) >= 70 ? 'bg-green-500 shadow-green-500/50' : (localHealthStats[selectedProject.id] ?? 100) >= 40 ? 'bg-amber-500 shadow-amber-500/50' : 'bg-red-500 shadow-red-500/50'}`} 
-                    title="Project Health"
-                  />
-                )}
               </div>
               <div className="flex items-center gap-3 text-[10px] font-mono text-muted-foreground">
                 <span>Updated: {new Date(selectedProject.updatedAt).toLocaleDateString()}</span>
@@ -440,7 +438,8 @@ export function ProjectsWidget() {
                   setFormData({
                     name: selectedProject.name,
                     description: selectedProject.description,
-                    folderPath: selectedProject.folderPath || ""
+                    folderPath: selectedProject.folderPath || "",
+                    status: selectedProject.status || "green"
                   });
                 }}>
                   <Pencil className="w-3.5 h-3.5" />
@@ -453,6 +452,18 @@ export function ProjectsWidget() {
                     <div className="space-y-2">
                       <label className="text-xs font-semibold text-muted-foreground">Title</label>
                       <Input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="bg-transparent border-white/10" placeholder="Project name" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-semibold text-muted-foreground">Color Indicator</label>
+                      <div className="flex gap-3">
+                        {['green', 'yellow', 'red'].map(color => (
+                          <button
+                            key={color}
+                            onClick={() => setFormData({...formData, status: color})}
+                            className={`w-5 h-5 rounded-full ${color === 'green' ? 'bg-green-500' : color === 'yellow' ? 'bg-yellow-500' : 'bg-red-500'} ${formData.status === color ? 'ring-2 ring-white ring-offset-2 ring-offset-[#0f0f11]' : 'opacity-50 hover:opacity-100'}`}
+                          />
+                        ))}
+                      </div>
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-semibold text-muted-foreground">Description</label>
@@ -471,12 +482,14 @@ export function ProjectsWidget() {
                           name: formData.name.trim(),
                           description: formData.description.trim(),
                           folderPath: formData.folderPath.trim() || undefined,
+                          status: formData.status as any,
                         });
                         setSelectedProject({ 
                           ...selectedProject, 
                           name: formData.name.trim(),
                           description: formData.description.trim(),
-                          folderPath: formData.folderPath.trim() || undefined
+                          folderPath: formData.folderPath.trim() || undefined,
+                          status: formData.status as any,
                         });
                         setIsEditDialogOpen(false);
                       }
@@ -525,7 +538,7 @@ export function ProjectsWidget() {
                   <Button 
                     size="sm" 
                     onClick={() => window.open(`vscode://file/${selectedProject.folderPath}`)}
-                    className="h-7 text-[10px] bg-[#007acc]/10 text-[#007acc] hover:bg-[#007acc]/20 border border-[#007acc]/20"
+                    className="h-7 text-[10px] bg-white/10 text-white hover:bg-white/20 border border-white/20"
                   >
                     <Code2 className="w-3.5 h-3.5 mr-1.5" /> Open in VS Code
                   </Button>
@@ -545,7 +558,7 @@ export function ProjectsWidget() {
                     className="bg-transparent border-white/10 text-xs min-h-[80px] custom-scrollbar focus-visible:ring-1 focus-visible:ring-primary/50"
                   />
                   <div className="flex justify-end">
-                    <Button size="sm" onClick={saveFeedback} disabled={isSavingFeedback} className="h-7 text-[10px]">
+                    <Button size="sm" onClick={saveFeedback} disabled={isSavingFeedback} className="h-7 text-[10px] bg-white text-black hover:bg-zinc-200">
                       {isSavingFeedback ? "Parsing..." : "Save Feedback"}
                     </Button>
                   </div>
