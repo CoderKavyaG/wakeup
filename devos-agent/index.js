@@ -211,8 +211,16 @@ app.post('/scan-project', async (req, res) => {
       const allDeps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
       if (allDeps['next']) result.tags.push('Next.js');
       if (allDeps['react']) result.tags.push('React');
+      if (allDeps['vue']) result.tags.push('Vue');
+      if (allDeps['svelte']) result.tags.push('Svelte');
+      if (allDeps['@angular/core']) result.tags.push('Angular');
+      if (allDeps['vite']) result.tags.push('Vite');
+      if (allDeps['@nestjs/core']) result.tags.push('NestJS');
       if (allDeps['express'] || allDeps['fastapi'] || allDeps['flask']) result.tags.push('Backend');
-      if (allDeps['prisma']) result.tags.push('PostgreSQL');
+      if (allDeps['prisma']) result.tags.push('Prisma');
+      if (allDeps['mongoose'] || allDeps['mongodb']) result.tags.push('MongoDB');
+      if (allDeps['firebase']) result.tags.push('Firebase');
+      if (allDeps['@supabase/supabase-js']) result.tags.push('Supabase');
       if (allDeps['tailwindcss']) result.tags.push('TailwindCSS');
       if (allDeps['typescript']) result.tags.push('TypeScript');
     } catch(e) {}

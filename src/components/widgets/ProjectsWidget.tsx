@@ -22,6 +22,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { 
   Folder, GitBranch, ExternalLink, Trash2, 
@@ -48,6 +54,9 @@ export function ProjectsWidget() {
   const [importScanning, setImportScanning] = useState(false);
   const [importError, setImportError] = useState("");
   const [importResult, setImportResult] = useState<any>(null);
+  
+  // List toggle state
+  const [activeListTab, setActiveListTab] = useState<"github" | "local">("github");
 
   const handleScanProject = async () => {
     if (!importPath.trim()) return;
@@ -306,10 +315,26 @@ export function ProjectsWidget() {
           <div className="flex items-center space-x-2">
             <Folder className="w-4 h-4 text-primary" />
             <h2 className="text-sm font-semibold tracking-wider uppercase text-secondary-foreground">Projects</h2>
-            {!selectedProject && staleWarningCount > 0 && (
+          </div>
+          <div className="flex items-center bg-black/40 p-1 rounded-full border border-white/5 shadow-inner">
+            <button 
+              onClick={() => setActiveListTab("github")} 
+              className={`px-3 py-1 rounded-full text-[9px] font-bold uppercase transition-all duration-300 ${activeListTab === "github" ? "bg-white text-black shadow-sm" : "text-muted-foreground hover:text-white"}`}
+            >
+              GitHub
+            </button>
+            <button 
+              onClick={() => setActiveListTab("local")} 
+              className={`px-3 py-1 rounded-full text-[9px] font-bold uppercase transition-all duration-300 ${activeListTab === "local" ? "bg-white text-black shadow-sm" : "text-muted-foreground hover:text-white"}`}
+            >
+              Local
+            </button>
+          </div>
+          <div className="flex items-center space-x-2">
+            {!selectedProject && staleWarningCount > 0 && activeListTab === "github" && (
               <button 
                 onClick={() => setShowStaleOnly(!showStaleOnly)}
-                className={`ml-2 px-1.5 py-0.5 border rounded flex items-center space-x-1 transition-colors ${
+                className={`px-1.5 py-0.5 border rounded flex items-center space-x-1 transition-colors ${
                   showStaleOnly 
                     ? "bg-primary/20 border-primary/40" 
                     : "bg-orange-500/10 border-orange-500/20 hover:bg-orange-500/20"
@@ -317,7 +342,7 @@ export function ProjectsWidget() {
               >
                 <AlertCircle className={`w-2.5 h-2.5 ${showStaleOnly ? "text-primary" : "text-orange-400"}`} />
                 <span className={`text-[9px] font-bold ${showStaleOnly ? "text-primary" : "text-orange-400"}`}>
-                  {showStaleOnly ? "Showing stale · Clear" : `${staleWarningCount} Stale`}
+                  {showStaleOnly ? "Clear" : `${staleWarningCount}`}
                 </span>
               </button>
             )}
@@ -355,7 +380,13 @@ export function ProjectsWidget() {
                 <div className="space-y-4 py-4">
                   <div className="bg-black/20 p-3 rounded-lg border border-white/10 space-y-2">
                     <h3 className="font-bold text-sm">{importResult.name}</h3>
-                    {importResult.description && <p className="text-xs text-muted-foreground line-clamp-2">{importResult.description}</p>}
+                    {importResult.folderPath && (
+                      <div className="flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground mt-1 bg-black/40 p-1.5 rounded">
+                        <Folder className="w-3 h-3 shrink-0" />
+                        <span className="truncate">{importResult.folderPath}</span>
+                      </div>
+                    )}
+                    {importResult.description && <p className="text-xs text-muted-foreground line-clamp-2 mt-2">{importResult.description}</p>}
                     
                     {importResult.tags && importResult.tags.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-2">
@@ -423,17 +454,13 @@ export function ProjectsWidget() {
           </Dialog>
         </div>
 
-        <Tabs defaultValue="github" className="flex-1 flex flex-col min-h-0">
-          <TabsList className="mx-2 mb-2 bg-[#0f0f11] border border-white/10 shrink-0">
-            <TabsTrigger value="github" className="flex-1 text-[10px] uppercase font-bold tracking-wider data-[state=active]:bg-primary/20 data-[state=active]:text-primary">GitHub</TabsTrigger>
-            <TabsTrigger value="local" className="flex-1 text-[10px] uppercase font-bold tracking-wider data-[state=active]:bg-primary/20 data-[state=active]:text-primary">Local</TabsTrigger>
-          </TabsList>
-
+        <div className="flex-1 flex flex-col min-h-0">
           <div 
-            className="flex-1 overflow-y-auto px-2"
+            className="flex-1 overflow-y-auto px-2 space-y-1.5 pb-4"
             style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}
           >
-             <TabsContent value="github" className="m-0 space-y-1.5 pb-4">
+             {activeListTab === "github" && (
+              <>
               {projects.filter(p => p.githubUrl).length === 0 && (
                 <div className="text-center py-6 text-xs text-muted-foreground">No GitHub repositories synced yet.</div>
               )}
@@ -533,9 +560,11 @@ export function ProjectsWidget() {
                   </div>
                 );
               })}
-            </TabsContent>
+              </>
+            )}
 
-            <TabsContent value="local" className="m-0 space-y-1.5 pb-4">
+            {activeListTab === "local" && (
+              <>
               {projects.filter(p => !p.githubUrl && p.status !== "archived").filter(p => {
                 if (!showStaleOnly) return true;
                 const daysAgo = (Date.now() - new Date(p.updatedAt).getTime()) / (1000 * 3600 * 24);
@@ -549,7 +578,6 @@ export function ProjectsWidget() {
                 return daysAgo > 14;
               }).map((project) => {
                 const isSelected = selectedProject?.id === project.id;
-                const healthScore = localHealthStats[project.id];
                 
                 const daysAgo = Math.floor((Date.now() - new Date(project.updatedAt).getTime()) / (1000 * 3600 * 24));
                 const isStale = daysAgo > 14;
@@ -614,9 +642,10 @@ export function ProjectsWidget() {
                   </div>
                 );
               })}
-            </TabsContent>
+              </>
+            )}
           </div>
-        </Tabs>
+        </div>
       </div>
 
       {/* ── DETAIL VIEW (Slides in) ── */}
@@ -627,9 +656,9 @@ export function ProjectsWidget() {
               <div className="flex items-center gap-3">
                 <div className={`w-2.5 h-2.5 rounded-full shadow-sm ${selectedProject.githubUrl ? ((!githubStats[selectedProject.githubUrl.toLowerCase()] || (new Date().getTime() - new Date(githubStats[selectedProject.githubUrl.toLowerCase()].lastCommit).getTime() <= 45*24*3600*1000)) ? "bg-green-500 shadow-green-500/50" : "bg-yellow-500 shadow-yellow-500/50") : getStatusColor(selectedProject.status)}`} />
                 <h3 className="text-base font-bold text-foreground truncate">{selectedProject.name}</h3>
+                <span className="text-[10px] font-mono text-muted-foreground ml-1 mt-0.5">Updated: {new Date(selectedProject.updatedAt).toLocaleDateString()}</span>
               </div>
               <div className="flex items-center gap-3 text-[10px] font-mono text-muted-foreground">
-                <span>Updated: {new Date(selectedProject.updatedAt).toLocaleDateString()}</span>
                 {selectedProject.githubUrl && (
                   <a href={selectedProject.githubUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 hover:text-foreground">
                     <GitBranch className="w-3 h-3" /> GitHub
@@ -642,38 +671,56 @@ export function ProjectsWidget() {
                 )}
               </div>
               
-              {/* Project Completion Pills */}
-              <div className="flex items-center gap-1 pt-1 overflow-x-auto custom-scrollbar pb-1">
-                {[
-                  { label: "Not started", value: 0 },
-                  { label: "Planning", value: 25 },
-                  { label: "Building", value: 50 },
-                  { label: "Almost done", value: 75 },
-                  { label: "Done", value: 100 }
-                ].map((pill) => {
-                  const isActive = getDerivedCompletion(selectedProject) === pill.value;
-                  
-                  return (
-                    <button
-                      key={pill.value}
-                      onClick={() => {
-                        updateProject(selectedProject.id, { completionPercentage: pill.value });
-                        setSelectedProject({ ...selectedProject, completionPercentage: pill.value });
-                      }}
-                      className={`text-[9px] font-bold uppercase tracking-wider px-2 py-1 rounded-full whitespace-nowrap transition-colors border ${
-                        isActive 
-                          ? "bg-white text-black border-white shadow-sm" 
-                          : "bg-transparent text-muted-foreground border-white/10 hover:bg-white/5 hover:text-white"
-                      }`}
-                    >
-                      {pill.label}
-                    </button>
-                  );
-                })}
+              <div className="pt-2">
+                <DropdownMenu>
+                  <DropdownMenuTrigger className="text-[9px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-full whitespace-nowrap transition-colors border bg-white/5 text-foreground hover:bg-white/10 border-white/10 flex items-center gap-2 outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer">
+                      Status: {
+                        [
+                          { label: "Not started", value: 0 },
+                          { label: "Planning", value: 25 },
+                          { label: "Building", value: 50 },
+                          { label: "Almost done", value: 75 },
+                          { label: "Done", value: 100 }
+                        ].find(p => p.value === getDerivedCompletion(selectedProject))?.label || "Unknown"
+                      }
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="bg-[#0f0f11] border-white/10 text-foreground min-w-[140px] shadow-xl">
+                    {[
+                      { label: "Not started", value: 0 },
+                      { label: "Planning", value: 25 },
+                      { label: "Building", value: 50 },
+                      { label: "Almost done", value: 75 },
+                      { label: "Done", value: 100 }
+                    ].map((pill) => {
+                       const isActive = getDerivedCompletion(selectedProject) === pill.value;
+                       return (
+                         <DropdownMenuItem 
+                           key={pill.value}
+                           className={`text-xs font-bold uppercase cursor-pointer focus:bg-white/10 focus:text-white ${isActive ? "bg-white/10 text-white" : "text-muted-foreground"}`}
+                           onClick={() => {
+                              updateProject(selectedProject.id, { completionPercentage: pill.value });
+                              setSelectedProject({ ...selectedProject, completionPercentage: pill.value });
+                           }}
+                         >
+                           {pill.label}
+                         </DropdownMenuItem>
+                       )
+                    })}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
             
-            <div className="flex items-center gap-1 shrink-0">
+            <div className="flex items-center gap-1 shrink-0 self-start">
+              {selectedProject.folderPath && (
+                <button 
+                  className="w-7 h-7 text-muted-foreground hover:text-[#007acc] hover:bg-[#007acc]/10 transition-colors inline-flex items-center justify-center rounded-md"
+                  onClick={() => window.open(`vscode://file/${selectedProject.folderPath}`)}
+                  title="Open in VS Code"
+                >
+                  <Code2 className="w-3.5 h-3.5" />
+                </button>
+              )}
               <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
                 <DialogTrigger className="w-7 h-7 text-muted-foreground hover:text-foreground transition-colors inline-flex items-center justify-center rounded-md" onClick={() => {
                   setFormData({
