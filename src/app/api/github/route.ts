@@ -48,7 +48,7 @@ export async function GET(request: Request) {
     const reposData = await reposRes.json();
 
     // 3. Process Repositories
-    const processedRepos = (reposData as any[]).map((r: any) => ({
+    let processedRepos = (reposData as any[]).map((r: any) => ({
       id: r.id,
       name: r.name,
       description: r.description || null,
@@ -57,8 +57,35 @@ export async function GET(request: Request) {
       stargazers_count: r.stargazers_count,
       forks_count: r.forks,
       language: r.language || null,
-      open_issues_count: r.open_issues_count || 0
+      open_issues_count: r.open_issues_count || 0,
+      last_commit_message: null
     }));
+
+    // Only enrich top 15 most recently updated repos to avoid rate limits
+    processedRepos = processedRepos.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+    
+    for (let i = 0; i < Math.min(15, processedRepos.length); i++) {
+      const r = processedRepos[i];
+      try {
+        // Fetch last commit
+        const commitRes = await fetch(`https://api.github.com/repos/${username}/${r.name}/commits?per_page=1`, { headers });
+        if (commitRes.ok) {
+          const commitsData = await commitRes.json();
+          if (commitsData && commitsData.length > 0) {
+            r.last_commit_message = commitsData[0].commit?.message?.split('\n')[0] || null;
+          }
+        }
+        
+        // Fetch accurate issues count (excluding PRs) using Search API
+        const issueRes = await fetch(`https://api.github.com/search/issues?q=repo:${username}/${r.name}+type:issue+state:open&per_page=1`, { headers });
+        if (issueRes.ok) {
+          const issueData = await issueRes.json();
+          r.open_issues_count = issueData.total_count !== undefined ? issueData.total_count : r.open_issues_count;
+        }
+      } catch (err) {
+        console.error(`Failed to enrich repo ${r.name}`, err);
+      }
+    }
 
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);

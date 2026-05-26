@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-export type ProjectStatus = "planning" | "active" | "completed" | "stale";
+export type ProjectStatus = "planning" | "active" | "completed" | "stale" | "archived";
 
 export interface Project {
   id: string;

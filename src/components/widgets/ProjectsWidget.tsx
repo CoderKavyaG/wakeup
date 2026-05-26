@@ -50,8 +50,9 @@ export function ProjectsWidget() {
   }, []);
 
   // GitHub Stats State
-  const [githubStats, setGithubStats] = useState<Record<string, { lastCommit: string, issues: number, stars: number }>>({});
+  const [githubStats, setGithubStats] = useState<Record<string, { lastCommit: string, issues: number, stars: number, lastCommitMsg: string | null }>>({});
   const [staleWarningCount, setStaleWarningCount] = useState(0);
+  const [showStaleOnly, setShowStaleOnly] = useState(false);
 
   // Local Health Stats
   const [localHealthStats, setLocalHealthStats] = useState<Record<string, number>>({});
@@ -142,17 +143,27 @@ export function ProjectsWidget() {
               stats[url] = {
                 lastCommit: repo.updated_at,
                 issues: repo.open_issues_count || 0,
-                stars: repo.stargazers_count || 0
+                stars: repo.stargazers_count || 0,
+                lastCommitMsg: repo.last_commit_message || null
               };
 
-              // Check staleness (older than 45 days)
+              // Check staleness (older than 14 days)
               const updated = new Date(repo.updated_at);
               const daysAgo = (Date.now() - updated.getTime()) / (1000 * 3600 * 24);
-              if (daysAgo > 45) {
+              if (daysAgo > 14) {
                 staleCount++;
               }
             });
           }
+
+          // Also count local stale projects
+          projects.forEach(p => {
+            if (!p.githubUrl && p.status !== "stale" && p.status !== "completed") {
+              const daysAgo = (Date.now() - new Date(p.updatedAt).getTime()) / (1000 * 3600 * 24);
+              if (daysAgo > 14) staleCount++;
+            }
+          });
+
           setGithubStats(stats);
           setStaleWarningCount(staleCount);
           
@@ -162,7 +173,12 @@ export function ProjectsWidget() {
               const repo = stats[proj.githubUrl.toLowerCase()];
               const updated = new Date(repo.lastCommit);
               const daysAgo = (Date.now() - updated.getTime()) / (1000 * 3600 * 24);
-              if (daysAgo > 45 && proj.status !== "stale" && proj.status !== "completed") {
+              if (daysAgo > 14 && proj.status !== "stale" && proj.status !== "completed" && proj.status !== "archived") {
+                updateProject(proj.id, { status: "stale" });
+              }
+            } else if (!proj.githubUrl) {
+              const daysAgo = (Date.now() - new Date(proj.updatedAt).getTime()) / (1000 * 3600 * 24);
+              if (daysAgo > 14 && proj.status !== "stale" && proj.status !== "completed" && proj.status !== "archived") {
                 updateProject(proj.id, { status: "stale" });
               }
             }
@@ -219,10 +235,19 @@ export function ProjectsWidget() {
             <Folder className="w-4 h-4 text-primary" />
             <h2 className="text-sm font-semibold tracking-wider uppercase text-secondary-foreground">Projects</h2>
             {!selectedProject && staleWarningCount > 0 && (
-              <div className="ml-2 px-1.5 py-0.5 bg-orange-500/10 border border-orange-500/20 rounded flex items-center space-x-1">
-                <AlertCircle className="w-2.5 h-2.5 text-orange-400" />
-                <span className="text-[9px] text-orange-400 font-bold">{staleWarningCount} Stale</span>
-              </div>
+              <button 
+                onClick={() => setShowStaleOnly(!showStaleOnly)}
+                className={`ml-2 px-1.5 py-0.5 border rounded flex items-center space-x-1 transition-colors ${
+                  showStaleOnly 
+                    ? "bg-primary/20 border-primary/40" 
+                    : "bg-orange-500/10 border-orange-500/20 hover:bg-orange-500/20"
+                }`}
+              >
+                <AlertCircle className={`w-2.5 h-2.5 ${showStaleOnly ? "text-primary" : "text-orange-400"}`} />
+                <span className={`text-[9px] font-bold ${showStaleOnly ? "text-primary" : "text-orange-400"}`}>
+                  {showStaleOnly ? "Showing stale · Clear" : `${staleWarningCount} Stale`}
+                </span>
+              </button>
             )}
           </div>
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
@@ -297,26 +322,79 @@ export function ProjectsWidget() {
                 if (!aCommit) return 1;
                 if (!bCommit) return -1;
                 return new Date(bCommit).getTime() - new Date(aCommit).getTime();
+              }).filter(p => {
+                if (p.status === "archived") return false;
+                if (!showStaleOnly) return true;
+                const stats = githubStats[p.githubUrl!.toLowerCase()];
+                if (!stats) return false;
+                const daysAgo = (Date.now() - new Date(stats.lastCommit).getTime()) / (1000 * 3600 * 24);
+                return daysAgo > 14;
               }).map((project) => {
                 const stats = githubStats[project.githubUrl!.toLowerCase()];
                 const isSelected = selectedProject?.id === project.id;
+                
+                const daysAgo = stats ? Math.floor((Date.now() - new Date(stats.lastCommit).getTime()) / (1000 * 3600 * 24)) : 0;
+                const isStale = daysAgo > 14;
                 
                 return (
                   <div 
                     key={project.id} 
                     className={`px-3 py-2.5 rounded-lg flex items-center justify-between cursor-pointer transition-all duration-200 border border-transparent 
-                      ${isSelected ? "bg-primary/10 border-primary/20 shadow-sm" : "bg-transparent hover:bg-white/5 hover:border-white/10"}`}
+                      ${isSelected ? "bg-primary/10 border-primary/20 shadow-sm" : "bg-transparent hover:bg-white/5 hover:border-white/10"}
+                      ${isStale ? "opacity-70 hover:opacity-100" : ""}`}
                     onClick={() => setSelectedProject(project)}
                   >
-                    <div className="flex items-center gap-3 overflow-hidden">
-                      <div className={`w-2 h-2 rounded-full shrink-0 shadow-sm ${(!stats || (new Date().getTime() - new Date(stats.lastCommit).getTime() <= 45*24*3600*1000)) ? "bg-green-500 shadow-green-500/50" : "bg-yellow-500 shadow-yellow-500/50"}`} />
-                      <span className={`text-sm font-semibold truncate ${isSelected ? 'text-primary' : 'text-foreground'}`}>{project.name}</span>
+                    <div className="flex flex-col overflow-hidden w-full pr-2">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-2 h-2 rounded-full shrink-0 shadow-sm ${!isStale ? "bg-green-500 shadow-green-500/50" : "bg-yellow-500 shadow-yellow-500/50"}`} />
+                        <span className={`text-sm font-semibold truncate ${isSelected ? 'text-primary' : 'text-foreground'}`}>{project.name}</span>
+                        {stats?.issues > 0 && (
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); window.open(`${project.githubUrl}/issues`); }}
+                            className="ml-1 px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400 text-[9px] font-bold shrink-0 hover:bg-red-500/30 transition-colors"
+                          >
+                            {stats.issues} issues
+                          </button>
+                        )}
+                      </div>
+                      {stats?.lastCommitMsg && (
+                        <p className="text-[10px] text-muted-foreground truncate pl-4 mt-0.5">
+                          {stats.lastCommitMsg.length > 35 ? stats.lastCommitMsg.substring(0, 35) + '...' : stats.lastCommitMsg}
+                        </p>
+                      )}
                     </div>
+
                     <div className="flex items-center gap-2 shrink-0">
-                      {!selectedProject && stats && (
+                      {!selectedProject && isStale && (
+                        <span className="text-[10px] text-amber-500/80 font-bold whitespace-nowrap">{daysAgo}d stale</span>
+                      )}
+                      
+                      {!selectedProject && isStale && (
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 hover:opacity-100 transition-opacity">
+                           <Button 
+                              variant="ghost" 
+                              size="sm"
+                              className="h-6 px-2 text-[10px] bg-white/5 hover:bg-white/10"
+                              onClick={(e) => { e.stopPropagation(); updateProject(project.id, { status: "active" }); }}
+                           >
+                             Mark active
+                           </Button>
+                           <Button 
+                              variant="ghost" 
+                              size="sm"
+                              className="h-6 px-2 text-[10px] bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 hover:text-rose-300"
+                              onClick={(e) => { e.stopPropagation(); updateProject(project.id, { status: "archived" }); }}
+                           >
+                             Archive
+                           </Button>
+                        </div>
+                      )}
+
+                      {!selectedProject && !isStale && stats && (
                         <span className="text-[10px] text-muted-foreground font-mono opacity-80">{new Date(stats.lastCommit).toLocaleDateString()}</span>
                       )}
-                      {project.folderPath && (
+                      
+                      {project.folderPath && !isStale && (
                         <Button 
                           variant="ghost" 
                           size="icon" 
@@ -337,29 +415,67 @@ export function ProjectsWidget() {
             </TabsContent>
 
             <TabsContent value="local" className="m-0 space-y-1.5 pb-4">
-              {projects.filter(p => !p.githubUrl).length === 0 && (
+              {projects.filter(p => !p.githubUrl && p.status !== "archived").filter(p => {
+                if (!showStaleOnly) return true;
+                const daysAgo = (Date.now() - new Date(p.updatedAt).getTime()) / (1000 * 3600 * 24);
+                return daysAgo > 14;
+              }).length === 0 && (
                 <div className="text-center py-6 text-xs text-muted-foreground">No local workspaces found.</div>
               )}
-              {projects.filter(p => !p.githubUrl).map((project) => {
+              {projects.filter(p => !p.githubUrl && p.status !== "archived").filter(p => {
+                if (!showStaleOnly) return true;
+                const daysAgo = (Date.now() - new Date(p.updatedAt).getTime()) / (1000 * 3600 * 24);
+                return daysAgo > 14;
+              }).map((project) => {
                 const isSelected = selectedProject?.id === project.id;
                 const healthScore = localHealthStats[project.id];
+                
+                const daysAgo = Math.floor((Date.now() - new Date(project.updatedAt).getTime()) / (1000 * 3600 * 24));
+                const isStale = daysAgo > 14;
                 
                 return (
                   <div 
                     key={project.id} 
-                    className={`px-3 py-2.5 rounded-lg flex items-center justify-between cursor-pointer transition-all duration-200 border border-transparent 
-                      ${isSelected ? "bg-primary/10 border-primary/20 shadow-sm" : "bg-transparent hover:bg-white/5 hover:border-white/10"}`}
+                    className={`px-3 py-2.5 rounded-lg flex items-center justify-between cursor-pointer transition-all duration-200 border border-transparent group
+                      ${isSelected ? "bg-primary/10 border-primary/20 shadow-sm" : "bg-transparent hover:bg-white/5 hover:border-white/10"}
+                      ${isStale ? "opacity-70 hover:opacity-100" : ""}`}
                     onClick={() => setSelectedProject(project)}
                   >
                     <div className="flex items-center gap-3 overflow-hidden">
                       <div 
-                        className={`w-2 h-2 rounded-full shrink-0 shadow-sm ${getStatusColor(project.status)}`} 
+                        className={`w-2 h-2 rounded-full shrink-0 shadow-sm ${!isStale ? getStatusColor(project.status) : "bg-yellow-500 shadow-yellow-500/50"}`} 
                         title="Project Color"
                       />
                       <span className={`text-sm font-semibold truncate ${isSelected ? 'text-primary' : 'text-foreground'}`}>{project.name}</span>
                     </div>
-                    {project.folderPath && (
-                      <div className="flex items-center gap-2 shrink-0">
+                    
+                    <div className="flex items-center gap-2 shrink-0">
+                      {!selectedProject && isStale && (
+                        <span className="text-[10px] text-amber-500/80 font-bold whitespace-nowrap">{daysAgo}d stale</span>
+                      )}
+                      
+                      {!selectedProject && isStale && (
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 hover:opacity-100 transition-opacity">
+                           <Button 
+                              variant="ghost" 
+                              size="sm"
+                              className="h-6 px-2 text-[10px] bg-white/5 hover:bg-white/10"
+                              onClick={(e) => { e.stopPropagation(); updateProject(project.id, { status: "active" }); }}
+                           >
+                             Mark active
+                           </Button>
+                           <Button 
+                              variant="ghost" 
+                              size="sm"
+                              className="h-6 px-2 text-[10px] bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 hover:text-rose-300"
+                              onClick={(e) => { e.stopPropagation(); updateProject(project.id, { status: "archived" }); }}
+                           >
+                             Archive
+                           </Button>
+                        </div>
+                      )}
+
+                      {project.folderPath && !isStale && (
                         <Button 
                           variant="ghost" 
                           size="icon" 
@@ -372,8 +488,8 @@ export function ProjectsWidget() {
                         >
                           <Code2 className="w-3.5 h-3.5" />
                         </Button>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 );
               })}

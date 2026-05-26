@@ -4,7 +4,7 @@ import React from "react";
 import { CockpitCommand } from "./CockpitCommand";
 import { useLayoutStore } from "@/store/useLayoutStore";
 import { useUrlStore } from "@/store/useUrlStore";
-import { Lock, Unlock, Bookmark, X } from "lucide-react";
+import { Lock, Unlock, Bookmark, X, Search } from "lucide-react";
 import { Button } from "../ui/button";
 import { QuickLinksWidget } from "../widgets/QuickLinksWidget";
 import { AnimatePresence, motion } from "framer-motion";
@@ -21,14 +21,15 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       <CockpitCommand />
 
       {/* Top Controls Bar */}
-      <div className="shrink-0 px-6 pt-6 pb-2 flex items-center justify-between gap-4 select-none bg-[#0f0f11]">
+      <div className="shrink-0 px-6 pt-4 pb-3 flex items-center justify-between gap-4 select-none bg-[#0f0f11] border-b border-white/5">
         <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 rounded-lg bg-foreground flex items-center justify-center font-bold text-background text-base shadow-sm border border-white/10">
+          <div className="w-7 h-7 rounded bg-foreground flex items-center justify-center font-bold text-background text-[13px] shadow-sm border border-white/10">
             D
           </div>
-          <div>
+          <div className="flex items-center gap-2">
             <h1 className="text-sm font-semibold tracking-tight text-foreground leading-none">DevOS</h1>
-            <p className="text-[9px] text-muted-foreground mt-0.5 font-mono uppercase">
+            <span className="w-1 h-1 rounded-full bg-white/20"></span>
+            <p className="text-[10px] text-muted-foreground font-mono uppercase tracking-wider">
               {isLocked ? "Locked" : "Edit mode"}
             </p>
           </div>
@@ -37,29 +38,21 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         <div className="flex items-center space-x-2">
 
 
+        <div className="flex items-center space-x-2 bg-[#161618] border border-white/5 p-1 rounded-lg">
           {/* Lock/Unlock */}
           <Button
             onClick={toggleLock}
             variant="ghost"
             size="sm"
-            className={`h-7 text-[11px] font-semibold gap-1.5 px-3 rounded-lg border ${
-              isLocked
-                ? "bg-rose-500/10 text-rose-400 border-rose-500/20"
-                : "bg-green-500/10 text-green-400 border-green-500/20"
+            className={`h-6 text-[10px] uppercase tracking-wider font-bold gap-1.5 px-2.5 rounded hover:bg-white/5 ${
+              isLocked ? "text-rose-400" : "text-green-400"
             }`}
           >
-            {isLocked ? (
-              <>
-                <Lock className="w-3 h-3" />
-                <span>Locked</span>
-              </>
-            ) : (
-              <>
-                <Unlock className="w-3 h-3" />
-                <span>Drag Mode</span>
-              </>
-            )}
+            {isLocked ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
+            {isLocked ? "Locked" : "Drag Mode"}
           </Button>
+
+          <div className="w-px h-4 bg-white/10 mx-1"></div>
 
           {/* Cockpit Command Trigger */}
           <button
@@ -67,23 +60,25 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               const event = new KeyboardEvent('keydown', { key: 'k', metaKey: true });
               window.dispatchEvent(event);
             }}
-            className="flex items-center gap-1.5 h-7 px-3 rounded-lg border border-white/10 hover:bg-white/5 text-muted-foreground transition-colors text-[11px] font-semibold"
+            className="flex items-center gap-1.5 h-6 px-2.5 rounded hover:bg-white/5 text-muted-foreground transition-colors text-[10px] uppercase tracking-wider font-bold"
           >
+            <Search className="w-3 h-3" />
             <span>Cockpit</span>
-            <kbd className="bg-white/5 px-1 rounded text-[9px] font-mono border border-white/10">⌘K</kbd>
+            <kbd className="bg-white/5 px-1 rounded text-[8px] font-mono border border-white/10 ml-1">⌘K</kbd>
           </button>
 
-
+          <div className="w-px h-4 bg-white/10 mx-1"></div>
 
           {/* Clear */}
           <Button
             onClick={clearLayout}
             variant="ghost"
             size="sm"
-            className="h-7 text-[11px] font-semibold px-3 rounded-lg border border-white/10 hover:bg-rose-500/10 hover:text-rose-400 hover:border-rose-500/20 text-muted-foreground"
+            className="h-6 text-[10px] uppercase tracking-wider font-bold px-2.5 rounded hover:bg-rose-500/10 hover:text-rose-400 text-muted-foreground"
           >
-            Clear Workspace
+            Clear Grid
           </Button>
+        </div>
         </div>
       </div>
 
