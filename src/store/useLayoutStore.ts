@@ -5,7 +5,8 @@ export type WidgetType =
   | "projects" 
   | "github" 
   | "focus" 
-  | "machine";
+  | "machine"
+  | "clock";
 
 export interface WidgetInstance {
   id: string;
@@ -28,6 +29,14 @@ interface LayoutState {
   resetLayout: () => Promise<void>;
   clearLayout: () => Promise<void>;
 }
+
+const widgetConfigs: { [key in WidgetType]: { minW: number, minH: number, defaultW: number, defaultH: number } } = {
+  projects: { minW: 3, minH: 3, defaultW: 4, defaultH: 4 },
+  github: { minW: 3, minH: 3, defaultW: 4, defaultH: 4 },
+  focus: { minW: 3, minH: 4, defaultW: 4, defaultH: 4 },
+  machine: { minW: 4, minH: 6, defaultW: 6, defaultH: 6 },
+  clock: { minW: 2, minH: 3, defaultW: 3, defaultH: 4 },
+};
 
 const defaultLayouts: { [key: string]: Layout } = {
   lg: [
@@ -112,19 +121,17 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
       if (l.y + l.h > maxY) maxY = l.y + l.h;
     });
     
-    let minW = 3;
-    let minH = 3;
-    let defaultW = 4;
-    let defaultH = 4;
+    const config = widgetConfigs[type] || { minW: 3, minH: 3, defaultW: 4, defaultH: 4 };
     
-    if (type === "focus") {
-      minW = 4;
-      minH = 9;
-      defaultW = 10;
-      defaultH = 9;
-    }
-    
-    lgLayout.push({ i: id, x: 0, y: maxY, w: defaultW, h: defaultH, minW, minH });
+    lgLayout.push({ 
+      i: id, 
+      x: 0, 
+      y: maxY, 
+      w: config.defaultW, 
+      h: config.defaultH, 
+      minW: config.minW, 
+      minH: config.minH 
+    });
     currentLayouts.lg = lgLayout;
 
     const previousWidgets = get().widgets;
