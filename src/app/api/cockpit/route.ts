@@ -1,6 +1,5 @@
-import { streamText } from "ai";
+import { streamText, createTextStreamResponse } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
-import { createTextStreamResponse } from "ai";
 import prisma from "@/lib/prisma";
 
 const openrouter = createOpenAI({
@@ -17,102 +16,96 @@ export const dynamic = "force-dynamic";
 
 interface CockpitRequest {
   query: string;
-  context?: {
-    projects?: { name: string; status: string; tags: string[]; nextAction?: string | null }[];
-    tasks?: { title: string; priority: string; completed: boolean }[];
-    notes?: { content: string }[];
-  };
 }
 
 export async function POST(request: Request) {
   try {
     const body: CockpitRequest = await request.json();
-    const { query, context } = body;
+    const { query } = body;
 
     if (!query?.trim()) {
       return Response.json({ error: "Query is required" }, { status: 400 });
     }
 
+    const lowerQuery = query.toLowerCase();
+
+    // 1. SMART ROUTING: Stale Projects (Direct DB bypass without AI)
+    if (lowerQuery.includes("stale")) {
+      const cutoff = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+      const staleProjects = await prisma.project.findMany({ 
+        where: { updatedAt: { lt: cutoff }, status: { not: "completed" } } 
+      });
+      
+      if (staleProjects.length === 0) {
+        return new Response("No stale projects! Everything has been touched recently.", { headers: { "Content-Type": "text/plain" } });
+      }
+      
+      const responseText = staleProjects.map(p => {
+        const days = Math.floor((Date.now() - new Date(p.updatedAt).getTime()) / (1000 * 60 * 60 * 24));
+        return `• ${p.name} (Stale for ${days} days)`;
+      }).join("\n");
+      
+      return new Response(`Here are your stale projects:\n\n${responseText}`, { headers: { "Content-Type": "text/plain" } });
+    }
+
     let modelInstance = null;
     
     if (process.env.GROQ_API_KEY) {
-      // Prioritizing Groq because it is stable and insanely fast.
       modelInstance = groq("llama-3.3-70b-versatile");
     } else if (process.env.OPENROUTER_API_KEY) {
-      // OpenRouter with the user-specified Gemma model
       modelInstance = openrouter("google/gemma-4-26b-a4b-it:free");
     }
 
-    // If no API key, fall back to fast DB-only response
     if (!modelInstance) {
-      const result = await handleNoAIFallback(query);
-      return Response.json({ result, fallback: true });
+      return Response.json({ error: "Please configure your OPENROUTER_API_KEY or GROQ_API_KEY in .env to enable AI answers." }, { status: 500 });
     }
 
-    // Build context summary from whatever we received (or fetch fresh from DB)
-    let projectsSummary = "";
-    let tasksSummary = "";
-    let notesSummary = "";
+    // 2. FETCH LIVE CONTEXT
+    const projects = await prisma.project.findMany();
+    const staleCount = projects.filter(p => p.updatedAt < new Date(Date.now() - 14 * 24 * 60 * 60 * 1000)).length;
+    const tasks = await prisma.task.findMany({ where: { completed: false }, orderBy: { createdAt: 'desc' }, take: 20 });
+    const notes = await prisma.note.findMany({ orderBy: { createdAt: 'desc' }, take: 10 });
 
-    if (context?.projects && context.projects.length > 0) {
-      projectsSummary = context.projects
-        .map((p) => `- ${p.name} [${p.status}]${p.tags.length ? ` (${p.tags.slice(0, 3).join(", ")})` : ""}${p.nextAction ? ` → next: ${p.nextAction}` : ""}`)
-        .join("\n");
-    } else {
-      const projects = await prisma.project.findMany({ orderBy: { updatedAt: "desc" }, take: 10 });
-      projectsSummary = projects
-        .map((p) => `- ${p.name} [${p.status}]${p.nextAction ? ` → next: ${p.nextAction}` : ""}`)
-        .join("\n");
+    // 3. SMART ROUTING MODIFIERS
+    let additionalInstructions = "";
+    let filteredProjects = projects;
+    let filteredTasks = tasks;
+    let filteredNotes = notes;
+
+    if (lowerQuery.includes("work on") || lowerQuery.includes("focus")) {
+      additionalInstructions = "\nCRITICAL INSTRUCTION: The user is asking what to focus on. Pick EXACTLY ONE project and ONE task from the context below and explain briefly why she should work on it.";
+    } else if (lowerQuery.includes("summarize")) {
+      const targetProject = projects.find(p => lowerQuery.includes(p.name.toLowerCase()));
+      if (targetProject) {
+        filteredProjects = [targetProject];
+        filteredTasks = tasks.filter(t => t.projectId === targetProject.id && !t.completed);
+        filteredNotes = notes;
+        additionalInstructions = `\nCRITICAL INSTRUCTION: Summarize the project "${targetProject.name}" based on its tasks and data.`;
+      }
     }
 
-    if (context?.tasks && context.tasks.length > 0) {
-      const open = context.tasks.filter((t) => !t.completed);
-      tasksSummary = open
-        .slice(0, 8)
-        .map((t) => `- [${t.priority}] ${t.title}`)
-        .join("\n");
-    } else {
-      const tasks = await prisma.task.findMany({ where: { completed: false }, orderBy: { priority: "desc" }, take: 8 });
-      tasksSummary = tasks.map((t) => `- [${t.priority}] ${t.title}`).join("\n");
-    }
+    // 4. BUILD PROMPT
+    const systemPrompt = `You are Kavya's personal dev OS assistant. You have access to her live workspace data. Be direct, specific, and actionable. Never be generic. Reference actual project names, task names, and dates.
+${additionalInstructions}
 
-    if (context?.notes && context.notes.length > 0) {
-      notesSummary = context.notes
-        .slice(0, 5)
-        .map((n) => `- ${n.content.substring(0, 80)}`)
-        .join("\n");
-    } else {
-      const notes = await prisma.note.findMany({ orderBy: { createdAt: "desc" }, take: 5 });
-      notesSummary = notes.map((n) => `- ${n.content.substring(0, 80)}`).join("\n");
-    }
+LIVE CONTEXT:
+Projects (${filteredProjects.length} total, ${staleCount} stale):
+${filteredProjects.map(p => `- ${p.name} [${p.status}] last updated ${new Date(p.updatedAt).toISOString().split('T')[0]} | tasks: ${tasks.filter(t=>!t.completed && t.projectId === p.id).length} open`).join('\n')}
 
-    const systemPrompt = `You are Kavya's personal developer OS assistant inside DevOS, her second brain and agentic dashboard.
+Open tasks (${filteredTasks.length}):
+${filteredTasks.map(t => `- ${t.title} [${t.priority}] due: ${t.dueDate ? new Date(t.dueDate).toISOString().split('T')[0] : 'no date'}`).join('\n')}
 
-You have full access to her live data:
+Recent notes:
+${filteredNotes.map(n => `- ${n.content.slice(0,80)}`).join('\n')}
 
-PROJECTS:
-${projectsSummary || "No projects yet."}
+Today is ${new Date().toDateString()}.`;
 
-OPEN TASKS:
-${tasksSummary || "No open tasks."}
-
-RECENT NOTES:
-${notesSummary || "No recent notes."}
-
-Rules:
-- If the user says a casual greeting (e.g., "hey", "hello", "hi"), simply reply back warmly and ask how you can help. Do NOT output a random project or task description in response to a simple greeting.
-- Answer concisely and actionably. No fluff, no preamble.
-- If asked what to work on, pick ONE thing and explain why briefly.
-- If asked about stale projects, list them with days since last update if you can infer it.
-- If the query is a command like "create task" or "add note", confirm what you would do (the UI handles actual creation).
-- Speak directly to Kavya in second person.
-- Keep responses under 150 words unless a detailed breakdown is explicitly asked for.`;
-
+    // 5. CALL AI
     const result = streamText({
       model: modelInstance,
       system: systemPrompt,
       prompt: query,
-      maxOutputTokens: 300,
+      maxOutputTokens: 500,
     });
 
     return createTextStreamResponse({ textStream: result.textStream });
@@ -121,30 +114,4 @@ Rules:
     console.error("[/api/cockpit]", message);
     return Response.json({ error: message }, { status: 500 });
   }
-}
-
-// Fallback when no OpenAI key — pure DB logic
-async function handleNoAIFallback(query: string): Promise<string> {
-  const lower = query.toLowerCase();
-
-  if (lower.includes("work on") || lower.includes("focus") || lower.includes("what should")) {
-    const project = await prisma.project.findFirst({ where: { status: "active" }, orderBy: { updatedAt: "desc" } });
-    const task = await prisma.task.findFirst({ where: { completed: false }, orderBy: { priority: "desc" } });
-    return `Focus on: ${project?.name ?? "No active project"}\nTop task: ${task?.title ?? "All clear"}`;
-  }
-
-  if (lower.includes("stale")) {
-    const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const stale = await prisma.project.findMany({ where: { updatedAt: { lt: cutoff }, status: { not: "completed" } }, take: 5 });
-    if (stale.length === 0) return "No stale projects — great work!";
-    return stale.map((p) => `• ${p.name}`).join("\n");
-  }
-
-  if (lower.includes("task") || lower.includes("todo")) {
-    const tasks = await prisma.task.findMany({ where: { completed: false }, orderBy: { priority: "desc" }, take: 5 });
-    if (tasks.length === 0) return "No open tasks!";
-    return tasks.map((t) => `• [${t.priority}] ${t.title}`).join("\n");
-  }
-
-  return "Please configure your OPENROUTER_API_KEY or GROQ_API_KEY in .env to enable AI answers. I can still answer basic data queries.";
 }
