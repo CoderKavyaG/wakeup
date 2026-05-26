@@ -209,9 +209,13 @@ export function ProjectsWidget() {
       let repo = match[1];
       repo = repo.split('?')[0].split('#')[0].replace(/\/$/, '');
 
+      const token = localStorage.getItem("GITHUB_TOKEN");
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+
       const res = await fetch("/api/github/issues/create", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ repo, title: "Feedback Review", body: feedbackText })
       });
       if (res.ok) {
@@ -228,6 +232,21 @@ export function ProjectsWidget() {
     }
   };
 
+  const getDerivedCompletion = (project: any) => {
+    if (!project.githubUrl) return project.completionPercentage || 0;
+    if (project.status === 'archived') return 100;
+    
+    const stats = githubStats[project.githubUrl.toLowerCase()];
+    if (!stats) return project.completionPercentage || 0;
+    
+    const daysAgo = (Date.now() - new Date(stats.lastCommit).getTime()) / (1000 * 3600 * 24);
+    
+    if (daysAgo > 14) {
+      return stats.issues === 0 ? 100 : 25; // Done if no issues, Planning if stale but has issues
+    } else {
+      return stats.issues === 0 ? 75 : 50; // Almost Done if active with 0 issues, Building if active with issues
+    }
+  };
 
   return (
     <div className="flex h-full w-full overflow-hidden text-foreground bg-[#0f0f11] rounded-xl">
@@ -536,24 +555,32 @@ export function ProjectsWidget() {
                   { label: "Almost done", value: 75 },
                   { label: "Done", value: 100 }
                 ].map((pill) => {
-                  const isActive = (selectedProject.completionPercentage || 0) === pill.value;
+                  const isGithub = !!selectedProject.githubUrl;
+                  const isActive = isGithub 
+                    ? getDerivedCompletion(selectedProject) === pill.value 
+                    : (selectedProject.completionPercentage || 0) === pill.value;
+                  
                   return (
                     <button
                       key={pill.value}
                       onClick={() => {
+                        if (isGithub) return;
                         updateProject(selectedProject.id, { completionPercentage: pill.value });
                         setSelectedProject({ ...selectedProject, completionPercentage: pill.value });
                       }}
                       className={`text-[9px] font-bold uppercase tracking-wider px-2 py-1 rounded-full whitespace-nowrap transition-colors border ${
                         isActive 
                           ? "bg-white text-black border-white shadow-sm" 
-                          : "bg-transparent text-muted-foreground border-white/10 hover:bg-white/5 hover:text-white"
-                      }`}
+                          : "bg-transparent text-muted-foreground border-white/10"
+                      } ${!isGithub && !isActive ? "hover:bg-white/5 hover:text-white" : ""} ${isGithub ? "cursor-default" : ""}`}
                     >
                       {pill.label}
                     </button>
                   );
                 })}
+                {selectedProject.githubUrl && (
+                  <span className="text-[8px] text-muted-foreground/60 ml-1 italic whitespace-nowrap">Auto-synced</span>
+                )}
               </div>
             </div>
             

@@ -8,9 +8,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    const token = process.env.GITHUB_TOKEN;
+    const authHeader = request.headers.get("Authorization");
+    const token = authHeader ? authHeader.replace("Bearer ", "") : process.env.GITHUB_TOKEN;
     if (!token) {
-      return NextResponse.json({ error: "No GITHUB_TOKEN configured in environment" }, { status: 500 });
+      return NextResponse.json({ error: "No GITHUB_TOKEN configured in environment or passed in request" }, { status: 500 });
     }
 
     const res = await fetch(`https://api.github.com/repos/${repo}/issues`, {
