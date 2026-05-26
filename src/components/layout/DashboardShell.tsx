@@ -8,6 +8,7 @@ import { Lock, Unlock, Bookmark, X } from "lucide-react";
 import { Button } from "../ui/button";
 import { QuickLinksWidget } from "../widgets/QuickLinksWidget";
 import { AnimatePresence, motion } from "framer-motion";
+import { SessionBriefing } from "./SessionBriefing";
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const { isLocked, toggleLock, resetLayout, clearLayout, setLayouts } = useLayoutStore();
@@ -85,6 +86,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           </Button>
         </div>
       </div>
+
+      <SessionBriefing />
 
       {/* Main Workspace */}
       <main className="flex-1 overflow-y-auto p-6 relative">
