@@ -233,19 +233,9 @@ export function ProjectsWidget() {
   };
 
   const getDerivedCompletion = (project: any) => {
-    if (!project.githubUrl) return project.completionPercentage || 0;
-    if (project.status === 'archived') return 100;
-    
-    const stats = githubStats[project.githubUrl.toLowerCase()];
-    if (!stats) return project.completionPercentage || 0;
-    
-    const daysAgo = (Date.now() - new Date(stats.lastCommit).getTime()) / (1000 * 3600 * 24);
-    
-    if (daysAgo > 14) {
-      return stats.issues === 0 ? 100 : 25; // Done if no issues, Planning if stale but has issues
-    } else {
-      return stats.issues === 0 ? 75 : 50; // Almost Done if active with 0 issues, Building if active with issues
-    }
+    if (project.completionPercentage !== undefined) return project.completionPercentage;
+    if (project.githubUrl) return 75; // Default GitHub repos to "Almost Done" since issues aren't always used
+    return 0; // Default local to 0
   };
 
   return (
@@ -555,32 +545,25 @@ export function ProjectsWidget() {
                   { label: "Almost done", value: 75 },
                   { label: "Done", value: 100 }
                 ].map((pill) => {
-                  const isGithub = !!selectedProject.githubUrl;
-                  const isActive = isGithub 
-                    ? getDerivedCompletion(selectedProject) === pill.value 
-                    : (selectedProject.completionPercentage || 0) === pill.value;
+                  const isActive = getDerivedCompletion(selectedProject) === pill.value;
                   
                   return (
                     <button
                       key={pill.value}
                       onClick={() => {
-                        if (isGithub) return;
                         updateProject(selectedProject.id, { completionPercentage: pill.value });
                         setSelectedProject({ ...selectedProject, completionPercentage: pill.value });
                       }}
                       className={`text-[9px] font-bold uppercase tracking-wider px-2 py-1 rounded-full whitespace-nowrap transition-colors border ${
                         isActive 
                           ? "bg-white text-black border-white shadow-sm" 
-                          : "bg-transparent text-muted-foreground border-white/10"
-                      } ${!isGithub && !isActive ? "hover:bg-white/5 hover:text-white" : ""} ${isGithub ? "cursor-default" : ""}`}
+                          : "bg-transparent text-muted-foreground border-white/10 hover:bg-white/5 hover:text-white"
+                      }`}
                     >
                       {pill.label}
                     </button>
                   );
                 })}
-                {selectedProject.githubUrl && (
-                  <span className="text-[8px] text-muted-foreground/60 ml-1 italic whitespace-nowrap">Auto-synced</span>
-                )}
               </div>
             </div>
             
