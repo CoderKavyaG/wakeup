@@ -111,7 +111,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 ? "bg-white/10 text-white border-white/20 hover:bg-white/20" 
                 : "bg-[#1a1a1d] text-muted-foreground border-white/10 hover:text-foreground hover:bg-[#252528] hover:border-white/20"
             }`}
-            title="Quick Links"
           >
             {isQuickLinksOpen ? <X className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}
           </button>

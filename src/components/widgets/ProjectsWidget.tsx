@@ -203,9 +203,11 @@ export function ProjectsWidget() {
   const createGitHubIssue = async (feedbackText: string) => {
     if (!selectedProject?.githubUrl) return alert("No GitHub URL for this project.");
     try {
-      const match = selectedProject.githubUrl.match(/github\.com\/([^\/]+\/[^\/]+)/);
+      const cleanUrl = selectedProject.githubUrl.replace(/\.git$/, '');
+      const match = cleanUrl.match(/github\.com\/([^\/]+\/[^\/]+)/);
       if (!match) return alert("Invalid GitHub URL");
-      const repo = match[1];
+      let repo = match[1];
+      repo = repo.split('?')[0].split('#')[0].replace(/\/$/, '');
 
       const res = await fetch("/api/github/issues/create", {
         method: "POST",
@@ -218,10 +220,11 @@ export function ProjectsWidget() {
           window.open(data.html_url, '_blank');
         }
       } else {
-        alert("Failed to create GitHub Issue.");
+        const errData = await res.json().catch(() => null);
+        alert(`Failed to create GitHub Issue: ${errData?.error || res.statusText}`);
       }
-    } catch (e) {
-      alert("Failed to connect to API.");
+    } catch (e: any) {
+      alert(`Failed to connect to API: ${e.message}`);
     }
   };
 
@@ -306,13 +309,16 @@ export function ProjectsWidget() {
         </div>
 
         <Tabs defaultValue="github" className="flex-1 flex flex-col min-h-0">
-          <TabsList className="mx-2 mb-2 bg-[#0f0f11] border border-white/10">
+          <TabsList className="mx-2 mb-2 bg-[#0f0f11] border border-white/10 shrink-0">
             <TabsTrigger value="github" className="flex-1 text-[10px] uppercase font-bold tracking-wider data-[state=active]:bg-primary/20 data-[state=active]:text-primary">GitHub</TabsTrigger>
             <TabsTrigger value="local" className="flex-1 text-[10px] uppercase font-bold tracking-wider data-[state=active]:bg-primary/20 data-[state=active]:text-primary">Local</TabsTrigger>
           </TabsList>
 
-          <ScrollArea className="flex-1 px-2 custom-scrollbar">
-                 <TabsContent value="github" className="m-0 space-y-1.5 pb-4">
+          <div 
+            className="flex-1 overflow-y-auto px-2"
+            style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}
+          >
+             <TabsContent value="github" className="m-0 space-y-1.5 pb-4">
               {projects.filter(p => p.githubUrl).length === 0 && (
                 <div className="text-center py-6 text-xs text-muted-foreground">No GitHub repositories synced yet.</div>
               )}
@@ -494,7 +500,7 @@ export function ProjectsWidget() {
                 );
               })}
             </TabsContent>
-          </ScrollArea>
+          </div>
         </Tabs>
       </div>
 
@@ -519,6 +525,35 @@ export function ProjectsWidget() {
                     <ExternalLink className="w-3 h-3" /> Live
                   </a>
                 )}
+              </div>
+              
+              {/* Project Completion Pills */}
+              <div className="flex items-center gap-1 pt-1 overflow-x-auto custom-scrollbar pb-1">
+                {[
+                  { label: "Not started", value: 0 },
+                  { label: "Planning", value: 25 },
+                  { label: "Building", value: 50 },
+                  { label: "Almost done", value: 75 },
+                  { label: "Done", value: 100 }
+                ].map((pill) => {
+                  const isActive = (selectedProject.completionPercentage || 0) === pill.value;
+                  return (
+                    <button
+                      key={pill.value}
+                      onClick={() => {
+                        updateProject(selectedProject.id, { completionPercentage: pill.value });
+                        setSelectedProject({ ...selectedProject, completionPercentage: pill.value });
+                      }}
+                      className={`text-[9px] font-bold uppercase tracking-wider px-2 py-1 rounded-full whitespace-nowrap transition-colors border ${
+                        isActive 
+                          ? "bg-white text-black border-white shadow-sm" 
+                          : "bg-transparent text-muted-foreground border-white/10 hover:bg-white/5 hover:text-white"
+                      }`}
+                    >
+                      {pill.label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
             
@@ -675,7 +710,10 @@ export function ProjectsWidget() {
                         </div>
                       ))
                     ) : (
-                      <div className="text-center py-6 text-xs text-muted-foreground">No notes or feedback recorded yet.</div>
+                      <div className="text-center py-6 flex flex-col items-center gap-1">
+                        <span className="text-xs text-muted-foreground">No notes or feedback recorded yet.</span>
+                        <span className="text-[10px] text-muted-foreground/60 italic">Tag a note to this project using @{selectedProject.name} in the Focus Panel</span>
+                      </div>
                     )}
                   </div>
                 </ScrollArea>

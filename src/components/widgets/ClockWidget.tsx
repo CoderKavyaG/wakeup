@@ -63,7 +63,7 @@ export function ClockWidget() {
       hour12: false,
     });
     const hour = parseInt(hourFormatter.format(now));
-    return hour >= 20 || hour < 6;
+    return hour >= 22 || hour < 7;
   };
 
   const nyTime = nyTimeFormatter.format(now);

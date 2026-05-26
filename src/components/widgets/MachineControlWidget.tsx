@@ -57,6 +57,8 @@ export function MachineControlWidget() {
   const containerRef = React.useRef<HTMLDivElement>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isShort, setIsShort] = useState(false);
+  const [isNarrow, setIsNarrow] = useState(false);
+  const [isTinyWidth, setIsTinyWidth] = useState(false);
 
   // Load saved workspace on mount
   useEffect(() => {
@@ -110,6 +112,8 @@ export function MachineControlWidget() {
     const observer = new ResizeObserver(entries => {
       for (let entry of entries) {
         setIsCollapsed(entry.contentRect.width < 400);
+        setIsNarrow(entry.contentRect.width < 380);
+        setIsTinyWidth(entry.contentRect.width < 300);
         setIsShort(entry.contentRect.height < 250);
       }
     });
@@ -258,10 +262,10 @@ export function MachineControlWidget() {
         )}
       </div>
 
-      <div ref={containerRef} className={`flex-1 flex divide-border/40 ${isCollapsed ? "flex-col divide-y overflow-y-auto custom-scrollbar" : "flex-row divide-x overflow-hidden"}`}>
+      <div ref={containerRef} className={`flex-1 flex divide-border/40 ${isNarrow ? "flex-col divide-y overflow-y-auto custom-scrollbar" : "flex-row divide-x overflow-hidden"}`}>
         
         {/* ── SECTION 1: WORKSPACE ── */}
-        <div className={`flex flex-col bg-[#0f0f11] ${isCollapsed ? "shrink-0" : "flex-1 min-h-0"}`}>
+        <div className={`flex flex-col bg-[#0f0f11] ${isNarrow ? "shrink-0" : "flex-1 min-h-0"}`}>
           <div className="p-3 shrink-0 border-b border-white/10 bg-[#0f0f11] flex items-center justify-between">
             <div className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
               <FolderCode className="w-3.5 h-3.5" /> Workspace
@@ -326,10 +330,10 @@ export function MachineControlWidget() {
         </div>
 
         {/* ── SECTION 2 & 3 CONTAINER ── */}
-        <div className={`flex flex-col bg-[#0f0f11] ${isCollapsed ? "shrink-0" : "flex-1 min-h-0"}`}>
+        <div className={`flex flex-col bg-[#0f0f11] ${isNarrow ? "shrink-0" : "flex-1 min-h-0"}`}>
           
           {/* SECTION 2: PORTS & PROCESSES */}
-          <div className={`flex flex-col border-b border-white/10 ${isCollapsed ? "shrink-0" : "flex-1 min-h-0"}`}>
+          <div className={`flex flex-col border-b border-white/10 ${isNarrow ? "shrink-0" : "flex-1 min-h-0"}`}>
             <div className="p-3 shrink-0 border-b border-white/10 bg-[#0f0f11] flex items-center justify-between">
               <div className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
                 <Activity className="w-3.5 h-3.5" /> Ports
@@ -409,8 +413,8 @@ export function MachineControlWidget() {
             ) : (
               <div className="grid grid-cols-2 gap-2">
                 {customLaunchers.map((l, i) => (
-                  <Button key={i} variant="outline" size="sm" className="h-8 text-[10px] justify-start bg-[#0f0f11] hover:bg-white/5 border-white/10" onClick={() => handleLaunch(l.command)} disabled={agentOffline}>
-                    <Terminal className="w-3 h-3 mr-2 text-primary" /> {l.name}
+                  <Button key={i} variant="outline" size="sm" className={`h-8 text-[10px] bg-[#0f0f11] hover:bg-white/5 border-white/10 ${isTinyWidth ? "justify-center" : "justify-start"}`} onClick={() => handleLaunch(l.command)} disabled={agentOffline}>
+                    <Terminal className={`w-3 h-3 ${isTinyWidth ? "" : "mr-2"} text-primary`} /> {!isTinyWidth && l.name}
                   </Button>
                 ))}
               </div>
