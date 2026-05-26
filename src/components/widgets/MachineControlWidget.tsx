@@ -56,6 +56,7 @@ export function MachineControlWidget() {
   // Responsive Layout State
   const containerRef = React.useRef<HTMLDivElement>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isShort, setIsShort] = useState(false);
 
   // Load saved workspace on mount
   useEffect(() => {
@@ -109,6 +110,7 @@ export function MachineControlWidget() {
     const observer = new ResizeObserver(entries => {
       for (let entry of entries) {
         setIsCollapsed(entry.contentRect.width < 400);
+        setIsShort(entry.contentRect.height < 250);
       }
     });
     observer.observe(containerRef.current);
@@ -371,8 +373,9 @@ export function MachineControlWidget() {
           </div>
 
           {/* SECTION 3: QUICK LAUNCHERS */}
-          <div className="shrink-0 p-3 bg-[#0f0f11] border-t border-white/10">
-            <div className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider mb-2 flex items-center justify-between">
+          {!isShort && (
+            <div className="shrink-0 p-3 bg-[#0f0f11] border-t border-white/10">
+              <div className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider mb-2 flex items-center justify-between">
               <span className="flex items-center gap-1.5"><Play className="w-3.5 h-3.5" /> Quick Launch</span>
               <Button variant="ghost" size="sm" className="h-5 text-[9px] px-1.5 text-muted-foreground" onClick={() => setIsEditingLaunchers(!isEditingLaunchers)}>
                 {isEditingLaunchers ? "Done" : "Config"}
@@ -413,6 +416,7 @@ export function MachineControlWidget() {
               </div>
             )}
           </div>
+          )}
 
         </div>
       </div>
