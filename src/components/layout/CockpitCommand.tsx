@@ -37,7 +37,6 @@ const ADD_WIDGET_OPTIONS = [
   { type: "github", name: "GitHub Monitor", desc: "Commits, streaks, and repo health", icon: <GitBranch className="w-4 h-4 text-primary" /> },
   { type: "focus", name: "Focus Panel", desc: "Tasks and brain dump", icon: <Crosshair className="w-4 h-4 text-primary" /> },
   { type: "machine", name: "Machine Control", desc: "Ports, launcher, workspace files", icon: <Terminal className="w-4 h-4 text-primary" /> },
-  { type: "quicklinks", name: "Quick Links", desc: "Social links and bookmarks", icon: <LinkIcon className="w-4 h-4 text-primary" /> },
   { type: "clock", name: "Clock & Time", desc: "IST + US time zones", icon: <Clock className="w-4 h-4 text-primary" /> },
 ];
 

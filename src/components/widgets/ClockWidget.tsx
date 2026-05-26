@@ -128,15 +128,20 @@ export function ClockWidget() {
         </div>
 
         {/* MIDDLE SECTION: World Times */}
-        <div className="bg-[#161618] rounded-lg p-3 mb-6 relative group border border-white/5 shrink-0">
-          <button 
-            onClick={handleToggle}
-            className="absolute top-2 right-2 text-[9px] uppercase tracking-wider text-muted-foreground hover:text-white font-bold px-1.5 py-0.5 rounded border border-white/10 hover:border-white/30 transition-colors"
-          >
-            Toggle US
-          </button>
+        <div className="bg-[#161618] rounded-lg p-3 mb-6 border border-white/5 shrink-0">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
+              <Clock className="w-3 h-3" /> World
+            </span>
+            <button 
+              onClick={handleToggle}
+              className="text-[9px] uppercase tracking-wider text-muted-foreground hover:text-white font-bold px-1.5 py-0.5 rounded border border-white/10 hover:border-white/30 transition-colors"
+            >
+              Toggle US
+            </button>
+          </div>
           
-          <div className="flex flex-col gap-2.5 mt-2">
+          <div className="flex flex-col gap-2.5">
             {usTimezone === 'America/New_York' ? (
               <>
                 <div className={`flex justify-between items-center text-xs font-mono ${isNyNight ? 'text-white/30' : 'text-white/80'}`}>
