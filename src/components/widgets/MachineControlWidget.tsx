@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { 
   Terminal, Server, FolderCode, Folder, File, Code2, 
   ExternalLink, CheckCircle2, Play, RefreshCw, XCircle,
-  Activity
+  Activity, Cpu, MemoryStick, GitBranch as GitBranchIcon, FileText, ClipboardCopy
 } from "lucide-react";
 
 interface FileItem {
@@ -36,8 +36,11 @@ export function MachineControlWidget() {
   const [ports, setPorts] = useState<number[]>([]);
   
   const [customLaunchers, setCustomLaunchers] = useState<{name: string, command: string}[]>([
-    { name: "VS Code", command: "code ." },
-    { name: "Terminal", command: "start cmd" }
+    { name: "DevOS Project", command: "VS Code" },
+    { name: "PostgreSQL", command: "postgres" },
+    { name: "Restart Agent", command: "RESTART_AGENT" },
+    { name: "Open Terminal Here", command: "Terminal" },
+    { name: "Copy .env Path", command: "COPY_ENV" }
   ]);
   const [isEditingLaunchers, setIsEditingLaunchers] = useState(false);
   
@@ -45,6 +48,14 @@ export function MachineControlWidget() {
   const [portsLoading, setPortsLoading] = useState(false);
   
   const [agentOffline, setAgentOffline] = useState(false);
+
+  // Live Stats State
+  const [stats, setStats] = useState({ cpu: 0, ram: 0 });
+  const [gitInfo, setGitInfo] = useState({ branch: "", commit: "" });
+
+  // Responsive Layout State
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   // Load saved workspace on mount
   useEffect(() => {
@@ -62,8 +73,46 @@ export function MachineControlWidget() {
     fetchPorts();
     
     // Auto refresh ports every 10 seconds
-    const interval = setInterval(fetchPorts, 10000);
-    return () => clearInterval(interval);
+    const portInterval = setInterval(fetchPorts, 10000);
+    
+    // Poll stats every 5 seconds
+    const fetchStats = async () => {
+      try {
+        const res = await fetch("/api/machine/stats");
+        if (res.ok) setStats(await res.json());
+      } catch {}
+    };
+    fetchStats();
+    const statsInterval = setInterval(fetchStats, 5000);
+
+    return () => {
+      clearInterval(portInterval);
+      clearInterval(statsInterval);
+    };
+  }, []);
+
+  // Fetch Git info when workspacePath changes
+  useEffect(() => {
+    if (!workspacePath) return;
+    const fetchGit = async () => {
+      try {
+        const res = await fetch(`/api/machine/git?path=${encodeURIComponent(workspacePath)}`);
+        if (res.ok) setGitInfo(await res.json());
+      } catch {}
+    };
+    fetchGit();
+  }, [workspacePath]);
+
+  // ResizeObserver for Container Queries
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const observer = new ResizeObserver(entries => {
+      for (let entry of entries) {
+        setIsCollapsed(entry.contentRect.width < 400);
+      }
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
   }, []);
 
   const fetchFiles = async (path: string) => {
@@ -131,6 +180,24 @@ export function MachineControlWidget() {
   };
 
   const handleLaunch = async (command: string) => {
+    if (command === "COPY_ENV") {
+      if (!workspacePath) return;
+      const envPath = `${workspacePath}\\.env.local`.replace(/\\\\/g, "\\");
+      navigator.clipboard.writeText(envPath);
+      return;
+    }
+    
+    if (command === "RESTART_AGENT") {
+      try {
+        await fetch("/api/machine/restart-agent", { method: "POST" });
+        setAgentOffline(true);
+        setTimeout(fetchPorts, 2000); // Check if it came back
+      } catch (e) {
+        console.error(e);
+      }
+      return;
+    }
+
     if (!workspacePath) return alert("Please set a workspace path first.");
     try {
       await fetch(`/api/machine/launch`, {
@@ -169,10 +236,30 @@ export function MachineControlWidget() {
         )}
       </div>
 
-      <div className="flex-1 flex flex-col md:flex-row overflow-hidden divide-y md:divide-y-0 md:divide-x divide-border/40">
+      {/* ── STATS BAR ── */}
+      <div className="px-3 py-1.5 shrink-0 bg-[#161618] border-b border-border/40 flex items-center gap-3 overflow-x-auto custom-scrollbar whitespace-nowrap">
+        <div className="flex items-center gap-1.5 text-[9px] font-mono text-muted-foreground bg-black/20 px-1.5 py-0.5 rounded border border-white/5">
+          <Cpu className="w-3 h-3 text-blue-400" /> CPU: {stats.cpu}%
+        </div>
+        <div className="flex items-center gap-1.5 text-[9px] font-mono text-muted-foreground bg-black/20 px-1.5 py-0.5 rounded border border-white/5">
+          <MemoryStick className="w-3 h-3 text-purple-400" /> RAM: {stats.ram}%
+        </div>
+        {gitInfo.branch && (
+          <div className="flex items-center gap-1.5 text-[9px] font-mono text-muted-foreground bg-black/20 px-1.5 py-0.5 rounded border border-white/5">
+            <GitBranchIcon className="w-3 h-3 text-orange-400" /> {gitInfo.branch}
+          </div>
+        )}
+        {gitInfo.commit && (
+          <div className="flex items-center gap-1.5 text-[9px] font-mono text-muted-foreground bg-black/20 px-1.5 py-0.5 rounded border border-white/5 truncate max-w-[200px]">
+            <FileText className="w-3 h-3 text-emerald-400 shrink-0" /> <span className="truncate">{gitInfo.commit.substring(0, 40)}{gitInfo.commit.length > 40 ? "..." : ""}</span>
+          </div>
+        )}
+      </div>
+
+      <div ref={containerRef} className={`flex-1 flex divide-border/40 ${isCollapsed ? "flex-col divide-y overflow-y-auto custom-scrollbar" : "flex-row divide-x overflow-hidden"}`}>
         
         {/* ── SECTION 1: WORKSPACE ── */}
-        <div className="flex-1 flex flex-col min-h-0 bg-[#0f0f11]">
+        <div className={`flex flex-col bg-[#0f0f11] ${isCollapsed ? "shrink-0" : "flex-1 min-h-0"}`}>
           <div className="p-3 shrink-0 border-b border-white/10 bg-[#0f0f11] flex items-center justify-between">
             <div className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
               <FolderCode className="w-3.5 h-3.5" /> Workspace
@@ -186,14 +273,19 @@ export function MachineControlWidget() {
           
           <div className="p-3 shrink-0">
             {isEditingPath || !workspacePath ? (
-              <div className="flex gap-2">
-                <Input 
-                  value={workspacePath}
-                  onChange={e => setWorkspacePath(e.target.value)}
-                  placeholder="C:\Users\Kavya\Projects..."
-                  className="h-7 text-xs bg-[#0f0f11] border-white/10"
-                />
-                <Button size="sm" className="h-7 px-3 text-xs" onClick={handleSaveWorkspace}>Save</Button>
+              <div className="flex flex-col gap-2">
+                <div className="flex gap-2">
+                  <Input 
+                    value={workspacePath}
+                    onChange={e => setWorkspacePath(e.target.value)}
+                    placeholder="Enter absolute path (e.g. C:\Users\...)"
+                    className="h-7 text-xs bg-[#0f0f11] border-white/10"
+                  />
+                  <Button size="sm" className="h-7 px-3 text-xs bg-primary text-primary-foreground hover:bg-primary/90" onClick={handleSaveWorkspace}>Save</Button>
+                </div>
+                {!workspacePath && (
+                  <span className="text-[10px] text-orange-400/80 italic">You must enter and save your project's folder path above to enable Git & file tracking.</span>
+                )}
               </div>
             ) : (
               <div className="flex flex-col gap-2">
@@ -207,33 +299,35 @@ export function MachineControlWidget() {
             )}
           </div>
 
-          <ScrollArea className="flex-1 px-3 pb-3">
-            {filesLoading ? (
-              <div className="text-center text-muted-foreground text-xs py-4 flex items-center justify-center gap-2">
-                <RefreshCw className="w-3 h-3 animate-spin" /> Loading...
-              </div>
-            ) : files.length > 0 ? (
-              <div className="space-y-0.5 mt-1">
-                {files.map((f, i) => (
-                  <div key={i} className="flex items-center gap-2 text-xs py-1 px-1.5 rounded hover:bg-white/5 font-mono text-muted-foreground">
-                    {f.isDirectory ? <Folder className="w-3 h-3 text-blue-400 shrink-0" /> : <File className="w-3 h-3 text-slate-500 shrink-0" />}
-                    <span className="truncate">{f.name}</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center text-muted-foreground/50 text-[10px] py-4 uppercase tracking-widest">
-                No files found
-              </div>
-            )}
-          </ScrollArea>
+          {!isCollapsed && (
+            <ScrollArea className="flex-1 px-3 pb-3">
+              {filesLoading ? (
+                <div className="text-center text-muted-foreground text-xs py-4 flex items-center justify-center gap-2">
+                  <RefreshCw className="w-3 h-3 animate-spin" /> Loading...
+                </div>
+              ) : files.length > 0 ? (
+                <div className="space-y-0.5 mt-1">
+                  {files.map((f, i) => (
+                    <div key={i} className="flex items-center gap-2 text-xs py-1 px-1.5 rounded hover:bg-white/5 font-mono text-muted-foreground">
+                      {f.isDirectory ? <Folder className="w-3 h-3 text-blue-400 shrink-0" /> : <File className="w-3 h-3 text-slate-500 shrink-0" />}
+                      <span className="truncate">{f.name}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center text-muted-foreground/50 text-[10px] py-4 uppercase tracking-widest">
+                  No files found
+                </div>
+              )}
+            </ScrollArea>
+          )}
         </div>
 
         {/* ── SECTION 2 & 3 CONTAINER ── */}
-        <div className="flex-1 flex flex-col min-h-0 bg-[#0f0f11]">
+        <div className={`flex flex-col bg-[#0f0f11] ${isCollapsed ? "shrink-0" : "flex-1 min-h-0"}`}>
           
           {/* SECTION 2: PORTS & PROCESSES */}
-          <div className="flex-1 flex flex-col min-h-0 border-b border-white/10">
+          <div className={`flex flex-col border-b border-white/10 ${isCollapsed ? "shrink-0" : "flex-1 min-h-0"}`}>
             <div className="p-3 shrink-0 border-b border-white/10 bg-[#0f0f11] flex items-center justify-between">
               <div className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
                 <Activity className="w-3.5 h-3.5" /> Ports
@@ -250,15 +344,17 @@ export function MachineControlWidget() {
                     const isHttp = [3000, 3001, 8080, 4000, 5000].includes(port);
                     return (
                       <div key={port} className="flex items-center justify-between p-2 rounded-lg border border-white/10 bg-black/20 hover:border-primary/30 transition-colors">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
-                          <span className="text-xs font-bold font-mono w-10 text-foreground">{port}</span>
-                          <Badge variant="outline" className="text-[9px] uppercase border-white/10 text-muted-foreground font-mono px-1.5 py-0 h-4">
-                            {KNOWN_PORTS[port] || "Service"}
-                          </Badge>
+                        <div className="flex items-center gap-2 overflow-hidden">
+                          <div className="w-2 h-2 shrink-0 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
+                          <span className="text-xs font-bold font-mono w-10 shrink-0 text-foreground">{port}</span>
+                          {!isCollapsed && (
+                            <Badge variant="outline" className="text-[9px] uppercase border-white/10 text-muted-foreground font-mono px-1.5 py-0 h-4 truncate">
+                              {KNOWN_PORTS[port] || "Service"}
+                            </Badge>
+                          )}
                         </div>
-                        {isHttp && (
-                          <Button variant="ghost" size="icon" className="w-6 h-6 hover:bg-primary/20 hover:text-primary rounded-md" onClick={() => window.open(`http://localhost:${port}`, '_blank')}>
+                        {isHttp && !isCollapsed && (
+                          <Button variant="ghost" size="icon" className="w-6 h-6 shrink-0 hover:bg-primary/20 hover:text-primary rounded-md" onClick={() => window.open(`http://localhost:${port}`, '_blank')}>
                             <ExternalLink className="w-3 h-3" />
                           </Button>
                         )}

@@ -34,7 +34,7 @@ const defaultLayouts: { [key: string]: Layout } = {
     { i: "projects-1", x: 4, y: 0, w: 5, h: 4, minW: 4, minH: 3 },
     { i: "github-1", x: 9, y: 0, w: 3, h: 4, minW: 3, minH: 3 },
     { i: "focus-1", x: 0, y: 4, w: 10, h: 5, minW: 4, minH: 4 },
-    { i: "machine-1", x: 10, y: 4, w: 2, h: 4, minW: 2, minH: 3 },
+    { i: "machine-1", x: 10, y: 4, w: 2, h: 6, minW: 4, minH: 6 },
   ],
 };
 

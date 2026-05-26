@@ -23,11 +23,6 @@ export async function GET(request: Request) {
     const data = await res.json();
     return NextResponse.json(data);
   } catch (error) {
-    // If agent is not running, return empty array for ports/files so widget doesn't crash
-    const { pathname } = new URL(request.url);
-    if (pathname.includes('/ports') || pathname.includes('/files')) {
-      return NextResponse.json([]);
-    }
     return NextResponse.json({ error: "DevOS Agent is offline." }, { status: 503 });
   }
 }

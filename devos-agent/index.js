@@ -114,6 +114,71 @@ app.post('/launch', (req, res) => {
   });
 });
 
+let prevCpuTimes = null;
+
+// GET /stats
+app.get('/stats', (req, res) => {
+  const totalMem = os.totalmem();
+  const freeMem = os.freemem();
+  const ramPercent = Math.round(((totalMem - freeMem) / totalMem) * 100);
+
+  const cpus = os.cpus();
+  let totalUser = 0;
+  let totalSys = 0;
+  let totalIdle = 0;
+
+  cpus.forEach(cpu => {
+    totalUser += cpu.times.user;
+    totalSys += cpu.times.sys;
+    totalIdle += cpu.times.idle;
+  });
+
+  const currentTimes = { totalUser, totalSys, totalIdle };
+  let cpuPercent = 0;
+
+  if (prevCpuTimes) {
+    const userDiff = currentTimes.totalUser - prevCpuTimes.totalUser;
+    const sysDiff = currentTimes.totalSys - prevCpuTimes.totalSys;
+    const idleDiff = currentTimes.totalIdle - prevCpuTimes.totalIdle;
+
+    const totalDiff = userDiff + sysDiff + idleDiff;
+    if (totalDiff > 0) {
+      cpuPercent = Math.round(((totalDiff - idleDiff) / totalDiff) * 100);
+    }
+  }
+
+  prevCpuTimes = currentTimes;
+
+  res.json({
+    cpu: cpuPercent,
+    ram: ramPercent
+  });
+});
+
+// GET /git
+app.get('/git', (req, res) => {
+  const targetPath = req.query.path;
+  if (!targetPath) return res.status(400).json({ error: 'Missing path' });
+
+  exec(`git branch --show-current`, { cwd: targetPath }, (error1, stdout1) => {
+    const branch = error1 ? "" : stdout1.trim();
+    
+    exec(`git log -1 --pretty=%s`, { cwd: targetPath }, (error2, stdout2) => {
+      const lastCommit = error2 ? "" : stdout2.trim();
+      res.json({
+        branch,
+        commit: lastCommit
+      });
+    });
+  });
+});
+
+// POST /restart
+app.post('/restart', (req, res) => {
+  res.json({ success: true, message: "Restarting agent..." });
+  setTimeout(() => process.exit(0), 500);
+});
+
 app.listen(PORT, () => {
   console.log(`DevOS Agent running on port ${PORT}`);
 });
