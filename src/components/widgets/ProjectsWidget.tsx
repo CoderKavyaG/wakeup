@@ -42,6 +42,66 @@ export function ProjectsWidget() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [formData, setFormData] = useState({ name: "", description: "", folderPath: "", status: "green" });
 
+  // Smart Import State
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importPath, setImportPath] = useState("");
+  const [importScanning, setImportScanning] = useState(false);
+  const [importError, setImportError] = useState("");
+  const [importResult, setImportResult] = useState<any>(null);
+
+  const handleScanProject = async () => {
+    if (!importPath.trim()) return;
+    setImportScanning(true);
+    setImportError("");
+    setImportResult(null);
+    try {
+      const res = await fetch("/api/machine/scan-project", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: importPath.trim() })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setImportError(data.error || "Failed to scan project");
+      } else {
+        setImportResult(data);
+      }
+    } catch (e: any) {
+      setImportError(e.message || "Failed to connect to scanner");
+    } finally {
+      setImportScanning(false);
+    }
+  };
+
+  const handleImportAccept = () => {
+    if (!importResult) return;
+    addProject({
+      name: importResult.name,
+      description: importResult.description || "Imported local project",
+      folderPath: importResult.folderPath,
+      status: "active",
+      tags: importResult.tags || [],
+      githubUrl: importResult.githubUrl || undefined,
+    });
+    setIsImportModalOpen(false);
+    setImportResult(null);
+    setImportPath("");
+  };
+
+  const handleImportEditFirst = () => {
+    if (!importResult) return;
+    setFormData({
+      name: importResult.name,
+      description: importResult.description,
+      folderPath: importResult.folderPath,
+      status: "green"
+    });
+    setIsImportModalOpen(false);
+    setImportResult(null);
+    setImportPath("");
+    setIsAddDialogOpen(true);
+  };
+
   const { tasks } = useTaskStore();
   const { notes, fetchNotes, addNote: notesStoreAddNote, deleteNote: notesStoreDeleteNote } = useNoteStore();
 
@@ -262,32 +322,77 @@ export function ProjectsWidget() {
               </button>
             )}
           </div>
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+          <Dialog open={isImportModalOpen} onOpenChange={setIsImportModalOpen}>
             <DialogTrigger className="w-6 h-6 hover:bg-white/5 inline-flex items-center justify-center rounded-md text-muted-foreground transition-colors" onClick={() => {
-              setFormData({ name: "", description: "", folderPath: "", status: "green" });
+              setImportPath("");
+              setImportResult(null);
+              setImportError("");
             }}>
               <Plus className="w-4 h-4" />
             </DialogTrigger>
             <DialogContent className="bg-[#0f0f11] border-white/10 text-foreground">
               <DialogHeader>
-                <DialogTitle>Add Local Project</DialogTitle>
+                <DialogTitle>Import Local Project</DialogTitle>
+              </DialogHeader>
+              {!importResult ? (
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-muted-foreground">Paste folder path</label>
+                    <Input value={importPath} onChange={e => setImportPath(e.target.value)} className="bg-transparent border-white/10" placeholder="C:\Projects\my-app" />
+                    <p className="text-[10px] text-muted-foreground italic mt-1">Tip: In VS Code, right-click your project folder → Copy Path, then paste here</p>
+                  </div>
+                  {importError && (
+                    <div className="text-xs text-red-400 bg-red-500/10 p-2 rounded border border-red-500/20">{importError}</div>
+                  )}
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsImportModalOpen(false)} className="border-white/10 bg-transparent">Cancel</Button>
+                    <Button onClick={handleScanProject} disabled={!importPath.trim() || importScanning}>
+                      {importScanning ? "Scanning..." : "Scan Project"}
+                    </Button>
+                  </DialogFooter>
+                </div>
+              ) : (
+                <div className="space-y-4 py-4">
+                  <div className="bg-black/20 p-3 rounded-lg border border-white/10 space-y-2">
+                    <h3 className="font-bold text-sm">{importResult.name}</h3>
+                    {importResult.description && <p className="text-xs text-muted-foreground line-clamp-2">{importResult.description}</p>}
+                    
+                    {importResult.tags && importResult.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {importResult.tags.map((tag: string) => (
+                          <Badge key={tag} variant="secondary" className="text-[9px] py-0 px-1.5 uppercase bg-primary/10 text-primary border-primary/20">
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {importResult.githubUrl && (
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-2">
+                        <GitBranch className="w-3.5 h-3.5" />
+                        <span className="truncate">{importResult.githubUrl}</span>
+                      </div>
+                    )}
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={handleImportEditFirst} className="border-white/10 bg-transparent">Edit first</Button>
+                    <Button onClick={handleImportAccept}>Import</Button>
+                  </DialogFooter>
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
+
+          {/* Hidden Dialog for Edit First */}
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogContent className="bg-[#0f0f11] border-white/10 text-foreground">
+              <DialogHeader>
+                <DialogTitle>Edit Project Details</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
                   <label className="text-xs font-semibold text-muted-foreground">Title</label>
                   <Input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="bg-transparent border-white/10" placeholder="Project name" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold text-muted-foreground">Color Indicator</label>
-                  <div className="flex gap-3">
-                    {['green', 'yellow', 'red'].map(color => (
-                      <button
-                        key={color}
-                        onClick={() => setFormData({...formData, status: color})}
-                        className={`w-5 h-5 rounded-full ${color === 'green' ? 'bg-green-500' : color === 'yellow' ? 'bg-yellow-500' : 'bg-red-500'} ${formData.status === color ? 'ring-2 ring-white ring-offset-2 ring-offset-[#0f0f11]' : 'opacity-50 hover:opacity-100'}`}
-                      />
-                    ))}
-                  </div>
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-semibold text-muted-foreground">Description</label>
@@ -304,14 +409,15 @@ export function ProjectsWidget() {
                   if (formData.name.trim()) {
                     addProject({
                       name: formData.name.trim(),
-                      description: formData.description.trim() || "New Project",
+                      description: formData.description.trim() || "Imported Project",
                       folderPath: formData.folderPath.trim() || undefined,
-                      status: formData.status as any,
-                      tags: [],
+                      status: "active",
+                      tags: importResult?.tags || [], 
+                      githubUrl: importResult?.githubUrl || undefined,
                     });
                     setIsAddDialogOpen(false);
                   }
-                }}>Add Project</Button>
+                }}>Save Project</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>

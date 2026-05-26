@@ -179,6 +179,83 @@ app.post('/restart', (req, res) => {
   setTimeout(() => process.exit(0), 500);
 });
 
+// POST /scan-project
+app.post('/scan-project', async (req, res) => {
+  const targetPath = req.body.path;
+  if (!targetPath) return res.status(400).json({ error: 'Missing path' });
+
+  try {
+    const stat = fs.statSync(targetPath);
+    if (!stat.isDirectory()) return res.status(400).json({ error: 'Path is not a directory' });
+  } catch (err) {
+    return res.status(400).json({ error: 'Invalid path' });
+  }
+
+  const result = {
+    name: path.basename(targetPath),
+    description: '',
+    tags: [],
+    githubUrl: '',
+    lastCommitMessage: '',
+    deployHints: [],
+    folderPath: targetPath
+  };
+
+  const pkgPath = path.join(targetPath, 'package.json');
+  if (fs.existsSync(pkgPath)) {
+    try {
+      const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+      if (pkg.name) result.name = pkg.name;
+      if (pkg.description) result.description = pkg.description;
+      
+      const allDeps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
+      if (allDeps['next']) result.tags.push('Next.js');
+      if (allDeps['react']) result.tags.push('React');
+      if (allDeps['express'] || allDeps['fastapi'] || allDeps['flask']) result.tags.push('Backend');
+      if (allDeps['prisma']) result.tags.push('PostgreSQL');
+      if (allDeps['tailwindcss']) result.tags.push('TailwindCSS');
+      if (allDeps['typescript']) result.tags.push('TypeScript');
+    } catch(e) {}
+  }
+
+  if (!result.description) {
+    const readmePath = path.join(targetPath, 'README.md');
+    if (fs.existsSync(readmePath)) {
+      try {
+        result.description = fs.readFileSync(readmePath, 'utf8').substring(0, 200).replace(/\n/g, ' ').trim();
+      } catch(e) {}
+    }
+  }
+
+  const envPath = fs.existsSync(path.join(targetPath, '.env.local')) ? path.join(targetPath, '.env.local') : path.join(targetPath, '.env');
+  if (fs.existsSync(envPath)) {
+    try {
+      const envContent = fs.readFileSync(envPath, 'utf8');
+      envContent.split('\n').forEach(line => {
+        const key = line.split('=')[0].trim();
+        if (key === 'DATABASE_URL' && !result.tags.includes('PostgreSQL')) result.tags.push('PostgreSQL');
+        if (key.startsWith('NEXT_PUBLIC_') && !result.tags.includes('Frontend')) result.tags.push('Frontend');
+        if ((key.startsWith('RAILWAY_') || key.startsWith('VERCEL_')) && !result.deployHints.includes(key)) {
+          result.deployHints.push(key);
+        }
+      });
+    } catch(e) {}
+  }
+
+  if (fs.existsSync(path.join(targetPath, '.git'))) {
+    try {
+      const execPromise = (cmd) => new Promise(resolve => exec(cmd, { cwd: targetPath }, (err, stdout) => resolve(err ? '' : stdout.trim())));
+      const url = await execPromise('git remote get-url origin');
+      if (url) result.githubUrl = url;
+      const msg = await execPromise('git log -1 --pretty=%s');
+      if (msg) result.lastCommitMessage = msg;
+    } catch(e) {}
+  }
+
+  result.tags = [...new Set(result.tags)];
+  res.json(result);
+});
+
 app.listen(PORT, () => {
   console.log(`DevOS Agent running on port ${PORT}`);
 });
