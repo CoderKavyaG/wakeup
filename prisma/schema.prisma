@@ -42,6 +42,7 @@ model Project {
   memories             Memory[]
   projectMemory        ProjectMemory?
   commits              Commit[]
+  links                ProjectLink[]
 }
 
 model Commit {
@@ -54,6 +55,18 @@ model Commit {
   projectId String?
   project   Project? @relation(fields: [projectId], references: [id])
   createdAt DateTime @default(now())
+}
+
+model ProjectLink {
+  id         String    @id @default(cuid())
+  projectId  String
+  project    Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  label      String
+  url        String
+  type       String    // 'frontend' | 'backend' | 'database' | 'storage' | 'monitoring' | 'logs' | 'other'
+  lastStatus Int?      // HTTP status code from last ping
+  lastPinged DateTime?
+  createdAt  DateTime  @default(now())
 }
 
 model Task {

@@ -114,8 +114,121 @@ export function ProjectsWidget() {
   const [commitsLoading, setCommitsLoading] = useState(false);
   const [commitLimit, setCommitLimit] = useState(10);
 
-  // Fetch Commits on project select
+  // Links & Control Room State
+  const [projectLinks, setProjectLinks] = useState<any[]>([]);
+  const [linksLoading, setLinksLoading] = useState(false);
+  const [pingingLinks, setPingingLinks] = useState(false);
+  const [activeTab, setActiveTab] = useState<"overview" | "control_room">("overview");
+
+  const pingLinks = async (projectId: string, showToast = true) => {
+    setPingingLinks(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/links/ping`, { method: "POST" });
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setProjectLinks(data);
+        if (showToast) {
+          data.forEach(link => {
+            if (link.lastStatus && (link.lastStatus < 200 || link.lastStatus >= 300)) {
+              // Create a custom toast or alert
+              alert(`⚠️ ${selectedProject?.name} ${link.type} link (${link.label}) returned ${link.lastStatus}`);
+            }
+          });
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setPingingLinks(false);
+    }
+  };
+
+  const fetchLinks = async (projectId: string) => {
+    setLinksLoading(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/links`);
+      const data = await res.json();
+      setProjectLinks(Array.isArray(data) ? data : []);
+      
+      if (Array.isArray(data) && data.length > 0) {
+        const needsPing = data.some(link => !link.lastPinged || (Date.now() - new Date(link.lastPinged).getTime()) > 15 * 60 * 1000);
+        if (needsPing) {
+          pingLinks(projectId, false);
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLinksLoading(false);
+    }
+  };
+
+  // Add Link State & Logic
+  const [newLinkUrl, setNewLinkUrl] = useState("");
+  const [newLinkLabel, setNewLinkLabel] = useState("");
+  const [creatingLink, setCreatingLink] = useState(false);
+
+  const handleUrlPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const text = e.clipboardData.getData('text');
+    if (text.startsWith('http://') || text.startsWith('https://')) {
+      let label = text.replace(/^https?:\/\//, '').split('/')[0];
+      if (label.includes('vercel.app')) label = label.replace('.vercel.app', ' (Vercel)');
+      else if (label.includes('railway.app')) label = label.replace('.railway.app', ' (Railway)');
+      else if (label.includes('supabase.co')) label = 'Supabase';
+      else if (label.includes('firebase')) label = 'Firebase';
+      setNewLinkLabel(label);
+    }
+  };
+
+  const submitNewLink = async () => {
+    if (!newLinkUrl || !newLinkLabel || !selectedProject) return;
+    setCreatingLink(true);
+    try {
+      let urlToSubmit = newLinkUrl;
+      if (!urlToSubmit.startsWith('http')) {
+        urlToSubmit = 'https://' + urlToSubmit;
+      }
+      
+      const res = await fetch(`/api/projects/${selectedProject.id}/links`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: urlToSubmit, label: newLinkLabel })
+      });
+      if (res.ok) {
+        fetchLinks(selectedProject.id);
+        setNewLinkUrl("");
+        setNewLinkLabel("");
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setCreatingLink(false);
+    }
+  };
+
+  const deleteLink = async (linkId: string) => {
+    if (!selectedProject) return;
+    try {
+      const res = await fetch(`/api/projects/${selectedProject.id}/links/${linkId}`, {
+        method: "DELETE"
+      });
+      if (res.ok) {
+        setProjectLinks(prev => prev.filter(l => l.id !== linkId));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Fetch data on project select
   useEffect(() => {
+    setActiveTab("overview");
+    if (selectedProject?.id) {
+      fetchLinks(selectedProject.id);
+    } else {
+      setProjectLinks([]);
+    }
+
     if (selectedProject?.githubUrl) {
       setCommitsLoading(true);
       fetch(`/api/github/commits?projectId=${selectedProject.id}&days=14`)
@@ -767,17 +880,33 @@ export function ProjectsWidget() {
               </Button>
             </div>
           </div>
+
+          <div className="flex items-center gap-4 border-b border-white/10 px-1 mb-4 shrink-0">
+            <button
+              onClick={() => setActiveTab("overview")}
+              className={`pb-2 text-[10px] uppercase font-bold tracking-wider border-b-2 transition-colors ${activeTab === "overview" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+            >
+              Overview
+            </button>
+            <button
+              onClick={() => setActiveTab("control_room")}
+              className={`pb-2 text-[10px] uppercase font-bold tracking-wider border-b-2 transition-colors ${activeTab === "control_room" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+            >
+              Control Room
+            </button>
+          </div>
+
           {/* Drawer Content */}
           <ScrollArea className="flex-1 pr-2 custom-scrollbar">
-            <div className="space-y-4 pb-4">
-              
-              {/* Unified Feedback Feed */}
-              <div className="pt-4 border-t border-white/10 space-y-4">
-                <div className="flex items-center justify-between pb-2">
-                  <h3 className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest px-1">Next Feedbacks</h3>
-                </div>
+            {activeTab === "overview" && (
+              <div className="space-y-4 pb-4">
+                
+                {/* Unified Feedback Feed */}
+                <div className="pt-2 space-y-4">
+                  <div className="flex items-center justify-between pb-2 border-b border-white/10">
+                    <h3 className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest px-1">Next Feedbacks</h3>
+                  </div>
 
-                <ScrollArea className="h-[250px] custom-scrollbar pr-2">
                   <div className="space-y-3">
                     {notes.filter(n => n.projectId === selectedProject.id).length > 0 ? (
                       notes.filter(n => n.projectId === selectedProject.id).map(note => (
@@ -815,75 +944,163 @@ export function ProjectsWidget() {
                       </div>
                     )}
                   </div>
-                </ScrollArea>
-              </div>
-
-              {/* Recent Commits Feed */}
-              <div className="pt-4 border-t border-white/10 space-y-4">
-                <div className="flex items-center justify-between pb-2">
-                  <h3 className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest px-1">Recent Commits</h3>
                 </div>
 
-                <div className="px-1">
-                  {!selectedProject.githubUrl ? (
-                    <div className="text-center py-4">
-                      <span className="text-xs text-muted-foreground">No commits yet — this is a local workspace</span>
-                    </div>
-                  ) : commitsLoading && projectCommits.length === 0 ? (
-                    <div className="text-center py-4">
-                      <span className="text-xs text-muted-foreground animate-pulse">Loading commits...</span>
-                    </div>
-                  ) : projectCommits.length === 0 ? (
-                    <div className="text-center py-4">
-                      <span className="text-xs text-muted-foreground">No recent commits found.</span>
-                    </div>
-                  ) : (
-                    <div className="space-y-3 relative before:absolute before:inset-0 before:ml-2 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-white/10 before:to-transparent">
-                      {projectCommits.slice(0, commitLimit).map((commit: any) => {
-                        const commitAgo = Math.floor((Date.now() - new Date(commit.date).getTime()) / (1000 * 60 * 60));
-                        const timeAgoString = commitAgo < 24 ? `${commitAgo}h ago` : `${Math.floor(commitAgo / 24)}d ago`;
-                        return (
-                          <div key={commit.sha} className="relative flex items-center justify-between group">
-                            <div className="flex items-center gap-3 w-full">
-                              <div className="flex items-center justify-center w-4 h-4 rounded-full bg-[#0f0f11] border border-white/20 z-10 shrink-0">
-                                <div className="w-1.5 h-1.5 rounded-full bg-primary/60 group-hover:bg-primary transition-colors" />
-                              </div>
-                              <div className="flex-1 min-w-0 pr-2">
-                                <p className="text-[11px] text-foreground truncate">{commit.message}</p>
-                              </div>
-                              <div className="flex items-center gap-2 shrink-0">
-                                <span className="text-[9px] text-muted-foreground">{timeAgoString}</span>
-                                <a 
-                                  href={commit.url} 
-                                  target="_blank" 
-                                  rel="noreferrer"
-                                  className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/5 hover:bg-white/10 text-primary/80 hover:text-primary transition-colors"
-                                >
-                                  {commit.sha.substring(0, 7)}
-                                </a>
+                {/* Recent Commits Feed */}
+                <div className="pt-4 border-t border-white/10 space-y-4">
+                  <div className="flex items-center justify-between pb-2">
+                    <h3 className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest px-1">Recent Commits</h3>
+                  </div>
+
+                  <div className="px-1">
+                    {!selectedProject.githubUrl ? (
+                      <div className="text-center py-4">
+                        <span className="text-xs text-muted-foreground">No commits yet — this is a local workspace</span>
+                      </div>
+                    ) : commitsLoading && projectCommits.length === 0 ? (
+                      <div className="text-center py-4">
+                        <span className="text-xs text-muted-foreground animate-pulse">Loading commits...</span>
+                      </div>
+                    ) : projectCommits.length === 0 ? (
+                      <div className="text-center py-4">
+                        <span className="text-xs text-muted-foreground">No recent commits found.</span>
+                      </div>
+                    ) : (
+                      <div className="space-y-3 relative before:absolute before:inset-0 before:ml-2 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-white/10 before:to-transparent">
+                        {projectCommits.slice(0, commitLimit).map((commit: any) => {
+                          const commitAgo = Math.floor((Date.now() - new Date(commit.date).getTime()) / (1000 * 60 * 60));
+                          const timeAgoString = commitAgo < 24 ? `${commitAgo}h ago` : `${Math.floor(commitAgo / 24)}d ago`;
+                          return (
+                            <div key={commit.sha} className="relative flex items-center justify-between group">
+                              <div className="flex items-center gap-3 w-full">
+                                <div className="flex items-center justify-center w-4 h-4 rounded-full bg-[#0f0f11] border border-white/20 z-10 shrink-0">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-primary/60 group-hover:bg-primary transition-colors" />
+                                </div>
+                                <div className="flex-1 min-w-0 pr-2">
+                                  <p className="text-[11px] text-foreground truncate">{commit.message}</p>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <span className="text-[9px] text-muted-foreground">{timeAgoString}</span>
+                                  <a 
+                                    href={commit.url} 
+                                    target="_blank" 
+                                    rel="noreferrer"
+                                    className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/5 hover:bg-white/10 text-primary/80 hover:text-primary transition-colors"
+                                  >
+                                    {commit.sha.substring(0, 7)}
+                                  </a>
+                                </div>
                               </div>
                             </div>
+                          );
+                        })}
+                        
+                        {projectCommits.length > commitLimit && (
+                          <div className="pt-2 flex justify-center">
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-6 text-[10px] text-muted-foreground hover:text-foreground"
+                              onClick={() => setCommitLimit(prev => prev + 10)}
+                            >
+                              Load more
+                            </Button>
                           </div>
-                        );
-                      })}
-                      
-                      {projectCommits.length > commitLimit && (
-                        <div className="pt-2 flex justify-center">
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="h-6 text-[10px] text-muted-foreground hover:text-foreground"
-                            onClick={() => setCommitLimit(prev => prev + 10)}
-                          >
-                            Load more
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
+
+            {activeTab === "control_room" && (
+              <div className="space-y-6 pb-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-semibold text-foreground">Project Links</h3>
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    className="h-7 text-[10px] bg-transparent border-white/10 hover:bg-white/5"
+                    onClick={() => pingLinks(selectedProject.id)}
+                    disabled={pingingLinks}
+                  >
+                    {pingingLinks ? "Pinging..." : "Ping All"}
+                  </Button>
+                </div>
+
+                {linksLoading ? (
+                  <div className="text-center py-4 text-xs text-muted-foreground">Loading links...</div>
+                ) : (
+                  <div className="space-y-6">
+                    {['frontend', 'backend', 'database', 'storage', 'monitoring', 'other'].map(type => {
+                      const typeLinks = projectLinks.filter(l => l.type === type);
+                      if (typeLinks.length === 0 && type !== 'other') return null; // Only 'other' is always shown as fallback to add links if everything is empty
+                      if (typeLinks.length === 0 && type === 'other' && projectLinks.length > 0) return null; // Don't show 'other' if there are links elsewhere and 'other' is empty
+
+                      return (
+                        <div key={type} className="space-y-2">
+                          <h4 className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">{type}</h4>
+                          <div className="space-y-1">
+                            {typeLinks.map(link => (
+                              <div key={link.id} className="group flex items-center justify-between p-2 rounded-md hover:bg-white/5 transition-colors border border-transparent hover:border-white/5">
+                                <div className="flex items-center gap-3 min-w-0">
+                                  <div 
+                                    className={`w-2 h-2 rounded-full shrink-0 shadow-sm ${!link.lastPinged ? 'bg-gray-500' : (link.lastStatus && link.lastStatus >= 200 && link.lastStatus < 300) ? 'bg-green-500 shadow-green-500/50' : (link.lastStatus && link.lastStatus >= 300 && link.lastStatus < 400) ? 'bg-yellow-500 shadow-yellow-500/50' : 'bg-red-500 shadow-red-500/50'}`}
+                                    title={link.lastPinged ? `Last status: ${link.lastStatus}` : 'Never pinged'}
+                                  />
+                                  <div className="flex flex-col min-w-0">
+                                    <span className="text-xs font-medium text-foreground truncate">{link.label}</span>
+                                    <span className="text-[10px] font-mono text-muted-foreground truncate">{link.url.replace(/^https?:\/\//, '')}</span>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                                  <Button size="icon" variant="ghost" className="w-6 h-6 text-muted-foreground hover:text-foreground" onClick={() => navigator.clipboard.writeText(link.url)}>
+                                    <Code2 className="w-3 h-3" />
+                                  </Button>
+                                  <a href={link.url} target="_blank" rel="noopener noreferrer" className="w-6 h-6 text-muted-foreground hover:text-foreground inline-flex items-center justify-center rounded-md hover:bg-white/5">
+                                    <ExternalLink className="w-3 h-3" />
+                                  </a>
+                                  <Button size="icon" variant="ghost" className="w-6 h-6 text-muted-foreground hover:text-red-400" onClick={() => deleteLink(link.id)}>
+                                    <Trash2 className="w-3 h-3" />
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
+                            {type === 'other' || (typeLinks.length > 0 && type === 'other') ? (
+                              <div className="pt-2 flex gap-2">
+                                <Input 
+                                  value={newLinkLabel} 
+                                  onChange={e => setNewLinkLabel(e.target.value)} 
+                                  placeholder="Label" 
+                                  className="h-7 text-xs bg-transparent border-white/10 w-1/3" 
+                                />
+                                <Input 
+                                  value={newLinkUrl} 
+                                  onChange={e => setNewLinkUrl(e.target.value)} 
+                                  onPaste={handleUrlPaste}
+                                  placeholder="URL (paste to auto-detect)" 
+                                  className="h-7 text-xs bg-transparent border-white/10 flex-1"
+                                  onKeyDown={e => e.key === 'Enter' && submitNewLink()}
+                                />
+                                <Button 
+                                  size="sm" 
+                                  onClick={submitNewLink} 
+                                  disabled={creatingLink || !newLinkUrl || !newLinkLabel}
+                                  className="h-7 px-3 text-xs bg-primary text-primary-foreground"
+                                >
+                                  {creatingLink ? "..." : "Add"}
+                                </Button>
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
           </ScrollArea>
         </div>
       )}
