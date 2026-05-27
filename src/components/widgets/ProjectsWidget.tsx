@@ -180,6 +180,8 @@ export function ProjectsWidget() {
     }
   };
 
+  const [justAdded, setJustAdded] = useState(false);
+
   const submitNewLink = async () => {
     if (!newLinkUrl || !newLinkLabel || !selectedProject) return;
     setCreatingLink(true);
@@ -198,6 +200,8 @@ export function ProjectsWidget() {
         fetchLinks(selectedProject.id);
         setNewLinkUrl("");
         setNewLinkLabel("");
+        setJustAdded(true);
+        setTimeout(() => setJustAdded(false), 2000);
       }
     } catch (e) {
       console.error(e);
@@ -1016,8 +1020,25 @@ export function ProjectsWidget() {
 
             {activeTab === "control_room" && (
               <div className="space-y-6 pb-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-semibold text-foreground">Project Links</h3>
+                
+                {/* Live Link Section */}
+                {selectedProject.liveUrl && (
+                  <div className="space-y-2">
+                    <h3 className="text-xs font-semibold text-foreground">Live Link</h3>
+                    <div className="flex items-center justify-between p-3 rounded-lg bg-primary/10 border border-primary/20">
+                      <div className="flex items-center gap-3">
+                        <div className="w-2 h-2 rounded-full bg-green-500 shadow-sm shadow-green-500/50" />
+                        <span className="text-xs font-semibold text-foreground">{selectedProject.name} (Live)</span>
+                      </div>
+                      <a href={selectedProject.liveUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-xs font-medium text-primary hover:text-primary/80 transition-colors truncate pl-4">
+                        {selectedProject.liveUrl.replace(/^https?:\/\//, '')} <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                      </a>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between pt-2 border-t border-white/10">
+                  <h3 className="text-xs font-semibold text-foreground">Infrastructure Links</h3>
                   <Button 
                     size="sm" 
                     variant="outline" 
@@ -1029,14 +1050,41 @@ export function ProjectsWidget() {
                   </Button>
                 </div>
 
+                {/* Always-visible Add Link Form */}
+                <div className="flex flex-col gap-2 p-3 rounded-lg bg-black/20 border border-white/5 relative overflow-hidden group">
+                  <div className="flex items-center gap-2 relative z-10">
+                    <Input 
+                      value={newLinkLabel} 
+                      onChange={e => setNewLinkLabel(e.target.value)} 
+                      placeholder="Label (e.g. Vercel)" 
+                      className="h-8 text-xs bg-transparent border-white/10 w-[30%]" 
+                    />
+                    <Input 
+                      value={newLinkUrl} 
+                      onChange={e => setNewLinkUrl(e.target.value)} 
+                      onPaste={handleUrlPaste}
+                      placeholder="URL (paste to auto-detect)" 
+                      className="h-8 text-xs bg-transparent border-white/10 flex-1"
+                      onKeyDown={e => e.key === 'Enter' && submitNewLink()}
+                    />
+                    <Button 
+                      size="sm" 
+                      onClick={submitNewLink} 
+                      disabled={creatingLink || !newLinkUrl || !newLinkLabel}
+                      className={`h-8 px-4 text-xs transition-colors shrink-0 ${justAdded ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-primary text-primary-foreground'}`}
+                    >
+                      {creatingLink ? "..." : justAdded ? "Added!" : "Add Link"}
+                    </Button>
+                  </div>
+                </div>
+
                 {linksLoading ? (
                   <div className="text-center py-4 text-xs text-muted-foreground">Loading links...</div>
                 ) : (
                   <div className="space-y-6">
                     {['frontend', 'backend', 'database', 'storage', 'monitoring', 'other'].map(type => {
                       const typeLinks = projectLinks.filter(l => l.type === type);
-                      if (typeLinks.length === 0 && type !== 'other') return null; // Only 'other' is always shown as fallback to add links if everything is empty
-                      if (typeLinks.length === 0 && type === 'other' && projectLinks.length > 0) return null; // Don't show 'other' if there are links elsewhere and 'other' is empty
+                      if (typeLinks.length === 0) return null;
 
                       return (
                         <div key={type} className="space-y-2">
@@ -1067,36 +1115,15 @@ export function ProjectsWidget() {
                                 </div>
                               </div>
                             ))}
-                            {type === 'other' || (typeLinks.length > 0 && type === 'other') ? (
-                              <div className="pt-2 flex gap-2">
-                                <Input 
-                                  value={newLinkLabel} 
-                                  onChange={e => setNewLinkLabel(e.target.value)} 
-                                  placeholder="Label" 
-                                  className="h-7 text-xs bg-transparent border-white/10 w-1/3" 
-                                />
-                                <Input 
-                                  value={newLinkUrl} 
-                                  onChange={e => setNewLinkUrl(e.target.value)} 
-                                  onPaste={handleUrlPaste}
-                                  placeholder="URL (paste to auto-detect)" 
-                                  className="h-7 text-xs bg-transparent border-white/10 flex-1"
-                                  onKeyDown={e => e.key === 'Enter' && submitNewLink()}
-                                />
-                                <Button 
-                                  size="sm" 
-                                  onClick={submitNewLink} 
-                                  disabled={creatingLink || !newLinkUrl || !newLinkLabel}
-                                  className="h-7 px-3 text-xs bg-primary text-primary-foreground"
-                                >
-                                  {creatingLink ? "..." : "Add"}
-                                </Button>
-                              </div>
-                            ) : null}
                           </div>
                         </div>
                       );
                     })}
+                    {projectLinks.length === 0 && (
+                      <div className="text-center py-8">
+                        <span className="text-xs text-muted-foreground">No infrastructure links added yet.</span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
