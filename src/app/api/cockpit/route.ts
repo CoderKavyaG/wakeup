@@ -82,6 +82,29 @@ export async function POST(request: Request) {
         filteredNotes = notes;
         additionalInstructions = `\nCRITICAL INSTRUCTION: Summarize the project "${targetProject.name}" based on its tasks and data.`;
       }
+    } else if (lowerQuery.match(/\b(built|last few days|this week|commits|progress|what did i do|summary)\b/)) {
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      const recentCommits = await prisma.commit.findMany({
+        where: { date: { gte: sevenDaysAgo } },
+        orderBy: { date: 'desc' }
+      });
+      
+      const commitSummary: Record<string, { count: number, messages: string[] }> = {};
+      recentCommits.forEach((c: any) => {
+        if (!commitSummary[c.repoName]) {
+          commitSummary[c.repoName] = { count: 0, messages: [] };
+        }
+        commitSummary[c.repoName].count++;
+        if (commitSummary[c.repoName].messages.length < 5) {
+          commitSummary[c.repoName].messages.push(c.message);
+        }
+      });
+      
+      const commitStr = Object.entries(commitSummary)
+        .map(([repo, data]) => `${repo} (${data.count} commits): ${data.messages.join(", ")}`)
+        .join("\n");
+        
+      additionalInstructions = `\nCRITICAL INSTRUCTION: The user is asking for a dev diary/progress summary. Based on the RECENT COMMITS below, return a short, human-readable changelog. Start with "Here's what you built recently:" followed by bullet points per project.\n\nRECENT COMMITS (last 7 days):\n${commitStr || "No recent commits."}`;
     }
 
     // 4. BUILD PROMPT

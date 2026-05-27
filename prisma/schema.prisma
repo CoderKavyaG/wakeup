@@ -41,6 +41,19 @@ model Project {
   // Relations (Phase 5)
   memories             Memory[]
   projectMemory        ProjectMemory?
+  commits              Commit[]
+}
+
+model Commit {
+  id        String   @id @default(cuid())
+  repoName  String
+  sha       String   @unique
+  message   String
+  date      DateTime
+  url       String?
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id])
+  createdAt DateTime @default(now())
 }
 
 model Task {

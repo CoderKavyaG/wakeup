@@ -102,8 +102,8 @@ function buildSuggestions(
 
   suggestions.push({
     id: "s5",
-    label: "Give me a weekly summary of what I've done",
-    query: "Give me a weekly summary of what I have done",
+    label: "What did I build this week?",
+    query: "What did I build this week?",
     icon: <Sparkles className="w-3.5 h-3.5 text-purple-400" />,
   });
 

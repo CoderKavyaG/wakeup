@@ -34,7 +34,7 @@ import {
   Brain, CheckCircle2, Sparkles, Plus,
   HelpCircle, Activity, ChevronRight, X, Heart, 
   Code2, Play, AlertCircle, Pencil,
-  Eye, FolderOpen
+  Eye, FolderOpen, GitCommit
 } from "lucide-react";
 
 export function ProjectsWidget() {
@@ -105,10 +105,35 @@ export function ProjectsWidget() {
   const [staleWarningCount, setStaleWarningCount] = useState(0);
   const [showStaleOnly, setShowStaleOnly] = useState(false);
 
-  // Local Health Stats
   const [localHealthStats, setLocalHealthStats] = useState<Record<string, number>>({});
 
   const [viewNote, setViewNote] = useState<any>(null);
+
+  // Commits State
+  const [projectCommits, setProjectCommits] = useState<any[]>([]);
+  const [commitsLoading, setCommitsLoading] = useState(false);
+  const [commitLimit, setCommitLimit] = useState(10);
+
+  // Fetch Commits on project select
+  useEffect(() => {
+    if (selectedProject?.githubUrl) {
+      setCommitsLoading(true);
+      fetch(`/api/github/commits?projectId=${selectedProject.id}&days=14`)
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) {
+            setProjectCommits(data);
+          } else {
+            setProjectCommits([]);
+          }
+          setCommitsLoading(false);
+          setCommitLimit(10);
+        })
+        .catch(() => setCommitsLoading(false));
+    } else {
+      setProjectCommits([]);
+    }
+  }, [selectedProject?.id]);
 
   // Auto-Sync GitHub Repos on Mount
   useEffect(() => {
@@ -791,6 +816,72 @@ export function ProjectsWidget() {
                     )}
                   </div>
                 </ScrollArea>
+              </div>
+
+              {/* Recent Commits Feed */}
+              <div className="pt-4 border-t border-white/10 space-y-4">
+                <div className="flex items-center justify-between pb-2">
+                  <h3 className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest px-1">Recent Commits</h3>
+                </div>
+
+                <div className="px-1">
+                  {!selectedProject.githubUrl ? (
+                    <div className="text-center py-4">
+                      <span className="text-xs text-muted-foreground">No commits yet — this is a local workspace</span>
+                    </div>
+                  ) : commitsLoading && projectCommits.length === 0 ? (
+                    <div className="text-center py-4">
+                      <span className="text-xs text-muted-foreground animate-pulse">Loading commits...</span>
+                    </div>
+                  ) : projectCommits.length === 0 ? (
+                    <div className="text-center py-4">
+                      <span className="text-xs text-muted-foreground">No recent commits found.</span>
+                    </div>
+                  ) : (
+                    <div className="space-y-3 relative before:absolute before:inset-0 before:ml-2 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-white/10 before:to-transparent">
+                      {projectCommits.slice(0, commitLimit).map((commit: any) => {
+                        const commitAgo = Math.floor((Date.now() - new Date(commit.date).getTime()) / (1000 * 60 * 60));
+                        const timeAgoString = commitAgo < 24 ? `${commitAgo}h ago` : `${Math.floor(commitAgo / 24)}d ago`;
+                        return (
+                          <div key={commit.sha} className="relative flex items-center justify-between group">
+                            <div className="flex items-center gap-3 w-full">
+                              <div className="flex items-center justify-center w-4 h-4 rounded-full bg-[#0f0f11] border border-white/20 z-10 shrink-0">
+                                <div className="w-1.5 h-1.5 rounded-full bg-primary/60 group-hover:bg-primary transition-colors" />
+                              </div>
+                              <div className="flex-1 min-w-0 pr-2">
+                                <p className="text-[11px] text-foreground truncate">{commit.message}</p>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className="text-[9px] text-muted-foreground">{timeAgoString}</span>
+                                <a 
+                                  href={commit.url} 
+                                  target="_blank" 
+                                  rel="noreferrer"
+                                  className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/5 hover:bg-white/10 text-primary/80 hover:text-primary transition-colors"
+                                >
+                                  {commit.sha.substring(0, 7)}
+                                </a>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      
+                      {projectCommits.length > commitLimit && (
+                        <div className="pt-2 flex justify-center">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-6 text-[10px] text-muted-foreground hover:text-foreground"
+                            onClick={() => setCommitLimit(prev => prev + 10)}
+                          >
+                            Load more
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </ScrollArea>
