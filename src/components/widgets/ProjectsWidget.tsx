@@ -29,12 +29,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { 
   Folder, GitBranch, ExternalLink, Trash2, 
   Brain, CheckCircle2, Sparkles, Plus,
   HelpCircle, Activity, ChevronRight, X, Heart, 
   Code2, Play, AlertCircle, Pencil,
-  Eye,
+  Eye, FolderOpen
 } from "lucide-react";
 
 export function ProjectsWidget() {
@@ -58,7 +57,9 @@ export function ProjectsWidget() {
     setIsPickingFolder(true);
     try {
       const res = await fetch("/api/machine/pick-and-scan-folder", {
-        method: "POST"
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({})
       });
       const data = await res.json();
       if (!res.ok) {
@@ -560,16 +561,23 @@ export function ProjectsWidget() {
               </div>
 
               {!selectedProject.folderPath && selectedProject.githubUrl && (
-                <div className="pt-2">
-                  <Button 
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handlePickFolder("link")}
-                    disabled={isPickingFolder}
-                    className="h-7 text-[10px] bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 w-full flex items-center justify-center gap-1.5"
-                  >
-                    <Folder className="w-3.5 h-3.5" /> {isPickingFolder ? "Linking..." : "Link Local Folder"}
-                  </Button>
+                <div className="pt-3 pb-1">
+                  <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 flex flex-col items-center justify-center gap-2 text-center relative overflow-hidden group">
+                    <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <FolderOpen className="w-5 h-5 text-primary mb-0.5" />
+                    <h4 className="text-xs font-bold text-foreground">Local Folder Missing</h4>
+                    <p className="text-[10px] text-muted-foreground px-2 leading-tight">
+                      Link this GitHub project to a local folder on your machine to enable smart file scanning, VS Code integration, and more.
+                    </p>
+                    <Button 
+                      size="sm"
+                      onClick={() => handlePickFolder("link")}
+                      disabled={isPickingFolder}
+                      className="mt-2 h-8 text-xs font-semibold px-4 w-full bg-primary hover:bg-primary/90 text-primary-foreground relative z-10"
+                    >
+                      {isPickingFolder ? "Linking..." : "Select Local Folder"}
+                    </Button>
+                  </div>
                 </div>
               )}
 
