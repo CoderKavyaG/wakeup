@@ -162,58 +162,7 @@ export function SessionBriefing() {
               </div>
             </div>
 
-            {/* Right: Pick up & Focus */}
-            <div className="flex-1 space-y-6 w-full mt-4 md:mt-0">
-              <div className="space-y-3">
-                <h3 className="text-[11px] uppercase tracking-wider text-muted-foreground font-bold">Pick up where you left off</h3>
-                {mostRecentProject && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <FolderOpen className="w-4 h-4 text-primary shrink-0" />
-                    <span className="truncate">{mostRecentProject.name}</span>
-                    <span className="text-muted-foreground text-[10px] ml-auto shrink-0 uppercase tracking-wider">
-                      updated {getTimeSince(new Date(mostRecentProject.updatedAt).getTime())}
-                    </span>
-                  </div>
-                )}
-                {topTask && (
-                  <div className="flex items-center gap-2 text-sm pt-2 border-t border-white/5">
-                    <CheckSquare className="w-4 h-4 text-white/50 shrink-0" />
-                    <span className="truncate flex-1">{topTask.title}</span>
-                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider shrink-0 ${topTask.priority === 'high' ? 'bg-red-500/20 text-red-400' : topTask.priority === 'medium' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-green-500/20 text-green-400'}`}>
-                      {topTask.priority}
-                    </span>
-                  </div>
-                )}
-              </div>
 
-              <div className="bg-primary/5 border border-primary/20 p-4 rounded-lg flex flex-col gap-3 relative overflow-hidden">
-                <div className="absolute -right-4 -top-4 opacity-10">
-                  <Sparkles className="w-24 h-24 text-primary" />
-                </div>
-                
-                <h3 className="text-[11px] uppercase tracking-wider text-primary font-bold flex items-center gap-1.5 relative z-10">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  Today's Focus
-                </h3>
-                
-                <div className="relative z-10">
-                  {isAiLoading ? (
-                    <div className="space-y-2 mt-1">
-                      <div className="h-3 w-3/4 bg-primary/20 rounded animate-pulse" />
-                      <div className="h-3 w-1/2 bg-primary/20 rounded animate-pulse" />
-                    </div>
-                  ) : (
-                    <p className="text-sm leading-relaxed text-white/90 pr-6">
-                      {focusText}
-                    </p>
-                  )}
-                </div>
-                
-                <Button onClick={handleGetStarted} size="sm" className="w-max mt-2 text-xs font-semibold px-4 relative z-10">
-                  Get Started <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
-                </Button>
-              </div>
-            </div>
           </div>
         </motion.div>
       )}
