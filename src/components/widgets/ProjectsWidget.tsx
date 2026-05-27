@@ -29,6 +29,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { 
   Folder, GitBranch, ExternalLink, Trash2, 
   Brain, CheckCircle2, Sparkles, Plus,
   HelpCircle, Activity, ChevronRight, X, Heart, 
