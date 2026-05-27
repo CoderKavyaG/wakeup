@@ -202,6 +202,9 @@ export function ProjectsWidget() {
         setNewLinkLabel("");
         setJustAdded(true);
         setTimeout(() => setJustAdded(false), 2000);
+      } else {
+        const err = await res.json();
+        alert(`Failed to add link: ${err.error || 'Server error'}`);
       }
     } catch (e) {
       console.error(e);
