@@ -670,6 +670,16 @@ export function ProjectsWidget() {
                   </a>
                 )}
               </div>
+
+              {selectedProject.tags && selectedProject.tags.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {selectedProject.tags.map((tag: string) => (
+                    <Badge key={tag} variant="secondary" className="text-[8px] py-0 px-1.5 uppercase bg-primary/10 text-primary border-primary/20">
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              )}
               
               <div className="pt-2">
                 <DropdownMenu>
@@ -823,18 +833,6 @@ export function ProjectsWidget() {
           <ScrollArea className="flex-1 pr-2 custom-scrollbar">
             <div className="space-y-4 pb-4">
               
-              {selectedProject.folderPath && (
-                <div className="flex items-center justify-end">
-                  <Button 
-                    size="sm" 
-                    onClick={() => window.open(`vscode://file/${selectedProject.folderPath}`)}
-                    className="h-7 text-[10px] bg-white/10 text-white hover:bg-white/20 border border-white/20"
-                  >
-                    <Code2 className="w-3.5 h-3.5 mr-1.5" /> Open in VS Code
-                  </Button>
-                </div>
-              )}
-
               {/* Unified Feedback Feed */}
               <div className="pt-4 border-t border-white/10 space-y-4">
                 <div className="flex items-center justify-between pb-2">
