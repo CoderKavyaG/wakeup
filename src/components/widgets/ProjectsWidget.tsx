@@ -562,21 +562,24 @@ export function ProjectsWidget() {
               </div>
 
               {!selectedProject.folderPath && selectedProject.githubUrl && (
-                <div className="pt-3 pb-1">
-                  <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 flex flex-col items-center justify-center gap-2 text-center relative overflow-hidden group">
-                    <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                    <FolderOpen className="w-5 h-5 text-primary mb-0.5" />
-                    <h4 className="text-xs font-bold text-foreground">Local Folder Missing</h4>
-                    <p className="text-[10px] text-muted-foreground px-2 leading-tight">
-                      Link this GitHub project to a local folder on your machine to enable smart file scanning, VS Code integration, and more.
-                    </p>
+                <div className="pt-3 pb-2">
+                  <div className="bg-primary/10 border border-primary/20 rounded-md p-2 flex items-center justify-between gap-3 overflow-hidden group hover:border-primary/40 transition-colors">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded bg-primary/20 flex items-center justify-center shrink-0">
+                        <FolderOpen className="w-3.5 h-3.5 text-primary" />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[11px] font-bold text-primary leading-tight">Unlinked</span>
+                        <span className="text-[9px] text-primary/70 leading-tight">Connect local folder for IDE features</span>
+                      </div>
+                    </div>
                     <Button 
                       size="sm"
                       onClick={() => handlePickFolder("link")}
                       disabled={isPickingFolder}
-                      className="mt-2 h-8 text-xs font-semibold px-4 w-full bg-primary hover:bg-primary/90 text-primary-foreground relative z-10"
+                      className="h-6 text-[10px] font-semibold px-3 bg-primary hover:bg-primary/90 text-primary-foreground shrink-0"
                     >
-                      {isPickingFolder ? "Linking..." : "Select Local Folder"}
+                      {isPickingFolder ? "..." : "Link Now"}
                     </Button>
                   </div>
                 </div>
