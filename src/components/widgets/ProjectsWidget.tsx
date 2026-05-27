@@ -298,16 +298,16 @@ export function ProjectsWidget() {
             <Folder className="w-4 h-4 text-primary" />
             <h2 className="text-sm font-semibold tracking-wider uppercase text-secondary-foreground">Projects</h2>
           </div>
-          <div className="flex items-center bg-black/40 p-1 rounded-full border border-white/5 shadow-inner">
+          <div className="flex items-center bg-black/40 p-0.5 rounded-full border border-white/5 shadow-inner mx-1 shrink-0">
             <button 
               onClick={() => setActiveListTab("github")} 
-              className={`px-3 py-1 rounded-full text-[9px] font-bold uppercase transition-all duration-300 ${activeListTab === "github" ? "bg-white text-black shadow-sm" : "text-muted-foreground hover:text-white"}`}
+              className={`px-2 py-0.5 rounded-full text-[8px] font-bold uppercase transition-all duration-300 ${activeListTab === "github" ? "bg-white text-black shadow-sm" : "text-muted-foreground hover:text-white"}`}
             >
               GitHub
             </button>
             <button 
               onClick={() => setActiveListTab("local")} 
-              className={`px-3 py-1 rounded-full text-[9px] font-bold uppercase transition-all duration-300 ${activeListTab === "local" ? "bg-white text-black shadow-sm" : "text-muted-foreground hover:text-white"}`}
+              className={`px-2 py-0.5 rounded-full text-[8px] font-bold uppercase transition-all duration-300 ${activeListTab === "local" ? "bg-white text-black shadow-sm" : "text-muted-foreground hover:text-white"}`}
             >
               Local
             </button>
@@ -443,16 +443,15 @@ export function ProjectsWidget() {
 
             {activeListTab === "local" && (
               <>
-              <div className="px-2 pt-2 pb-1">
+              <div className="px-2 pt-2 pb-2">
                 <Button 
                   onClick={() => handlePickFolder("import")}
                   disabled={isPickingFolder}
-                  className="w-full bg-white/5 hover:bg-white/10 text-foreground border border-white/10 border-dashed py-5 flex items-center justify-center gap-2 transition-all duration-300 group"
+                  size="sm"
+                  className="w-full h-8 bg-white/5 hover:bg-white/10 text-foreground border border-white/10 border-dashed flex items-center justify-center gap-1.5 transition-all duration-300 group"
                 >
-                  <div className="w-6 h-6 rounded bg-primary/20 text-primary flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <Plus className="w-4 h-4" />
-                  </div>
-                  <span className="font-semibold text-sm">{isPickingFolder ? "Opening Picker..." : "Import Local Project"}</span>
+                  <Plus className="w-3.5 h-3.5 text-primary group-hover:scale-110 transition-transform" />
+                  <span className="text-xs font-medium">{isPickingFolder ? "Opening..." : "Import Local Project"}</span>
                 </Button>
               </div>
               {projects.filter(p => !p.githubUrl && p.status !== "archived").filter(p => {
