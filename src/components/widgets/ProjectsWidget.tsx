@@ -49,96 +49,45 @@ export function ProjectsWidget() {
   const [formData, setFormData] = useState({ name: "", description: "", folderPath: "", status: "green" });
 
   // Smart Import State
-  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-  const [importPath, setImportPath] = useState("");
-  const [importScanning, setImportScanning] = useState(false);
-  const [importError, setImportError] = useState("");
-  const [importResult, setImportResult] = useState<any>(null);
+  const [isPickingFolder, setIsPickingFolder] = useState(false);
   
   // List toggle state
   const [activeListTab, setActiveListTab] = useState<"github" | "local">("github");
 
-  const handleScanProject = async () => {
-    if (!importPath.trim()) return;
-    setImportScanning(true);
-    setImportError("");
-    setImportResult(null);
+  const handlePickFolder = async (action: "import" | "link") => {
+    setIsPickingFolder(true);
     try {
-      const res = await fetch("/api/machine/scan-project", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ path: importPath.trim() })
+      const res = await fetch("/api/machine/pick-and-scan-folder", {
+        method: "POST"
       });
       const data = await res.json();
       if (!res.ok) {
-        setImportError(data.error || "Failed to scan project");
-      } else {
-        setImportResult(data);
+        if (data.error === "No folder selected") return; // User cancelled
+        throw new Error(data.error || "Failed to scan project");
       }
-    } catch (e: any) {
-      setImportError(e.message || "Failed to connect to scanner");
-    } finally {
-      setImportScanning(false);
-    }
-  };
 
-  const handleImportAccept = () => {
-    if (!importResult) return;
-    addProject({
-      name: importResult.name,
-      description: importResult.description || "Imported local project",
-      folderPath: importResult.folderPath,
-      status: "active",
-      tags: importResult.tags || [],
-      githubUrl: importResult.githubUrl || undefined,
-    });
-    setIsImportModalOpen(false);
-    setImportResult(null);
-    setImportPath("");
-  };
-
-  const handleImportEditFirst = () => {
-    if (!importResult) return;
-    setFormData({
-      name: importResult.name,
-      description: importResult.description,
-      folderPath: importResult.folderPath,
-      status: "green"
-    });
-    setIsImportModalOpen(false);
-    setImportResult(null);
-    setImportPath("");
-    setIsAddDialogOpen(true);
-  };
-
-  const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
-  const [linkPath, setLinkPath] = useState("");
-  const [linkScanning, setLinkScanning] = useState(false);
-
-  const handleLinkFolder = async () => {
-    if (!linkPath.trim() || !selectedProject) return;
-    setLinkScanning(true);
-    try {
-      const res = await fetch("/api/machine/scan-project", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ path: linkPath.trim() })
-      });
-      if (!res.ok) throw new Error("Failed to scan project");
-      const data = await res.json();
       const newTags = data.tags || [];
       
-      updateProject(selectedProject.id, {
-        folderPath: data.folderPath || linkPath.trim(),
-        tags: newTags
-      });
-      setSelectedProject({ ...selectedProject, folderPath: data.folderPath || linkPath.trim(), tags: newTags });
-      setIsLinkModalOpen(false);
-      setLinkPath("");
+      if (action === "import") {
+        addProject({
+          name: data.name,
+          description: data.description || "Imported local project",
+          folderPath: data.folderPath,
+          status: "active",
+          tags: newTags,
+          githubUrl: data.githubUrl || undefined,
+        });
+      } else if (action === "link" && selectedProject) {
+        updateProject(selectedProject.id, {
+          folderPath: data.folderPath,
+          tags: newTags
+        });
+        setSelectedProject({ ...selectedProject, folderPath: data.folderPath, tags: newTags });
+      }
     } catch (e: any) {
-      alert(`Failed to link: ${e.message}`);
+      alert(`Failed to ${action}: ${e.message}`);
     } finally {
-      setLinkScanning(false);
+      setIsPickingFolder(false);
     }
   };
 
@@ -494,13 +443,14 @@ export function ProjectsWidget() {
               <>
               <div className="px-2 pt-2 pb-1">
                 <Button 
-                  onClick={() => setIsImportModalOpen(true)}
+                  onClick={() => handlePickFolder("import")}
+                  disabled={isPickingFolder}
                   className="w-full bg-white/5 hover:bg-white/10 text-foreground border border-white/10 border-dashed py-5 flex items-center justify-center gap-2 transition-all duration-300 group"
                 >
                   <div className="w-6 h-6 rounded bg-primary/20 text-primary flex items-center justify-center group-hover:scale-110 transition-transform">
                     <Plus className="w-4 h-4" />
                   </div>
-                  <span className="font-semibold text-sm">Import Local Project</span>
+                  <span className="font-semibold text-sm">{isPickingFolder ? "Opening Picker..." : "Import Local Project"}</span>
                 </Button>
               </div>
               {projects.filter(p => !p.githubUrl && p.status !== "archived").filter(p => {
@@ -614,10 +564,11 @@ export function ProjectsWidget() {
                   <Button 
                     size="sm"
                     variant="outline"
-                    onClick={() => setIsLinkModalOpen(true)}
+                    onClick={() => handlePickFolder("link")}
+                    disabled={isPickingFolder}
                     className="h-7 text-[10px] bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 w-full flex items-center justify-center gap-1.5"
                   >
-                    <Folder className="w-3.5 h-3.5" /> Link Local Folder
+                    <Folder className="w-3.5 h-3.5" /> {isPickingFolder ? "Linking..." : "Link Local Folder"}
                   </Button>
                 </div>
               )}

@@ -180,15 +180,13 @@ app.post('/restart', (req, res) => {
 });
 
 // POST /scan-project
-app.post('/scan-project', async (req, res) => {
-  const targetPath = req.body.path;
-  if (!targetPath) return res.status(400).json({ error: 'Missing path' });
 
+async function scanDirectory(targetPath) {
   try {
     const stat = fs.statSync(targetPath);
-    if (!stat.isDirectory()) return res.status(400).json({ error: 'Path is not a directory' });
+    if (!stat.isDirectory()) throw new Error('Path is not a directory');
   } catch (err) {
-    return res.status(400).json({ error: 'Invalid path' });
+    throw new Error('Invalid path');
   }
 
   const result = {
@@ -226,6 +224,14 @@ app.post('/scan-project', async (req, res) => {
     } catch(e) {}
   }
 
+  // Language/Tech detection for generic projects
+  if (fs.existsSync(path.join(targetPath, 'requirements.txt')) || fs.existsSync(path.join(targetPath, 'main.py'))) result.tags.push('Python');
+  if (fs.existsSync(path.join(targetPath, 'pom.xml')) || fs.existsSync(path.join(targetPath, 'build.gradle'))) result.tags.push('Java');
+  if (fs.existsSync(path.join(targetPath, 'go.mod'))) result.tags.push('Go');
+  if (fs.existsSync(path.join(targetPath, 'Cargo.toml'))) result.tags.push('Rust');
+  if (fs.existsSync(path.join(targetPath, 'composer.json'))) result.tags.push('PHP');
+  if (fs.existsSync(path.join(targetPath, 'docker-compose.yml')) || fs.existsSync(path.join(targetPath, 'Dockerfile'))) result.tags.push('Docker');
+
   if (!result.description) {
     const readmePath = path.join(targetPath, 'README.md');
     if (fs.existsSync(readmePath)) {
@@ -261,8 +267,43 @@ app.post('/scan-project', async (req, res) => {
   }
 
   result.tags = [...new Set(result.tags)];
-  res.json(result);
+  return result;
+}
+
+app.post('/scan-project', async (req, res) => {
+  const targetPath = req.body.path;
+  if (!targetPath) return res.status(400).json({ error: 'Missing path' });
+  try {
+    const data = await scanDirectory(targetPath);
+    res.json(data);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
+
+app.post('/pick-and-scan-folder', async (req, res) => {
+  const isWin = os.platform() === 'win32';
+  if (!isWin) return res.status(400).json({ error: 'Folder picker only supported on Windows' });
+
+  const psScriptPath = path.join(__dirname, 'picker.ps1');
+  if (!fs.existsSync(psScriptPath)) {
+    return res.status(500).json({ error: 'picker.ps1 not found' });
+  }
+
+  exec(`powershell -ExecutionPolicy Bypass -File "${psScriptPath}"`, async (error, stdout) => {
+    if (error) return res.status(500).json({ error: error.message });
+    const pickedPath = stdout.trim();
+    if (!pickedPath) return res.status(400).json({ error: 'No folder selected' });
+    
+    try {
+      const data = await scanDirectory(pickedPath);
+      res.json(data);
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+});
+
 
 app.listen(PORT, () => {
   console.log(`DevOS Agent running on port ${PORT}`);
