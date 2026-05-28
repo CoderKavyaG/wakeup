@@ -28,6 +28,9 @@ interface LayoutState {
   removeWidget: (id: string) => Promise<void>;
   resetLayout: () => Promise<void>;
   clearLayout: () => Promise<void>;
+  savedLayout: { layouts: { [key: string]: Layout }; widgets: WidgetInstance[] } | null;
+  saveCurrentLayout: () => void;
+  loadSavedLayout: () => void;
 }
 
 const widgetConfigs: { [key in WidgetType]: { minW: number, minH: number, defaultW: number, defaultH: number } } = {
@@ -63,6 +66,8 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
   toggleLock: () => set((state) => ({ isLocked: !state.isLocked })),
   showTips: false,
   toggleTips: () => set((state) => ({ showTips: !state.showTips })),
+  savedLayout: typeof window !== "undefined" ? JSON.parse(localStorage.getItem("devos_saved_layout") || "null") : null,
+
 
   fetchLayout: async () => {
     set({ loading: true, error: null });
@@ -217,6 +222,30 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An error occurred';
       set({ error: errorMessage });
+    }
+  },
+  
+  saveCurrentLayout: () => {
+    const current = { layouts: get().layouts, widgets: get().widgets };
+    if (typeof window !== "undefined") {
+      localStorage.setItem("devos_saved_layout", JSON.stringify(current));
+    }
+    set({ savedLayout: current });
+  },
+
+  loadSavedLayout: async () => {
+    const saved = get().savedLayout;
+    if (saved) {
+      set({ layouts: saved.layouts, widgets: saved.widgets });
+      try {
+        await fetch("/api/layouts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(saved),
+        });
+      } catch (err) {
+        set({ error: err instanceof Error ? err.message : 'An error occurred' });
+      }
     }
   }
 }));
