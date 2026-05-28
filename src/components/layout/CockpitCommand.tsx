@@ -138,7 +138,7 @@ export function CockpitCommand() {
   const { tasks, addTask } = useTaskStore();
   const { notes, addNote } = useNoteStore();
   const { urls } = useUrlStore();
-  const { resetLayout, addWidget } = useLayoutStore();
+  const { resetLayout, addWidget, saveCurrentLayout } = useLayoutStore();
 
   const suggestions = buildSuggestions(projects, tasks);
 
@@ -372,6 +372,14 @@ export function CockpitCommand() {
     if (lower === "reset layout" || lower === "reset layout to default") {
       resetLayout();
       setConfirmation(`✓ Layout reset to default`);
+      setInput("");
+      setTimeout(() => setConfirmation(null), 3000);
+      return true;
+    }
+
+    if (lower === "save layout") {
+      saveCurrentLayout();
+      setConfirmation(`✓ Layout saved successfully`);
       setInput("");
       setTimeout(() => setConfirmation(null), 3000);
       return true;
@@ -691,6 +699,7 @@ export function CockpitCommand() {
                         { prefix: "quicklinks", desc: "Toggle quick links panel" },
                         { prefix: "task:", desc: "Create a task instantly" },
                         { prefix: "note:", desc: "Save a quick note" },
+                        { prefix: "save layout", desc: "Save current grid layout" },
                         { prefix: "reset layout", desc: "Reset workspace to defaults" },
                       ].map((c) => (
                         <div key={c.prefix} className="flex items-center gap-1.5 text-[10px] text-muted-foreground/40">

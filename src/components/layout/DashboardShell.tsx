@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { CockpitCommand } from "./CockpitCommand";
 import { useLayoutStore } from "@/store/useLayoutStore";
 import { useUrlStore } from "@/store/useUrlStore";
@@ -9,9 +9,13 @@ import { Button } from "../ui/button";
 import { QuickLinksWidget } from "../widgets/QuickLinksWidget";
 import { AnimatePresence, motion } from "framer-motion";
 import { SessionBriefing } from "./SessionBriefing";
+import { Download } from "lucide-react";
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
-  const { isLocked, toggleLock, resetLayout, clearLayout, setLayouts } = useLayoutStore();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  const { isLocked, toggleLock, resetLayout, clearLayout, setLayouts, saveCurrentLayout, loadSavedLayout, savedLayout } = useLayoutStore();
   const { isQuickLinksOpen, toggleQuickLinks } = useUrlStore();
 
   // Removed switchProfile logic as per request
@@ -68,6 +72,21 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           </button>
 
           <div className="w-px h-4 bg-white/10 mx-1"></div>
+
+          {/* Layout Restore */}
+          {mounted && savedLayout && (
+            <>
+              <Button
+                onClick={loadSavedLayout}
+                variant="ghost"
+                size="sm"
+                className="h-6 text-[10px] uppercase tracking-wider font-bold px-2.5 rounded hover:bg-white/5 text-muted-foreground flex items-center gap-1.5"
+              >
+                <Download className="w-3 h-3" /> Restore Layout
+              </Button>
+              <div className="w-px h-4 bg-white/10 mx-1"></div>
+            </>
+          )}
 
           {/* Clear */}
           <Button
