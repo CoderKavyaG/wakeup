@@ -857,26 +857,26 @@ export function ProjectsWidget() {
               </Dialog>
 
               <AlertDialog>
-                <AlertDialogTrigger className="w-7 h-7 hover:bg-red-500/10 hover:text-red-500 text-muted-foreground transition-colors rounded-md inline-flex items-center justify-center">
-                  <Trash2 className="w-4 h-4" />
+                <AlertDialogTrigger className="w-7 h-7 hover:bg-green-500/10 hover:text-green-500 text-muted-foreground transition-colors rounded-md inline-flex items-center justify-center" title="Mark issues resolved">
+                  <CheckCircle2 className="w-4 h-4" />
                 </AlertDialogTrigger>
                 <AlertDialogContent className="bg-[#0f0f11] border-white/10 text-foreground">
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Delete Project?</AlertDialogTitle>
+                    <AlertDialogTitle>Mark Issues Resolved?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      This will permanently delete the project from your workspace. This action cannot be undone.
+                      This will mark all issues as resolved and set the project status to completed.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel className="bg-transparent border-white/10 hover:bg-white/5">Cancel</AlertDialogCancel>
                     <AlertDialogAction 
-                      className="bg-red-500 hover:bg-red-600 text-white"
+                      className="bg-green-500 hover:bg-green-600 text-white"
                       onClick={() => {
-                        deleteProject(selectedProject.id);
+                        updateProject(selectedProject.id, { status: "completed", completionPercentage: 100 });
                         setSelectedProject(null);
                       }}
                     >
-                      Delete
+                      Resolve Issues
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>

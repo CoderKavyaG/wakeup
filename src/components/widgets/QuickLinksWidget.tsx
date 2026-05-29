@@ -25,7 +25,7 @@ import { CSS } from "@dnd-kit/utilities";
 
 // Default seeds
 const DEFAULT_LINKS: Omit<ResourceUrl, "id">[] = [
-  { label: "GitHub", url: "https://github.com/coderkavya", category: "github" },
+  { label: "GitHub", url: "https://github.com/coderkavyag", category: "github" },
 ];
 
 interface SortableLinkItemProps {
