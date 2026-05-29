@@ -5,6 +5,7 @@ import { useUrlStore, ResourceUrl } from "@/store/useUrlStore";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Link2, Search, Copy, Loader2, GripVertical, Trash2, Check, Plus, Briefcase, User, MessageSquare, X } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   DndContext,
   closestCenter,
@@ -62,12 +63,18 @@ function SortableLinkItem({ url, onCopy, copiedId, onDelete }: SortableLinkItemP
         <GripVertical className="w-3 h-3" />
       </div>
       
-      <img 
-        src={`https://www.google.com/s2/favicons?domain=${domain}&sz=16`} 
-        alt="favicon" 
-        className="w-3.5 h-3.5 rounded-sm shrink-0"
-        onError={(e) => { e.currentTarget.style.display = 'none'; }}
-      />
+      <button 
+        onClick={(e) => onCopy(e, url.url)}
+        className="w-3.5 h-3.5 rounded-sm shrink-0 overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
+        title="Copy URL"
+      >
+        <img 
+          src={`https://www.google.com/s2/favicons?domain=${domain}&sz=16`} 
+          alt="favicon" 
+          className="w-full h-full"
+          onError={(e) => { e.currentTarget.style.display = 'none'; }}
+        />
+      </button>
       
       <a href={url.url} target="_blank" rel="noopener noreferrer" className="flex-1 text-xs text-foreground/90 hover:text-foreground truncate font-medium min-w-0" title={`${url.label} • ${url.url}`}>
         {url.label}
@@ -113,7 +120,16 @@ export function QuickLinksWidget() {
       };
       seed();
     }
-  }, [urls.length, loading, hasSeeded, addUrl]);
+
+    // Migration for github link
+    if (!loading && urls.length > 0) {
+      const oldGithub = urls.find(u => u.url === "https://github.com/coderkavya");
+      if (oldGithub) {
+        deleteUrl(oldGithub.id);
+        addUrl({ label: "GitHub", url: "https://github.com/coderkavyag", category: "github" });
+      }
+    }
+  }, [urls, loading, hasSeeded, addUrl, deleteUrl]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -295,6 +311,20 @@ export function QuickLinksWidget() {
           </div>
         </form>
       </div>
+
+      {/* Copy Toast */}
+      <AnimatePresence>
+        {copiedId && (
+          <motion.div
+            initial={{ opacity: 0, y: 10, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.9 }}
+            className="absolute bottom-14 left-1/2 -translate-x-1/2 bg-green-500/90 text-white px-3 py-1.5 rounded-full text-[10px] font-bold shadow-lg pointer-events-none z-50 flex items-center gap-1.5"
+          >
+            <Check className="w-3.5 h-3.5" /> Link Copied!
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
