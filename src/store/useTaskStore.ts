@@ -7,6 +7,7 @@ export interface Task {
   completed: boolean;
   priority: "low" | "medium" | "high";
   projectId?: string;
+  createdAt: string;
 }
 
 interface TaskState {
@@ -43,6 +44,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       ...task,
       id: tempId,
       completed: false,
+      createdAt: new Date().toISOString(),
     };
 
     // Optimistic update

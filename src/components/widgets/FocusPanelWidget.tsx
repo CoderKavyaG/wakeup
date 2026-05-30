@@ -27,7 +27,6 @@ export function FocusPanelWidget() {
   const { tasks, addTask, toggleTask, deleteTask } = useTaskStore();
   const { notes, addNote, deleteNote } = useNoteStore();
   // Unified Input State
-  const [inputMode, setInputMode] = useState<"task" | "note">("task");
   const [unifiedInput, setUnifiedInput] = useState("");
   const unifiedInputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -114,51 +113,48 @@ export function FocusPanelWidget() {
         }
       }
 
-      // If it's note mode OR there's a tagged project, we treat it as a note to be classified
-      if (currentTaggedProject || (inputMode === "note" && (e.ctrlKey || e.metaKey))) {
-        e.preventDefault();
-        if (finalInput.trim()) {
-          const content = finalInput.trim();
-          setUnifiedInput("");
-          setShowProjectDropdown(false);
+      // All inputs go through AI layer now
+      if (finalInput.trim()) {
+        const content = finalInput.trim();
+        setUnifiedInput("");
+        setShowProjectDropdown(false);
+        
+        setIsClassifying(true);
+        try {
+          const res = await fetch("/api/ai/classify-note", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: content })
+          });
+          const data = await res.json();
           
-          setIsClassifying(true);
-          try {
-            const res = await fetch("/api/ai/classify-note", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ text: content })
-            });
-            const data = await res.json();
-            
-            // Handle array response from classify-note
-            if (data.items && Array.isArray(data.items)) {
-              for (const item of data.items) {
+          if (data.items && Array.isArray(data.items)) {
+            for (const item of data.items) {
+              if (item.category === "task") {
+                const parsed = parseTaskInput(item.content);
+                addTask({ title: parsed.title, priority: parsed.priority, dueDate: parsed.dueDate, projectId: currentTaggedProject?.id });
+              } else {
                 await addNote(item.content, currentTaggedProject?.id, item.category);
               }
+            }
+          } else {
+            if (data.category === "task") {
+              const parsed = parseTaskInput(content);
+              addTask({ title: parsed.title, priority: parsed.priority, dueDate: parsed.dueDate, projectId: currentTaggedProject?.id });
             } else {
               await addNote(content, currentTaggedProject?.id, data.category || "general note");
             }
-          } catch (e) {
-            addNote(content, currentTaggedProject?.id, "general note");
-          } finally {
-            setIsClassifying(false);
-            setTaggedProject(null);
           }
-        }
-        return;
-      }
-
-      // Normal task/note logic
-      if (inputMode === "task") {
-        e.preventDefault();
-        if (unifiedInput.trim()) {
-          const parsed = parseTaskInput(unifiedInput);
-          addTask({ title: parsed.title, priority: parsed.priority, dueDate: parsed.dueDate });
-          setUnifiedInput("");
-          setShowProjectDropdown(false);
+        } catch (e) {
+          // Fallback to task if error
+          const parsed = parseTaskInput(content);
+          addTask({ title: parsed.title, priority: parsed.priority, dueDate: parsed.dueDate, projectId: currentTaggedProject?.id });
+        } finally {
+          setIsClassifying(false);
+          setTaggedProject(null);
         }
       }
+      return;
     }
   };
 
@@ -232,8 +228,8 @@ export function FocusPanelWidget() {
           value={unifiedInput}
           onChange={handleInputChange}
           onKeyDown={handleUnifiedEnter}
-          placeholder={inputMode === "task" ? "Add a task... (try 'fix bug tomorrow')" : "Brain dump... (Type @ to tag project, Ctrl+Enter to save)"}
-          className="min-h-[60px] max-h-[140px] overflow-y-auto text-sm resize-none bg-[#0f0f11] border-white/10 focus-visible:ring-1 focus-visible:ring-primary/50 p-3 pr-10 custom-scrollbar"
+          placeholder="Type anything... AI will sort into Tasks or Brain Dump (Enter to save)"
+          className="min-h-[60px] max-h-[140px] overflow-y-auto text-sm resize-none bg-[#0f0f11] border-white/10 focus-visible:ring-1 focus-visible:ring-primary/50 p-3 custom-scrollbar"
         />
         
         {isClassifying && (
@@ -271,17 +267,6 @@ export function FocusPanelWidget() {
           </div>
         )}
 
-        <button
-          onClick={() => setInputMode(m => m === "task" ? "note" : "task")}
-          className="absolute top-5 right-6 transition-all flex items-center justify-center w-6 h-6 rounded hover:bg-white/5"
-          title={inputMode === "task" ? "Switch to Note Mode" : "Switch to Task Mode"}
-        >
-          {inputMode === "task" ? (
-            <CheckSquare className="w-4 h-4 text-white/80 drop-shadow-[0_0_2px_rgba(255,255,255,0.8)]" />
-          ) : (
-            <Pencil className="w-4 h-4 text-white/80 drop-shadow-[0_0_2px_rgba(255,255,255,0.8)]" />
-          )}
-        </button>
       </div>
 
       <div className="flex-1 flex flex-col min-h-0 divide-y divide-border/40">
@@ -305,9 +290,12 @@ export function FocusPanelWidget() {
                     onCheckedChange={() => toggleTask(t.id)} 
                     className="mt-0.5 border-muted-foreground/50 data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
                   />
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0 flex flex-col">
                     <span className="text-sm text-foreground/90 leading-tight">{t.title}</span>
-                    {t.dueDate && <span className="ml-2 text-[10px] text-muted-foreground font-mono bg-[#0f0f11] px-1 rounded">{t.dueDate}</span>}
+                    <div className="flex items-center gap-2 mt-1">
+                      {t.createdAt && <span className="text-[9px] text-muted-foreground/60 font-mono">{new Date(t.createdAt).toLocaleDateString()}</span>}
+                      {t.dueDate && <span className="text-[10px] text-muted-foreground font-mono bg-[#0f0f11] px-1 rounded">{t.dueDate}</span>}
+                    </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                     <div className={`w-1.5 h-1.5 rounded-full ${getPriorityColor(t.priority)}`} title={`Priority: ${t.priority}`} />
