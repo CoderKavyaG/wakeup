@@ -9,8 +9,9 @@ import { Badge } from "@/components/ui/badge";
 import { 
   Terminal, Server, FolderCode, Folder, File, Code2, 
   ExternalLink, CheckCircle2, Play, RefreshCw, XCircle,
-  Activity, Cpu, MemoryStick, GitBranch as GitBranchIcon, FileText, ClipboardCopy
+  Activity, Cpu, MemoryStick, GitBranch as GitBranchIcon, FileText, ClipboardCopy, Power
 } from "lucide-react";
+import { useProjectStore } from "@/store/useProjectStore";
 
 interface FileItem {
   name: string;
@@ -59,6 +60,9 @@ export function MachineControlWidget() {
   const [isShort, setIsShort] = useState(false);
   const [isNarrow, setIsNarrow] = useState(false);
   const [isTinyWidth, setIsTinyWidth] = useState(false);
+
+  const { projects } = useProjectStore();
+  const localProjects = projects.filter(p => p.folderPath).slice(0, 3);
 
   // Load saved workspace on mount
   useEffect(() => {
@@ -221,8 +225,26 @@ export function MachineControlWidget() {
     localStorage.setItem("DEVOS_LAUNCHERS", JSON.stringify(launchers));
   };
 
+  const handleStartAgent = async () => {
+    try {
+      await fetch("/api/machine/start-agent", { method: "POST" });
+      setTimeout(fetchPorts, 2000);
+    } catch (e) {}
+  };
+
+  const handleKillPort = async (port: number) => {
+    try {
+      await fetch("/api/machine/kill-port", { 
+        method: "POST", 
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ port }) 
+      });
+      setTimeout(fetchPorts, 1000);
+    } catch (e) {}
+  };
+
   return (
-    <div className="flex flex-col h-full text-foreground bg-[#0f0f11] rounded-xl overflow-hidden divide-y divide-border/40">
+    <div className={`flex flex-col h-full text-foreground bg-[#0f0f11] rounded-xl overflow-hidden divide-y divide-border/40 transition-all duration-1000 ${agentOffline ? "shadow-[0_0_15px_rgba(239,68,68,0.15)] border border-red-500/20" : "shadow-[0_0_15px_rgba(34,197,94,0.08)] border border-green-500/20"}`}>
       
       {/* ── HEADER ── */}
       <div className="px-4 py-3 shrink-0 flex items-center justify-between bg-[#0f0f11]">
@@ -231,11 +253,11 @@ export function MachineControlWidget() {
           <h3 className="text-sm font-semibold tracking-tight">Machine Control</h3>
         </div>
         {agentOffline ? (
-          <Badge variant="outline" className="text-[9px] uppercase border-red-500/20 text-red-400 bg-red-500/10">
-            Agent Offline
-          </Badge>
+          <button onClick={handleStartAgent} className="text-[9px] uppercase border border-red-500/30 text-red-400 bg-red-500/10 hover:bg-red-500/20 px-2 py-0.5 rounded-full flex items-center gap-1.5 transition-colors font-bold shadow-[0_0_10px_rgba(239,68,68,0.2)]">
+            <Power className="w-3 h-3" /> Start Agent
+          </button>
         ) : (
-          <Badge variant="outline" className="text-[9px] uppercase border-green-500/20 text-green-500 bg-green-500/10 flex items-center gap-1.5">
+          <Badge variant="outline" className="text-[9px] uppercase border-green-500/20 text-green-500 bg-green-500/10 flex items-center gap-1.5 shadow-[0_0_10px_rgba(34,197,94,0.1)]">
             <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
             Agent Connected
           </Badge>
@@ -325,6 +347,20 @@ export function MachineControlWidget() {
                   No files found
                 </div>
               )}
+              
+              {!agentOffline && localProjects.length > 0 && (
+                <div className="mt-4 border-t border-white/5 pt-3">
+                  <div className="text-[9px] font-bold uppercase text-muted-foreground tracking-wider mb-2">Recent Local Scans</div>
+                  <div className="space-y-1">
+                    {localProjects.map(p => (
+                      <div key={p.id} className="text-xs text-foreground/80 flex items-center justify-between p-1.5 bg-black/20 rounded hover:bg-white/5 cursor-pointer" onClick={() => { setWorkspacePath(p.folderPath!); handleSaveWorkspace(); }}>
+                        <span className="truncate">{p.name}</span>
+                        <Badge variant="outline" className="text-[8px] bg-green-500/10 text-green-500 border-0">Scanned</Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </ScrollArea>
           )}
         </div>
@@ -359,11 +395,16 @@ export function MachineControlWidget() {
                             </Badge>
                           )}
                         </div>
-                        {isHttp && !isCollapsed && (
-                          <Button variant="ghost" size="icon" className="w-6 h-6 shrink-0 hover:bg-primary/20 hover:text-primary rounded-md" onClick={() => window.open(`http://localhost:${port}`, '_blank')}>
-                            <ExternalLink className="w-3 h-3" />
+                        <div className="flex items-center gap-1">
+                          {isHttp && !isCollapsed && (
+                            <Button variant="ghost" size="icon" className="w-6 h-6 shrink-0 hover:bg-primary/20 hover:text-primary rounded-md" onClick={() => window.open(`http://localhost:${port}`, '_blank')}>
+                              <ExternalLink className="w-3 h-3" />
+                            </Button>
+                          )}
+                          <Button variant="ghost" size="icon" className="w-6 h-6 shrink-0 hover:bg-red-500/20 hover:text-red-500 rounded-md" onClick={() => handleKillPort(port)} title="Kill Process">
+                            <XCircle className="w-3 h-3" />
                           </Button>
-                        )}
+                        </div>
                       </div>
                     );
                   })

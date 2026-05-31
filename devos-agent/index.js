@@ -46,6 +46,34 @@ app.get('/ports', (req, res) => {
   }
 });
 
+// POST /kill-port
+app.post('/kill-port', (req, res) => {
+  const { port } = req.body;
+  if (!port) return res.status(400).json({ error: 'Missing port' });
+  
+  const isWin = os.platform() === 'win32';
+  
+  if (isWin) {
+    exec(`netstat -ano | findstr LISTENING | findstr :${port}`, (error, stdout) => {
+      if (!stdout) return res.json({ success: true });
+      const lines = stdout.split('\n').filter(l => l.trim());
+      const pids = new Set();
+      lines.forEach(l => {
+        const parts = l.trim().split(/\s+/);
+        if (parts.length >= 5) pids.add(parts[parts.length - 1]);
+      });
+      pids.forEach(pid => {
+        if (pid !== '0') exec(`taskkill /F /PID ${pid}`);
+      });
+      setTimeout(() => res.json({ success: true }), 500);
+    });
+  } else {
+    exec(`lsof -t -i:${port} | xargs kill -9`, (error) => {
+      res.json({ success: true });
+    });
+  }
+});
+
 // GET /files?path=X
 app.get('/files', (req, res) => {
   const targetPath = req.query.path;
