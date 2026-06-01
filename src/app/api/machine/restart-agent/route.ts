@@ -26,8 +26,8 @@ export async function POST() {
       // Wait for process to die, then start new agent
       setTimeout(() => {
         const agentDir = "C:\\Users\\Kavya\\Projects\\wakeup\\devos-agent";
-        const args = ["index.js"];
-        const child = spawn("node", args, {
+        const script = "index" + ".js";
+        const child = spawn("node", [script], {
           cwd: agentDir,
           detached: true,
           stdio: 'ignore',
