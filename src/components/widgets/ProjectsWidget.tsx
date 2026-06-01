@@ -69,6 +69,15 @@ export function ProjectsWidget() {
       }
 
       const newTags = data.tags || [];
+
+      // Auto-register workspace in devos-agent
+      try {
+        await fetch("/api/machine/register-workspace", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path: data.folderPath })
+        });
+      } catch(e) {}
       
       if (action === "import") {
         addProject({
@@ -1054,27 +1063,27 @@ export function ProjectsWidget() {
                 </div>
 
                 {/* Always-visible Add Link Form */}
-                <div className="flex flex-col gap-2 p-3 rounded-lg bg-black/20 border border-white/5 relative overflow-hidden group">
-                  <div className="flex items-center gap-2 relative z-10">
+                <div className="p-3 rounded-xl bg-black/40 border border-white/5 relative overflow-hidden group shadow-inner">
+                  <div className="flex items-center gap-3 relative z-10">
                     <Input 
                       value={newLinkLabel} 
                       onChange={e => setNewLinkLabel(e.target.value)} 
                       placeholder="Label (e.g. Vercel)" 
-                      className="h-8 text-xs bg-transparent border-white/10 w-[30%]" 
+                      className="h-9 text-xs bg-black/40 border-white/10 rounded-lg focus-visible:ring-primary/30 w-[120px]" 
                     />
                     <Input 
                       value={newLinkUrl} 
                       onChange={e => setNewLinkUrl(e.target.value)} 
                       onPaste={handleUrlPaste}
                       placeholder="URL (paste to auto-detect)" 
-                      className="h-8 text-xs bg-transparent border-white/10 flex-1"
+                      className="h-9 text-xs bg-black/40 border-white/10 rounded-lg focus-visible:ring-primary/30 flex-1 min-w-0"
                       onKeyDown={e => e.key === 'Enter' && submitNewLink()}
                     />
                     <Button 
                       size="sm" 
                       onClick={submitNewLink} 
                       disabled={creatingLink || !newLinkUrl || !newLinkLabel}
-                      className={`h-8 px-4 text-xs transition-colors shrink-0 ${justAdded ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-primary text-primary-foreground'}`}
+                      className={`h-9 px-5 text-xs font-semibold tracking-wide rounded-lg transition-all shrink-0 ${justAdded ? 'bg-green-500 hover:bg-green-600 text-white shadow-[0_0_15px_rgba(34,197,94,0.3)]' : 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-md'}`}
                     >
                       {creatingLink ? "..." : justAdded ? "Added!" : "Add Link"}
                     </Button>

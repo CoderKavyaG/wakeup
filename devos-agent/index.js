@@ -345,6 +345,98 @@ app.post('/pick-and-scan-folder', async (req, res) => {
   });
 });
 
+// GET /git-status-all
+app.get('/git-status-all', async (req, res) => {
+  const workspacesPath = path.join(__dirname, 'workspaces.json');
+  let workspaces = [];
+  if (fs.existsSync(workspacesPath)) {
+    try {
+      workspaces = JSON.parse(fs.readFileSync(workspacesPath, 'utf8'));
+    } catch(e) {}
+  }
+
+  const results = await Promise.all(workspaces.map(async (targetPath) => {
+    const name = path.basename(targetPath);
+    const execPromise = (cmd) => new Promise(resolve => exec(cmd, { cwd: targetPath }, (err, stdout) => resolve(err ? '' : stdout.trim())));
+    
+    let branch = '', uncommitted = 0, ahead = 0, lastCommit = '';
+    
+    if (fs.existsSync(path.join(targetPath, '.git'))) {
+      branch = await execPromise('git branch --show-current');
+      
+      const statusOutput = await execPromise('git status --porcelain');
+      if (statusOutput) {
+        uncommitted = statusOutput.split('\n').filter(l => l.trim()).length;
+      }
+      
+      const aheadOutput = await execPromise('git log origin/HEAD..HEAD --oneline 2>/dev/null');
+      if (aheadOutput) {
+        ahead = aheadOutput.split('\n').filter(l => l.trim()).length;
+      }
+      
+      lastCommit = await execPromise('git log -1 --pretty=%s');
+    }
+    
+    return { path: targetPath, name, branch, uncommitted, ahead, lastCommit };
+  }));
+
+  res.json(results);
+});
+
+// GET /npm-scripts
+app.get('/npm-scripts', (req, res) => {
+  const targetPath = req.query.path;
+  if (!targetPath) return res.status(400).json({ error: 'Missing path' });
+
+  const pkgPath = path.join(targetPath, 'package.json');
+  if (fs.existsSync(pkgPath)) {
+    try {
+      const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+      return res.json({ scripts: pkg.scripts || {} });
+    } catch(e) {
+      return res.status(500).json({ error: 'Failed to parse package.json' });
+    }
+  }
+  res.json({ scripts: {} });
+});
+
+// POST /run-npm-script
+app.post('/run-npm-script', (req, res) => {
+  const { path: targetPath, script } = req.body;
+  if (!targetPath || !script) return res.status(400).json({ error: 'Missing path or script' });
+
+  const isWin = os.platform() === 'win32';
+  // Use originalExec because we WANT to pop up the terminal window here!
+  const cmd = isWin 
+    ? `start cmd /k "cd /d ${targetPath} && npm run ${script}"`
+    : `osascript -e 'tell app "Terminal" to do script "cd ${targetPath} && npm run ${script}"'`;
+
+  originalExec(cmd, (error) => {
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ success: true });
+  });
+});
+
+// POST /register-workspace
+app.post('/register-workspace', (req, res) => {
+  const targetPath = req.body.path;
+  if (!targetPath) return res.status(400).json({ error: 'Missing path' });
+
+  const workspacesPath = path.join(__dirname, 'workspaces.json');
+  let workspaces = [];
+  if (fs.existsSync(workspacesPath)) {
+    try {
+      workspaces = JSON.parse(fs.readFileSync(workspacesPath, 'utf8'));
+    } catch(e) {}
+  }
+
+  if (!workspaces.includes(targetPath)) {
+    workspaces.push(targetPath);
+    fs.writeFileSync(workspacesPath, JSON.stringify(workspaces, null, 2));
+  }
+
+  res.json({ success: true });
+});
 
 app.listen(PORT, () => {
   console.log(`DevOS Agent running on port ${PORT}`);

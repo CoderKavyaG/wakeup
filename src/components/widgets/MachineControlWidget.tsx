@@ -53,6 +53,10 @@ export function MachineControlWidget() {
   const [stats, setStats] = useState({ cpu: 0, ram: 0 });
   const [gitInfo, setGitInfo] = useState({ branch: "", commit: "" });
 
+  const [gitRepos, setGitRepos] = useState<any[]>([]);
+  const [gitReposLoading, setGitReposLoading] = useState(false);
+  const [npmScripts, setNpmScripts] = useState<Record<string, string>>({});
+
   // Responsive Layout State
   const containerRef = React.useRef<HTMLDivElement>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -97,6 +101,19 @@ export function MachineControlWidget() {
     };
   }, []);
 
+  const fetchGitRepos = async () => {
+    setGitReposLoading(true);
+    try {
+      const res = await fetch("/api/machine/git-status-all");
+      if (res.ok) setGitRepos(await res.json());
+    } catch {}
+    setGitReposLoading(false);
+  };
+
+  useEffect(() => {
+    fetchGitRepos();
+  }, []);
+
   // Fetch Git info when workspacePath changes
   useEffect(() => {
     if (!workspacePath) return;
@@ -107,6 +124,17 @@ export function MachineControlWidget() {
       } catch {}
     };
     fetchGit();
+
+    const fetchNpmScripts = async () => {
+      try {
+        const res = await fetch(`/api/machine/npm-scripts?path=${encodeURIComponent(workspacePath)}`);
+        if (res.ok) {
+          const data = await res.json();
+          setNpmScripts(data.scripts || {});
+        }
+      } catch {}
+    };
+    fetchNpmScripts();
   }, [workspacePath]);
 
   // ResizeObserver for Container Queries
@@ -363,6 +391,34 @@ export function MachineControlWidget() {
                   </div>
                 </div>
               )}
+
+              {!agentOffline && workspacePath && Object.keys(npmScripts).length > 0 && (
+                <div className="mt-4 border-t border-white/5 pt-3">
+                  <div className="text-[9px] font-bold uppercase text-muted-foreground tracking-wider mb-2">NPM Scripts</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {Object.keys(npmScripts).map(script => (
+                      <Button 
+                        key={script}
+                        variant="outline" 
+                        size="sm"
+                        className={`h-6 text-[10px] px-2 border-white/10 ${script === 'dev' || script === 'start' ? 'bg-primary text-primary-foreground font-bold hover:bg-primary/90' : 'bg-black/20 hover:bg-white/10 text-foreground'}`}
+                        onClick={async () => {
+                          const originalLaunchers = customLaunchers;
+                          try {
+                            await fetch("/api/machine/run-npm-script", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ path: workspacePath, script })
+                            });
+                          } catch(e) {}
+                        }}
+                      >
+                        <Terminal className="w-3 h-3 mr-1" /> {script}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </ScrollArea>
           )}
         </div>
@@ -473,6 +529,59 @@ export function MachineControlWidget() {
               </div>
             )}
           </div>
+          )}
+
+          {/* SECTION 4: GIT REPOS */}
+          {!isShort && (
+            <div className="shrink-0 p-3 bg-[#0f0f11] border-t border-white/10">
+              <div className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider mb-2 flex items-center justify-between">
+                <span className="flex items-center gap-1.5"><GitBranchIcon className="w-3.5 h-3.5" /> Repos</span>
+                <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-muted-foreground" onClick={fetchGitRepos} disabled={gitReposLoading || agentOffline}>
+                  <RefreshCw className={`w-3 h-3 ${gitReposLoading ? 'animate-spin' : ''}`} />
+                </Button>
+              </div>
+              
+              <div className="space-y-1.5 max-h-[150px] overflow-y-auto custom-scrollbar pr-1">
+                {gitRepos.length > 0 ? (
+                  gitRepos.map((repo, i) => (
+                    <div key={i} className="flex flex-col gap-1 p-2 rounded-lg border border-white/10 bg-black/20 hover:border-primary/30 transition-colors cursor-pointer" onClick={() => { setWorkspacePath(repo.path); handleSaveWorkspace(); }}>
+                      <div className="flex items-center justify-between overflow-hidden">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <Folder className="w-3 h-3 text-blue-400 shrink-0" />
+                          <span className="text-xs font-bold text-foreground truncate">{repo.name}</span>
+                          {repo.branch && (
+                            <Badge variant="outline" className="text-[8px] uppercase border-white/10 text-muted-foreground font-mono px-1.5 py-0 h-4 shrink-0">
+                              {repo.branch}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {repo.uncommitted > 0 && (
+                            <div className="flex items-center gap-1 text-[9px] text-amber-400 font-mono" title={`${repo.uncommitted} uncommitted`}>
+                              <div className="w-1.5 h-1.5 rounded-full bg-amber-400" /> {repo.uncommitted}
+                            </div>
+                          )}
+                          {repo.ahead > 0 && (
+                            <div className="flex items-center gap-1 text-[9px] text-blue-400 font-mono" title={`${repo.ahead} ahead`}>
+                              <div className="w-1.5 h-1.5 rounded-full bg-blue-400" /> {repo.ahead}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      {repo.lastCommit && (
+                        <div className="text-[9px] font-mono text-muted-foreground truncate opacity-70">
+                          {repo.lastCommit}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center text-muted-foreground/50 text-[10px] py-4 uppercase tracking-widest">
+                    No repos tracked
+                  </div>
+                )}
+              </div>
+            </div>
           )}
 
         </div>
