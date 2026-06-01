@@ -441,7 +441,7 @@ export function CockpitCommand() {
   const createTaskFromAnswer = () => {
     if (!streamedAnswer) return;
     const firstLine = streamedAnswer.split("\n")[0].replace(/^[-•*]\s*/, "").substring(0, 100);
-    addTask({ title: firstLine, priority: "medium" });
+    addTask({ title: firstLine, priority: "medium", createdAt: new Date().toISOString() });
     setConfirmation(`✓ Task created from answer`);
     setTimeout(() => setConfirmation(null), 3000);
   };
