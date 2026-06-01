@@ -350,7 +350,12 @@ export function CockpitCommand() {
     if (lower.startsWith("task:")) {
       const title = val.slice(5).trim();
       if (title) {
-        addTask({ title, priority: "medium" });
+        addTask({ 
+          title, 
+          priority: "medium", 
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
         setConfirmation(`✓ Task created: "${title}"`);
         setInput("");
         setTimeout(() => setConfirmation(null), 3000);
