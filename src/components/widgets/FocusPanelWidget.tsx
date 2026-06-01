@@ -235,31 +235,34 @@ export function FocusPanelWidget() {
       
       {/* ── UNIFIED INPUT SECTION ── */}
       <div className="px-4 py-3 shrink-0 relative bg-[#0f0f11]">
-        <Textarea 
-          ref={unifiedInputRef as any}
-          value={unifiedInput}
-          onChange={handleInputChange}
-          onKeyDown={handleUnifiedEnter}
-          placeholder="Type anything... AI will sort into Tasks or Brain Dump (Ctrl+Enter to save)"
-          className="min-h-[60px] max-h-[140px] overflow-y-auto text-sm resize-none bg-[#0f0f11] border-white/10 focus-visible:ring-1 focus-visible:ring-primary/50 p-3 custom-scrollbar scrollbar-hide"
-        />
-        
-        {isClassifying && (
-          <div className="absolute bottom-2 right-12 flex items-center text-[10px] text-primary gap-1">
-            <Loader2 className="w-3 h-3 animate-spin" /> Classifying...
+        <div className="relative flex flex-col bg-[#161619] border border-white/5 rounded-xl focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/50 transition-all shadow-sm">
+          <Textarea 
+            ref={unifiedInputRef as any}
+            value={unifiedInput}
+            onChange={handleInputChange}
+            onKeyDown={handleUnifiedEnter}
+            placeholder="Type anything... AI will sort into Tasks or Brain Dump"
+            className="min-h-[60px] max-h-[140px] overflow-y-auto text-sm resize-none bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 p-3 pb-10 custom-scrollbar scrollbar-hide"
+          />
+          
+          <div className="absolute bottom-2 right-2 flex items-center gap-2">
+            {isClassifying && (
+              <div className="flex items-center text-[10px] text-primary gap-1 mr-1">
+                <Loader2 className="w-3 h-3 animate-spin" /> Classifying...
+              </div>
+            )}
+            <Button 
+              size="icon"
+              variant="secondary"
+              className="w-7 h-7 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:bg-white/5 disabled:text-white/40 transition-all"
+              onClick={handleSubmit}
+              disabled={!unifiedInput.trim() || isClassifying}
+              title="Submit to AI (Ctrl+Enter)"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </Button>
           </div>
-        )}
-
-        <Button 
-          size="icon"
-          variant="secondary"
-          className="absolute bottom-3 right-5 w-7 h-7 bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-          onClick={handleSubmit}
-          disabled={!unifiedInput.trim() || isClassifying}
-          title="Submit to AI"
-        >
-          <ChevronRight className="w-4 h-4" />
-        </Button>
+        </div>
 
         {showProjectDropdown && (
           <div className="absolute top-full left-4 right-4 mt-1 bg-[#1a1a1d] border border-white/10 rounded-lg shadow-xl z-50 max-h-40 overflow-y-auto">

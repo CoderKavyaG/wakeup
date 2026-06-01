@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { exec } from "child_process";
+import { exec, spawn } from "child_process";
 import path from "path";
 
 export async function POST() {
@@ -25,8 +25,13 @@ export async function POST() {
       
       // Wait for process to die, then start new agent
       setTimeout(() => {
-        const agentDir = path.join(process.cwd(), "devos-agent");
-        exec("node index.js", { cwd: agentDir });
+        const agentDir = "C:\\Users\\Kavya\\Projects\\wakeup\\devos-agent";
+        const child = spawn("node", ["index.js"], {
+          cwd: agentDir,
+          detached: true,
+          stdio: 'ignore'
+        });
+        child.unref();
       }, 1000);
     });
 

@@ -1,18 +1,19 @@
 import { NextResponse } from "next/server";
-import { exec } from "child_process";
+import { spawn } from "child_process";
 import path from "path";
 
 export async function POST() {
   try {
-    // The devos-agent folder is in the project root
-    const agentDir = path.join(process.cwd(), "devos-agent");
+    const agentDir = "C:\\Users\\Kavya\\Projects\\wakeup\\devos-agent";
     
     // Spawn the agent in the background detached so it persists
-    const child = exec("node index.js", { cwd: agentDir }, (error) => {
-      if (error) {
-        console.error("Failed to start agent:", error);
-      }
+    const child = spawn("node", ["index.js"], {
+      cwd: agentDir,
+      detached: true,
+      stdio: 'ignore'
     });
+    
+    child.unref();
 
     return NextResponse.json({ success: true, message: "Agent started" });
   } catch (error) {
