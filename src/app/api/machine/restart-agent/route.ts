@@ -8,26 +8,20 @@ export async function POST() {
     // Attempt to kill existing agent gracefully if endpoint exists
     await fetch("http://127.0.0.1:3131/kill", { method: "POST" }).catch(() => {});
     
-    // Also try to forcefully kill process on port 3131 on Windows
-    exec("netstat -ano | findstr :3131", (error, stdout) => {
-      if (stdout) {
-        const lines = stdout.split('\n');
-        lines.forEach(l => {
-          if (l.includes('LISTENING') && l.includes(':3131')) {
-            const parts = l.trim().split(/\s+/);
-            if (parts.length >= 5) {
-              const pid = parts[parts.length - 1];
-              if (pid !== '0') exec(`taskkill /F /PID ${pid}`);
-            }
-          }
-        });
-      }
+    // 1. Kill any process listening on 3131 (the agent)
+    const isWin = os.platform() === 'win32';
+    const killCmd = isWin 
+      ? `FOR /F "tokens=5" %a in ('netstat -aon ^| findstr :3131') do taskkill /F /PID %a`
+      : `lsof -ti:3131 | xargs kill -9`;
+      
+    exec(killCmd, (error) => {
+      // It's okay if error occurs (port might not be in use yet)
       
       // Wait for process to die, then start new agent
       setTimeout(() => {
-        const agentDir = "C:\\Users\\Kavya\\Projects\\wakeup\\devos-agent";
-        const script = "index" + ".js";
-        const child = spawn("node", [script], {
+        const agentDir = path.join(process.cwd(), "devos-agent");
+        const scriptPath = path.join(agentDir, "index.js");
+        const child = spawn("node", [scriptPath], {
           cwd: agentDir,
           detached: true,
           stdio: 'ignore',

@@ -4,11 +4,11 @@ import path from "path";
 
 export async function POST() {
   try {
-    const agentDir = "C:\\Users\\Kavya\\Projects\\wakeup\\devos-agent";
+    const agentDir = path.join(process.cwd(), "devos-agent");
+    const scriptPath = path.join(agentDir, "index.js");
     
     // Spawn the agent in the background detached so it persists
-    const script = "index" + ".js";
-    const child = spawn("node", [script], {
+    const child = spawn("node", [scriptPath], {
       cwd: agentDir,
       detached: true,
       stdio: 'ignore',
