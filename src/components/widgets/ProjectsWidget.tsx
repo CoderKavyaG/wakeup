@@ -963,26 +963,23 @@ export function ProjectsWidget() {
                 </div>
 
                 {/* Recent Commits Feed */}
-                <div className="pt-4 border-t border-white/10 space-y-4">
-                  <div className="flex items-center justify-between pb-2">
-                    <h3 className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest px-1">Recent Commits</h3>
-                  </div>
+                {selectedProject.githubUrl && (
+                  <div className="pt-4 border-t border-white/10 space-y-4">
+                    <div className="flex items-center justify-between pb-2">
+                      <h3 className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest px-1">Recent Commits</h3>
+                    </div>
 
-                  <div className="px-1">
-                    {!selectedProject.githubUrl ? (
-                      <div className="text-center py-4">
-                        <span className="text-xs text-muted-foreground">No commits yet — this is a local workspace</span>
-                      </div>
-                    ) : commitsLoading && projectCommits.length === 0 ? (
-                      <div className="text-center py-4">
-                        <span className="text-xs text-muted-foreground animate-pulse">Loading commits...</span>
-                      </div>
-                    ) : projectCommits.length === 0 ? (
-                      <div className="text-center py-4">
-                        <span className="text-xs text-muted-foreground">No recent commits found.</span>
-                      </div>
-                    ) : (
-                      <div className="space-y-3 relative before:absolute before:inset-0 before:ml-2 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-white/10 before:to-transparent">
+                    <div className="px-1">
+                      {commitsLoading && projectCommits.length === 0 ? (
+                        <div className="text-center py-4">
+                          <span className="text-xs text-muted-foreground animate-pulse">Loading commits...</span>
+                        </div>
+                      ) : projectCommits.length === 0 ? (
+                        <div className="text-center py-4">
+                          <span className="text-xs text-muted-foreground">No recent commits found.</span>
+                        </div>
+                      ) : (
+                        <div className="space-y-3 relative before:absolute before:inset-0 before:ml-2 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-white/10 before:to-transparent">
                         {projectCommits.slice(0, commitLimit).map((commit: any) => {
                           const commitAgo = Math.floor((Date.now() - new Date(commit.date).getTime()) / (1000 * 60 * 60));
                           const timeAgoString = commitAgo < 24 ? `${commitAgo}h ago` : `${Math.floor(commitAgo / 24)}d ago`;
@@ -1027,6 +1024,7 @@ export function ProjectsWidget() {
                     )}
                   </div>
                 </div>
+                )}
               </div>
             )}
 
