@@ -316,13 +316,16 @@ export function MachineControlWidget() {
                 )}
               </div>
             ) : (
-              <div className="flex flex-col gap-2">
-                <div className="text-xs font-mono text-muted-foreground break-all bg-black/20 p-1.5 rounded border border-white/10">
-                  {workspacePath}
+              <div className="flex flex-col gap-2 group relative">
+                <div className="flex items-center justify-between bg-black/20 p-2 rounded-md border border-white/5 group-hover:border-white/10 transition-colors">
+                  <div className="flex flex-col min-w-0 mr-2">
+                    <span className="text-sm font-bold text-foreground truncate">{workspacePath.split('\\').pop() || workspacePath.split('/').pop() || "Workspace"}</span>
+                    <span className="text-[9px] text-muted-foreground font-mono truncate" title={workspacePath}>{workspacePath}</span>
+                  </div>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-primary hover:bg-primary/20 rounded" onClick={handleOpenVSCode} disabled={agentOffline} title="Open in VS Code">
+                    <Code2 className="w-4 h-4" />
+                  </Button>
                 </div>
-                <Button size="sm" variant="secondary" className="h-7 text-xs w-full bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20" onClick={handleOpenVSCode} disabled={agentOffline}>
-                  <Code2 className="w-3.5 h-3.5 mr-1.5" /> Open in VS Code
-                </Button>
               </div>
             )}
           </div>

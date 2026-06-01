@@ -54,13 +54,15 @@ app.post('/kill-port', (req, res) => {
   const isWin = os.platform() === 'win32';
   
   if (isWin) {
-    exec(`netstat -ano | findstr LISTENING | findstr :${port}`, (error, stdout) => {
+    exec('netstat -ano', (error, stdout) => {
       if (!stdout) return res.json({ success: true });
-      const lines = stdout.split('\n').filter(l => l.trim());
+      const lines = stdout.split('\n');
       const pids = new Set();
       lines.forEach(l => {
-        const parts = l.trim().split(/\s+/);
-        if (parts.length >= 5) pids.add(parts[parts.length - 1]);
+        if (l.includes('LISTENING') && l.includes(`:${port}`)) {
+          const parts = l.trim().split(/\s+/);
+          if (parts.length >= 5) pids.add(parts[parts.length - 1]);
+        }
       });
       pids.forEach(pid => {
         if (pid !== '0') exec(`taskkill /F /PID ${pid}`);

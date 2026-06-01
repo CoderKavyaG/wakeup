@@ -84,7 +84,7 @@ export function FocusPanelWidget() {
       return;
     }
 
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === "Enter") {
       if (showProjectDropdown) {
         const matches = projects.filter(p => p.name.toLowerCase().includes(projectSearch.toLowerCase()));
         if (matches.length > 0) {
@@ -98,63 +98,66 @@ export function FocusPanelWidget() {
         }
       }
 
-      let currentTaggedProject = taggedProject;
-      let finalInput = unifiedInput;
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        
+        let currentTaggedProject = taggedProject;
+        let finalInput = unifiedInput;
 
-      if (!currentTaggedProject) {
-        const match = unifiedInput.match(/@([a-zA-Z0-9_-]+)/);
-        if (match) {
-          const possibleProjectName = match[1];
-          const matchedProject = projects.find(p => p.name.toLowerCase() === possibleProjectName.toLowerCase());
-          if (matchedProject) {
-            currentTaggedProject = matchedProject;
-            finalInput = unifiedInput.replace(`@${possibleProjectName}`, "").trim();
+        if (!currentTaggedProject) {
+          const match = unifiedInput.match(/@([a-zA-Z0-9_-]+)/);
+          if (match) {
+            const possibleProjectName = match[1];
+            const matchedProject = projects.find(p => p.name.toLowerCase() === possibleProjectName.toLowerCase());
+            if (matchedProject) {
+              currentTaggedProject = matchedProject;
+              finalInput = unifiedInput.replace(`@${possibleProjectName}`, "").trim();
+            }
           }
         }
-      }
 
-      // All inputs go through AI layer now
-      if (finalInput.trim()) {
-        const content = finalInput.trim();
-        setUnifiedInput("");
-        setShowProjectDropdown(false);
-        
-        setIsClassifying(true);
-        try {
-          const res = await fetch("/api/ai/classify-note", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ text: content })
-          });
-          const data = await res.json();
+        // All inputs go through AI layer now
+        if (finalInput.trim()) {
+          const content = finalInput.trim();
+          setUnifiedInput("");
+          setShowProjectDropdown(false);
           
-          if (data.items && Array.isArray(data.items)) {
-            for (const item of data.items) {
-              if (item.category === "task") {
-                const parsed = parseTaskInput(item.content);
+          setIsClassifying(true);
+          try {
+            const res = await fetch("/api/ai/classify-note", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ text: content })
+            });
+            const data = await res.json();
+            
+            if (data.items && Array.isArray(data.items)) {
+              for (const item of data.items) {
+                if (item.category === "task") {
+                  const parsed = parseTaskInput(item.content);
+                  addTask({ title: parsed.title, priority: parsed.priority, dueDate: parsed.dueDate, projectId: currentTaggedProject?.id });
+                } else {
+                  await addNote(item.content, currentTaggedProject?.id, item.category);
+                }
+              }
+            } else {
+              if (data.category === "task") {
+                const parsed = parseTaskInput(content);
                 addTask({ title: parsed.title, priority: parsed.priority, dueDate: parsed.dueDate, projectId: currentTaggedProject?.id });
               } else {
-                await addNote(item.content, currentTaggedProject?.id, item.category);
+                await addNote(content, currentTaggedProject?.id, data.category || "general note");
               }
             }
-          } else {
-            if (data.category === "task") {
-              const parsed = parseTaskInput(content);
-              addTask({ title: parsed.title, priority: parsed.priority, dueDate: parsed.dueDate, projectId: currentTaggedProject?.id });
-            } else {
-              await addNote(content, currentTaggedProject?.id, data.category || "general note");
-            }
+          } catch (e) {
+            // Fallback to task if error
+            const parsed = parseTaskInput(content);
+            addTask({ title: parsed.title, priority: parsed.priority, dueDate: parsed.dueDate, projectId: currentTaggedProject?.id });
+          } finally {
+            setIsClassifying(false);
+            setTaggedProject(null);
           }
-        } catch (e) {
-          // Fallback to task if error
-          const parsed = parseTaskInput(content);
-          addTask({ title: parsed.title, priority: parsed.priority, dueDate: parsed.dueDate, projectId: currentTaggedProject?.id });
-        } finally {
-          setIsClassifying(false);
-          setTaggedProject(null);
         }
       }
-      return;
     }
   };
 
@@ -228,8 +231,8 @@ export function FocusPanelWidget() {
           value={unifiedInput}
           onChange={handleInputChange}
           onKeyDown={handleUnifiedEnter}
-          placeholder="Type anything... AI will sort into Tasks or Brain Dump (Enter to save)"
-          className="min-h-[60px] max-h-[140px] overflow-y-auto text-sm resize-none bg-[#0f0f11] border-white/10 focus-visible:ring-1 focus-visible:ring-primary/50 p-3 custom-scrollbar"
+          placeholder="Type anything... AI will sort into Tasks or Brain Dump (Ctrl+Enter to save)"
+          className="min-h-[60px] max-h-[140px] overflow-y-auto text-sm resize-none bg-[#0f0f11] border-white/10 focus-visible:ring-1 focus-visible:ring-primary/50 p-3 custom-scrollbar scrollbar-hide"
         />
         
         {isClassifying && (
@@ -281,7 +284,7 @@ export function FocusPanelWidget() {
             <Badge variant="secondary" className="font-mono text-[10px]">{pendingTasks.length}</Badge>
           </div>
 
-          <ScrollArea className="flex-1 px-4 pb-2 min-h-0 h-full w-full overflow-y-auto custom-scrollbar">
+          <ScrollArea className="flex-1 px-4 pb-2 min-h-0 h-full w-full overflow-y-auto custom-scrollbar scrollbar-hide">
             <div className="space-y-1.5">
               {pendingTasks.map(t => (
                 <div key={t.id} className="group flex items-start gap-2.5 p-1.5 rounded hover:bg-white/5 transition-colors">
@@ -345,7 +348,7 @@ export function FocusPanelWidget() {
             <span className="text-[10px] font-mono text-muted-foreground">{wordCount} words</span>
           </div>
 
-          <ScrollArea className="flex-1 px-4 pb-2 min-h-0 h-full w-full overflow-y-auto custom-scrollbar">
+          <ScrollArea className="flex-1 px-4 pb-2 min-h-0 h-full w-full overflow-y-auto custom-scrollbar scrollbar-hide">
             <div className="space-y-2">
               {notes.filter(n => !n.projectId).map(renderNoteCard)}
             </div>
