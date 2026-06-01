@@ -2,8 +2,19 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
-const { exec } = require('child_process');
+const { exec: originalExec } = require('child_process');
 const os = require('os');
+
+// Wrapper to always hide the console window on Windows
+const exec = (command, options, callback) => {
+  if (typeof options === 'function') {
+    callback = options;
+    options = {};
+  }
+  options = options || {};
+  options.windowsHide = true;
+  return originalExec(command, options, callback);
+};
 
 const app = express();
 app.use(cors());
