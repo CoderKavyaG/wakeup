@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { generateObject } from "ai";
-import { openai } from "@ai-sdk/openai";
+import { createOpenAI } from "@ai-sdk/openai";
 import { z } from "zod";
+
+const openrouter = createOpenAI({
+  baseURL: "https://openrouter.ai/api/v1",
+  apiKey: process.env.OPENROUTER_API_KEY || "",
+});
 
 export async function POST(request: Request) {
   try {
@@ -12,7 +17,7 @@ export async function POST(request: Request) {
     }
 
     const result = await generateObject({
-      model: openai("gpt-4o-mini"),
+      model: openrouter("openai/gpt-4o-mini"),
       system: "You are a specialized parsing assistant. The user will provide a block of text containing tasks, feedback, bugs, or ideas. Your primary job is to aggressively split this text into distinct, separate points, UP TO A MAXIMUM OF 3 POINTS. Do not exceed 3 distinct items. If the text only contains 1 or 2 distinct core ideas, only return 1 or 2 items. If the user provides a list, you MUST break each item into its own separate feedback object in the array, but never exceed 3 total items. For each point, provide the 'content' (the exact text for that specific point) and the 'category' strictly chosen from: 'task', 'general feedback', 'bug report', 'feature idea', or 'general note'.",
       prompt: `Parse this text:\n\n${text}`,
       schema: z.object({
