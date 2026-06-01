@@ -7,7 +7,8 @@ export async function POST() {
     const agentDir = "C:\\Users\\Kavya\\Projects\\wakeup\\devos-agent";
     
     // Spawn the agent in the background detached so it persists
-    const child = spawn("node", ["index.js"], {
+    const args = ["index.js"];
+    const child = spawn("node", args, {
       cwd: agentDir,
       detached: true,
       stdio: 'ignore',
