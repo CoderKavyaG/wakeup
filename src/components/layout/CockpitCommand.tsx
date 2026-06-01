@@ -353,8 +353,7 @@ export function CockpitCommand() {
         addTask({ 
           title, 
           priority: "medium", 
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
+          createdAt: new Date().toISOString()
         });
         setConfirmation(`✓ Task created: "${title}"`);
         setInput("");
