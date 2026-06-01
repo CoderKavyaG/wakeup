@@ -129,6 +129,8 @@ export function FocusPanelWidget() {
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ text: content })
             });
+            if (!res.ok) throw new Error("Classification failed");
+            
             const data = await res.json();
             
             if (data.items && Array.isArray(data.items)) {
@@ -149,9 +151,15 @@ export function FocusPanelWidget() {
               }
             }
           } catch (e) {
-            // Fallback to task if error
-            const parsed = parseTaskInput(content);
-            addTask({ title: parsed.title, priority: parsed.priority, dueDate: parsed.dueDate, projectId: currentTaggedProject?.id });
+            // Heuristic fallback if AI fails (e.g., no API key)
+            // If it contains action words or is short, assume task
+            const isTask = content.length < 100 || /^(fix|do|make|create|deploy|update|urgent|add)\b/i.test(content);
+            if (isTask) {
+              const parsed = parseTaskInput(content);
+              addTask({ title: parsed.title, priority: parsed.priority, dueDate: parsed.dueDate, projectId: currentTaggedProject?.id });
+            } else {
+              await addNote(content, currentTaggedProject?.id, "general note");
+            }
           } finally {
             setIsClassifying(false);
             setTaggedProject(null);

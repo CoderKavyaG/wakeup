@@ -37,11 +37,10 @@ export function MachineControlWidget() {
   const [ports, setPorts] = useState<number[]>([]);
   
   const [customLaunchers, setCustomLaunchers] = useState<{name: string, command: string}[]>([
-    { name: "DevOS Project", command: "VS Code" },
-    { name: "PostgreSQL", command: "postgres" },
-    { name: "Restart Agent", command: "RESTART_AGENT" },
-    { name: "Open Terminal Here", command: "Terminal" },
-    { name: "Copy .env Path", command: "COPY_ENV" }
+    { name: "VS Code", command: "VS Code" },
+    { name: "Terminal", command: "Terminal" },
+    { name: "Docker", command: "Docker Desktop" },
+    { name: "Restart Agent", command: "RESTART_AGENT" }
   ]);
   const [isEditingLaunchers, setIsEditingLaunchers] = useState(false);
   
@@ -431,28 +430,38 @@ export function MachineControlWidget() {
             </div>
             
             {isEditingLaunchers ? (
-              <div className="space-y-2">
+              <div className="space-y-2 max-h-[150px] overflow-y-auto custom-scrollbar scrollbar-hide pr-1">
                 {customLaunchers.map((l, i) => (
                   <div key={i} className="flex gap-2">
                     <Input value={l.name} onChange={(e) => {
                       const newL = [...customLaunchers];
                       newL[i].name = e.target.value;
                       saveLaunchers(newL);
-                    }} placeholder="Name" className="h-7 text-xs w-1/3" />
+                    }} placeholder="Name" className="h-7 text-xs w-1/3 bg-black/20" />
                     <Input value={l.command} onChange={(e) => {
                       const newL = [...customLaunchers];
                       newL[i].command = e.target.value;
                       saveLaunchers(newL);
-                    }} placeholder="Terminal command..." className="h-7 text-xs flex-1" />
-                    <Button variant="destructive" size="icon" className="h-7 w-7 shrink-0" onClick={() => {
+                    }} placeholder="Command..." className="h-7 text-xs flex-1 bg-black/20" />
+                    <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-red-500 hover:bg-red-500/20 rounded" onClick={() => {
                       const newL = customLaunchers.filter((_, idx) => idx !== i);
                       saveLaunchers(newL);
                     }}><XCircle className="w-3 h-3" /></Button>
                   </div>
                 ))}
-                <Button variant="outline" size="sm" className="h-7 w-full text-xs border-dashed" onClick={() => {
-                  saveLaunchers([...customLaunchers, { name: "New App", command: "" }]);
-                }}>+ Add Launcher</Button>
+                <div className="flex gap-2 pt-1">
+                  <Button variant="outline" size="sm" className="h-7 flex-1 text-[10px] border-dashed border-white/10 hover:bg-white/5" onClick={() => {
+                    saveLaunchers([...customLaunchers, { name: "New App", command: "" }]);
+                  }}>+ Add</Button>
+                  <Button variant="outline" size="sm" className="h-7 flex-1 text-[10px] border-dashed border-red-500/20 text-red-400 hover:bg-red-500/10" onClick={() => {
+                    saveLaunchers([
+                      { name: "VS Code", command: "VS Code" },
+                      { name: "Terminal", command: "Terminal" },
+                      { name: "Docker", command: "Docker Desktop" },
+                      { name: "Restart Agent", command: "RESTART_AGENT" }
+                    ]);
+                  }}>Reset Defaults</Button>
+                </div>
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-2">
