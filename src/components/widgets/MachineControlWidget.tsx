@@ -73,6 +73,13 @@ export function MachineControlWidget() {
     if (saved) {
       setWorkspacePath(saved);
       fetchFiles(saved);
+      
+      // Auto-register so it shows up in Repos list
+      fetch("/api/machine/register-workspace", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: saved })
+      }).then(() => fetchGitRepos());
     }
     
     const savedLaunchers = localStorage.getItem("DEVOS_LAUNCHERS");
@@ -201,6 +208,13 @@ export function MachineControlWidget() {
     localStorage.setItem("DEVOS_WORKSPACE", workspacePath);
     setIsEditingPath(false);
     fetchFiles(workspacePath);
+    
+    // Auto-register so it shows up in Repos list
+    fetch("/api/machine/register-workspace", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: workspacePath })
+    }).then(() => fetchGitRepos());
   };
 
   const handleOpenVSCode = async () => {

@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { exec: originalExec } = require('child_process');
 const os = require('os');
+const net = require('net');
 
 // Wrapper to always hide the console window on Windows
 const exec = (command, options, callback) => {
@@ -401,15 +402,38 @@ app.get('/npm-scripts', (req, res) => {
 });
 
 // POST /run-npm-script
-app.post('/run-npm-script', (req, res) => {
+app.post('/run-npm-script', async (req, res) => {
   const { path: targetPath, script } = req.body;
   if (!targetPath || !script) return res.status(400).json({ error: 'Missing path or script' });
+
+  let portCmd = "";
+  if (script === "dev" || script === "start") {
+    // Find an open port starting at 3000
+    const findOpenPort = async (startPort) => {
+      let p = startPort;
+      while (p < 3050) {
+        const isOpen = await new Promise(resolve => {
+          const server = net.createServer();
+          server.listen(p, '127.0.0.1', () => {
+            server.close(() => resolve(true));
+          });
+          server.on('error', () => resolve(false));
+        });
+        if (isOpen) return p;
+        p++;
+      }
+      return startPort;
+    };
+    const openPort = await findOpenPort(3000);
+    const isWin = os.platform() === 'win32';
+    portCmd = isWin ? `set PORT=${openPort} && ` : `PORT=${openPort} `;
+  }
 
   const isWin = os.platform() === 'win32';
   // Use originalExec because we WANT to pop up the terminal window here!
   const cmd = isWin 
-    ? `start cmd /k "cd /d ${targetPath} && npm run ${script}"`
-    : `osascript -e 'tell app "Terminal" to do script "cd ${targetPath} && npm run ${script}"'`;
+    ? `start cmd /k "cd /d ${targetPath} && ${portCmd}npm run ${script}"`
+    : `osascript -e 'tell app "Terminal" to do script "cd ${targetPath} && ${portCmd}npm run ${script}"'`;
 
   originalExec(cmd, (error) => {
     if (error) return res.status(500).json({ error: error.message });
