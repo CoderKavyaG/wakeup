@@ -7,8 +7,8 @@ export async function POST() {
     // The devos-agent folder is in the project root
     const agentDir = path.join(process.cwd(), "devos-agent");
     
-    // Spawn the agent in the background
-    exec("npm run start", { cwd: agentDir }, (error) => {
+    // Spawn the agent in the background detached so it persists
+    const child = exec("node index.js", { cwd: agentDir }, (error) => {
       if (error) {
         console.error("Failed to start agent:", error);
       }

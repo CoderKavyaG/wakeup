@@ -19,6 +19,7 @@ import {
   Trash2,
   ChevronDown,
   ChevronRight,
+  Folder,
   X,
   Loader2
 } from "lucide-react";
@@ -100,71 +101,71 @@ export function FocusPanelWidget() {
 
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
-        
-        let currentTaggedProject = taggedProject;
-        let finalInput = unifiedInput;
+        handleSubmit();
+      }
+    }
+  };
 
-        if (!currentTaggedProject) {
-          const match = unifiedInput.match(/@([a-zA-Z0-9_-]+)/);
-          if (match) {
-            const possibleProjectName = match[1];
-            const matchedProject = projects.find(p => p.name.toLowerCase() === possibleProjectName.toLowerCase());
-            if (matchedProject) {
-              currentTaggedProject = matchedProject;
-              finalInput = unifiedInput.replace(`@${possibleProjectName}`, "").trim();
-            }
-          }
+  const handleSubmit = async () => {
+    let currentTaggedProject = taggedProject;
+    let finalInput = unifiedInput;
+
+    if (!currentTaggedProject) {
+      const match = unifiedInput.match(/@([a-zA-Z0-9_-]+)/);
+      if (match) {
+        const possibleProjectName = match[1];
+        const matchedProject = projects.find(p => p.name.toLowerCase() === possibleProjectName.toLowerCase());
+        if (matchedProject) {
+          currentTaggedProject = matchedProject;
+          finalInput = unifiedInput.replace(`@${possibleProjectName}`, "").trim();
         }
+      }
+    }
 
-        // All inputs go through AI layer now
-        if (finalInput.trim()) {
-          const content = finalInput.trim();
-          setUnifiedInput("");
-          setShowProjectDropdown(false);
-          
-          setIsClassifying(true);
-          try {
-            const res = await fetch("/api/ai/classify-note", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ text: content })
-            });
-            if (!res.ok) throw new Error("Classification failed");
-            
-            const data = await res.json();
-            
-            if (data.items && Array.isArray(data.items)) {
-              for (const item of data.items) {
-                if (item.category === "task") {
-                  const parsed = parseTaskInput(item.content);
-                  addTask({ title: parsed.title, priority: parsed.priority, dueDate: parsed.dueDate, projectId: currentTaggedProject?.id });
-                } else {
-                  await addNote(item.content, currentTaggedProject?.id, item.category);
-                }
-              }
-            } else {
-              if (data.category === "task") {
-                const parsed = parseTaskInput(content);
-                addTask({ title: parsed.title, priority: parsed.priority, dueDate: parsed.dueDate, projectId: currentTaggedProject?.id });
-              } else {
-                await addNote(content, currentTaggedProject?.id, data.category || "general note");
-              }
-            }
-          } catch (e) {
-            // Heuristic fallback if AI fails (e.g., no API key)
-            // If it contains action words or is short, assume task
-            const isTask = content.length < 100 || /^(fix|do|make|create|deploy|update|urgent|add)\b/i.test(content);
-            if (isTask) {
-              const parsed = parseTaskInput(content);
+    if (finalInput.trim()) {
+      const content = finalInput.trim();
+      setUnifiedInput("");
+      setShowProjectDropdown(false);
+      
+      setIsClassifying(true);
+      try {
+        const res = await fetch("/api/ai/classify-note", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: content })
+        });
+        if (!res.ok) throw new Error("Classification failed");
+        
+        const data = await res.json();
+        
+        if (data.items && Array.isArray(data.items)) {
+          for (const item of data.items) {
+            if (item.category === "task") {
+              const parsed = parseTaskInput(item.content);
               addTask({ title: parsed.title, priority: parsed.priority, dueDate: parsed.dueDate, projectId: currentTaggedProject?.id });
             } else {
-              await addNote(content, currentTaggedProject?.id, "general note");
+              await addNote(item.content, currentTaggedProject?.id, item.category);
             }
-          } finally {
-            setIsClassifying(false);
-            setTaggedProject(null);
+          }
+        } else {
+          if (data.category === "task") {
+            const parsed = parseTaskInput(content);
+            addTask({ title: parsed.title, priority: parsed.priority, dueDate: parsed.dueDate, projectId: currentTaggedProject?.id });
+          } else {
+            await addNote(content, currentTaggedProject?.id, data.category || "general note");
           }
         }
+      } catch (e) {
+        const isTask = content.length < 100 || /^(fix|do|make|create|deploy|update|urgent|add)\b/i.test(content);
+        if (isTask) {
+          const parsed = parseTaskInput(content);
+          addTask({ title: parsed.title, priority: parsed.priority, dueDate: parsed.dueDate, projectId: currentTaggedProject?.id });
+        } else {
+          await addNote(content, currentTaggedProject?.id, "general note");
+        }
+      } finally {
+        setIsClassifying(false);
+        setTaggedProject(null);
       }
     }
   };
@@ -248,6 +249,17 @@ export function FocusPanelWidget() {
             <Loader2 className="w-3 h-3 animate-spin" /> Classifying...
           </div>
         )}
+
+        <Button 
+          size="icon"
+          variant="secondary"
+          className="absolute bottom-3 right-5 w-7 h-7 bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+          onClick={handleSubmit}
+          disabled={!unifiedInput.trim() || isClassifying}
+          title="Submit to AI"
+        >
+          <ChevronRight className="w-4 h-4" />
+        </Button>
 
         {showProjectDropdown && (
           <div className="absolute top-full left-4 right-4 mt-1 bg-[#1a1a1d] border border-white/10 rounded-lg shadow-xl z-50 max-h-40 overflow-y-auto">
