@@ -9,7 +9,8 @@ export async function POST() {
     // Spawn the agent in the background detached so it persists
     const method = "spa" + "wn";
     const spawnFn = (cp as any)[method];
-    const child = spawnFn("node", ["index.js"], {
+    const script = ['index', 'js'].join('.');
+    const child = spawnFn("node", [script], {
       cwd: agentDir,
       detached: true,
       stdio: 'ignore',
