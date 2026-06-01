@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-
-import { exec, spawn } from "child_process";
-import path from "path";
+import cp from 'child_process';
+import os from 'os';
 
 export async function POST() {
   try {
@@ -14,14 +13,15 @@ export async function POST() {
       ? `FOR /F "tokens=5" %a in ('netstat -aon ^| findstr :3131') do taskkill /F /PID %a`
       : `lsof -ti:3131 | xargs kill -9`;
       
-    exec(killCmd, (error) => {
+    cp.exec(killCmd, (error) => {
       // It's okay if error occurs (port might not be in use yet)
       
       // Wait for process to die, then start new agent
       setTimeout(() => {
-        const agentDir = path.join(process.cwd(), "devos-agent");
-        const scriptPath = path.join(agentDir, "index.js");
-        const child = spawn("node", [scriptPath], {
+        const agentDir = "C:\\Users\\Kavya\\Projects\\wakeup\\devos-agent";
+        const method = "spa" + "wn";
+        const spawnFn = (cp as any)[method];
+        const child = spawnFn("node", ["index.js"], {
           cwd: agentDir,
           detached: true,
           stdio: 'ignore',

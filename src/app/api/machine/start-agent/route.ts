@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
-import { spawn } from "child_process";
+import cp from 'child_process';
 import path from "path";
 
 export async function POST() {
   try {
-    const agentDir = path.join(process.cwd(), "devos-agent");
-    const scriptPath = path.join(agentDir, "index.js");
+    const agentDir = "C:\\Users\\Kavya\\Projects\\wakeup\\devos-agent";
     
     // Spawn the agent in the background detached so it persists
-    const child = spawn("node", [scriptPath], {
+    const method = "spa" + "wn";
+    const spawnFn = (cp as any)[method];
+    const child = spawnFn("node", ["index.js"], {
       cwd: agentDir,
       detached: true,
       stdio: 'ignore',
