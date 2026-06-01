@@ -10,7 +10,8 @@ export async function POST() {
     const child = spawn("node", ["index.js"], {
       cwd: agentDir,
       detached: true,
-      stdio: 'ignore'
+      stdio: 'ignore',
+      windowsHide: true
     });
     
     child.unref();
