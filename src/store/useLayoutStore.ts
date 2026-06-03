@@ -6,11 +6,13 @@ export type WidgetType =
   | "github" 
   | "focus" 
   | "machine"
-  | "clock";
+  | "clock"
+  | "terminal";
 
 export interface WidgetInstance {
   id: string;
   type: WidgetType;
+  metadata?: Record<string, any>;
 }
 
 interface LayoutState {
@@ -24,7 +26,7 @@ interface LayoutState {
   toggleTips: () => void;
   fetchLayout: () => Promise<void>;
   setLayouts: (layouts: { [key: string]: Layout }) => Promise<void>;
-  addWidget: (type: WidgetType) => Promise<void>;
+  addWidget: (type: WidgetType, metadata?: Record<string, any>) => Promise<void>;
   removeWidget: (id: string) => Promise<void>;
   resetLayout: () => Promise<void>;
   clearLayout: () => Promise<void>;
@@ -39,6 +41,7 @@ const widgetConfigs: { [key in WidgetType]: { minW: number, minH: number, defaul
   focus: { minW: 3, minH: 4, defaultW: 4, defaultH: 4 },
   machine: { minW: 4, minH: 6, defaultW: 6, defaultH: 6 },
   clock: { minW: 2, minH: 3, defaultW: 3, defaultH: 4 },
+  terminal: { minW: 4, minH: 6, defaultW: 6, defaultH: 8 },
 };
 
 const defaultLayouts: { [key: string]: Layout } = {
@@ -114,9 +117,9 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
     }
   },
 
-  addWidget: async (type) => {
+  addWidget: async (type, metadata) => {
     const id = `${type}-${Date.now()}`;
-    const newWidget = { id, type };
+    const newWidget: WidgetInstance = { id, type, metadata };
     
     const currentLayouts = { ...get().layouts };
     const lgLayout = [...(currentLayouts.lg || [])];
