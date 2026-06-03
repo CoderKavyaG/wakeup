@@ -10,6 +10,7 @@ import { GithubWidget } from "../widgets/GithubWidget";
 import { FocusPanelWidget } from "../widgets/FocusPanelWidget";
 import { MachineControlWidget } from "../widgets/MachineControlWidget";
 import { ClockWidget } from "../widgets/ClockWidget";
+import { TerminalWidget } from "../widgets/TerminalWidget";
 import { X, GripHorizontal } from "lucide-react";
 import { Button } from "../ui/button";
 
@@ -40,8 +41,8 @@ export function GridWorkspace() {
     }
   };
 
-  const renderWidgetContent = (type: WidgetType) => {
-    switch (type) {
+  const renderWidgetContent = (widget: any) => {
+    switch (widget.type) {
       case "projects":
         return <ProjectsWidget />;
       case "github":
@@ -52,8 +53,10 @@ export function GridWorkspace() {
         return <MachineControlWidget />;
       case "clock":
         return <ClockWidget />;
+      case "terminal":
+        return <TerminalWidget initialCwd={widget.metadata?.initialCwd} />;
       default:
-        return <p className="text-muted-foreground text-sm">Unknown widget: {type}</p>;
+        return <p className="text-muted-foreground text-sm">Unknown widget: {widget.type}</p>;
     }
   };
 
@@ -77,7 +80,7 @@ export function GridWorkspace() {
         isResizable={!isLocked}
       >
         {widgets.map((widget) => (
-          <div key={widget.id} className="bg-card border border-border/80 rounded-xl shadow-md flex flex-col overflow-hidden hover:border-primary/20 transition-colors duration-200">
+          <div key={widget.id} data-widget-type={widget.type} className="bg-card border border-border/80 rounded-xl shadow-md flex flex-col overflow-hidden hover:border-primary/20 transition-colors duration-200">
             {/* Widget Header with Drag Handle & Close Button */}
             <div className="h-9 border-b border-border/60 bg-popover/40 flex items-center justify-between px-3 shrink-0">
               <div className="widget-drag-handle flex items-center space-x-1.5 cursor-grab active:cursor-grabbing flex-1 h-full select-none">
@@ -98,7 +101,7 @@ export function GridWorkspace() {
             
             {/* Widget Body */}
             <div className="p-4 flex-1 overflow-hidden">
-              {renderWidgetContent(widget.type)}
+              {renderWidgetContent(widget)}
             </div>
           </div>
         ))}
