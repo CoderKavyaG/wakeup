@@ -38,6 +38,7 @@ const ADD_WIDGET_OPTIONS = [
   { type: "focus", name: "Focus Panel", desc: "Tasks and brain dump", icon: <Crosshair className="w-4 h-4 text-primary" /> },
   { type: "machine", name: "Machine Control", desc: "Ports, launcher, workspace files", icon: <Terminal className="w-4 h-4 text-primary" /> },
   { type: "clock", name: "Clock & Time", desc: "IST + US time zones", icon: <Clock className="w-4 h-4 text-primary" /> },
+  { type: "terminal", name: "Terminal", desc: "Embedded terminal with agent connection", icon: <Terminal className="w-4 h-4 text-primary" /> },
 ];
 
 
@@ -352,8 +353,7 @@ export function CockpitCommand() {
       if (title) {
         addTask({ 
           title, 
-          priority: "medium", 
-          createdAt: new Date().toISOString()
+          priority: "medium"
         });
         setConfirmation(`✓ Task created: "${title}"`);
         setInput("");
@@ -441,7 +441,7 @@ export function CockpitCommand() {
   const createTaskFromAnswer = () => {
     if (!streamedAnswer) return;
     const firstLine = streamedAnswer.split("\n")[0].replace(/^[-•*]\s*/, "").substring(0, 100);
-    addTask({ title: firstLine, priority: "medium", createdAt: new Date().toISOString() });
+    addTask({ title: firstLine, priority: "medium" });
     setConfirmation(`✓ Task created from answer`);
     setTimeout(() => setConfirmation(null), 3000);
   };
