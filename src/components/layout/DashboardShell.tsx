@@ -27,6 +27,25 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       {/* Top Controls Bar */}
       <div className="shrink-0 px-6 pt-4 pb-3 flex items-center justify-between gap-4 select-none bg-[#0f0f11] border-b border-white/5" style={{ WebkitAppRegion: "drag" } as any}>
         <div className="flex items-center space-x-2">
+          {typeof window !== 'undefined' && (window as any).electronAPI?.isElectron && (
+            <div className="flex items-center gap-1.5 mr-2" style={{ WebkitAppRegion: "no-drag" } as any}>
+              <button 
+                onClick={() => (window as any).electronAPI.close()}
+                className="w-3 h-3 rounded-full bg-red-500 hover:bg-red-400 transition-colors cursor-pointer"
+                title="Close"
+              />
+              <button 
+                onClick={() => (window as any).electronAPI.minimize()}
+                className="w-3 h-3 rounded-full bg-yellow-500 hover:bg-yellow-400 transition-colors cursor-pointer"
+                title="Minimize"
+              />
+              <button 
+                onClick={() => (window as any).electronAPI.maximize()}
+                className="w-3 h-3 rounded-full bg-green-500 hover:bg-green-400 transition-colors cursor-pointer"
+                title="Maximize"
+              />
+            </div>
+          )}
           <div className="w-7 h-7 rounded bg-foreground flex items-center justify-center font-bold text-background text-[13px] shadow-sm border border-white/10">
             D
           </div>
@@ -40,17 +59,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         </div>
 
         <div className="flex items-center space-x-2" style={{ WebkitAppRegion: "no-drag" } as any}>
-
-        {typeof window !== 'undefined' && (window as any).electronAPI?.isElectron && (
-          <div className="flex items-center gap-2 mr-4 bg-[#161618] border border-white/5 px-3 py-1.5 rounded-lg">
-            <button onClick={() => (window as any).electronAPI.minimize()}
-              className="w-3 h-3 rounded-full bg-yellow-500 hover:bg-yellow-400" />
-            <button onClick={() => (window as any).electronAPI.maximize()}
-              className="w-3 h-3 rounded-full bg-green-500 hover:bg-green-400" />
-            <button onClick={() => (window as any).electronAPI.close()}
-              className="w-3 h-3 rounded-full bg-red-500 hover:bg-red-400" />
-          </div>
-        )}
         <div className="flex items-center space-x-2 bg-[#161618] border border-white/5 p-1 rounded-lg">
           {/* Lock/Unlock */}
           <Button
