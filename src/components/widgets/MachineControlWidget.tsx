@@ -12,6 +12,8 @@ import {
   Activity, Cpu, MemoryStick, GitBranch as GitBranchIcon, FileText, ClipboardCopy, Power
 } from "lucide-react";
 import { useProjectStore } from "@/store/useProjectStore";
+import { useLayoutStore } from "@/store/useLayoutStore";
+import { useTerminalStore } from "@/store/useTerminalStore";
 
 interface FileItem {
   name: string;
@@ -65,22 +67,26 @@ export function MachineControlWidget() {
   const [isTinyWidth, setIsTinyWidth] = useState(false);
 
   const { projects } = useProjectStore();
+  const { widgets, addWidget } = useLayoutStore();
+  const sendTerminalCommand = useTerminalStore((s) => s.sendCommand);
   const localProjects = projects.filter(p => p.folderPath).slice(0, 3);
 
   // Load saved workspace on mount
   useEffect(() => {
-    const saved = localStorage.getItem("DEVOS_WORKSPACE");
-    if (saved) {
-      setWorkspacePath(saved);
-      fetchFiles(saved);
-      
-      // Auto-register so it shows up in Repos list
-      fetch("/api/machine/register-workspace", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ path: saved })
-      }).then(() => fetchGitRepos());
+    let saved = localStorage.getItem("DEVOS_WORKSPACE");
+    if (!saved) {
+      saved = "C:\\Users\\Kavya\\Projects\\wakeup";
+      localStorage.setItem("DEVOS_WORKSPACE", saved);
     }
+    setWorkspacePath(saved);
+    fetchFiles(saved);
+    
+    // Auto-register so it shows up in Repos list
+    fetch("/api/machine/register-workspace", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: saved })
+    }).then(() => fetchGitRepos());
     
     const savedLaunchers = localStorage.getItem("DEVOS_LAUNCHERS");
     if (savedLaunchers) {
@@ -204,16 +210,17 @@ export function MachineControlWidget() {
     }
   };
 
-  const handleSaveWorkspace = () => {
-    localStorage.setItem("DEVOS_WORKSPACE", workspacePath);
+  const handleSaveWorkspace = (pathVal?: string) => {
+    const targetPath = pathVal || workspacePath;
+    localStorage.setItem("DEVOS_WORKSPACE", targetPath);
     setIsEditingPath(false);
-    fetchFiles(workspacePath);
+    fetchFiles(targetPath);
     
     // Auto-register so it shows up in Repos list
     fetch("/api/machine/register-workspace", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ path: workspacePath })
+      body: JSON.stringify({ path: targetPath })
     }).then(() => fetchGitRepos());
   };
 
@@ -350,7 +357,7 @@ export function MachineControlWidget() {
                     placeholder="Enter absolute path (e.g. C:\Users\...)"
                     className="h-7 text-xs bg-[#0f0f11] border-white/10"
                   />
-                  <Button size="sm" className="h-7 px-3 text-xs bg-primary text-primary-foreground hover:bg-primary/90" onClick={handleSaveWorkspace}>Save</Button>
+                  <Button size="sm" className="h-7 px-3 text-xs bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => handleSaveWorkspace()}>Save</Button>
                 </div>
                 {!workspacePath && (
                   <span className="text-[10px] text-orange-400/80 italic">You must enter and save your project's folder path above to enable Git & file tracking.</span>
@@ -397,7 +404,7 @@ export function MachineControlWidget() {
                   <div className="text-[9px] font-bold uppercase text-muted-foreground tracking-wider mb-2">Recent Local Scans</div>
                   <div className="space-y-1">
                     {localProjects.map(p => (
-                      <div key={p.id} className="text-xs text-foreground/80 flex items-center justify-between p-1.5 bg-black/20 rounded hover:bg-white/5 cursor-pointer" onClick={() => { setWorkspacePath(p.folderPath!); handleSaveWorkspace(); }}>
+                      <div key={p.id} className="text-xs text-foreground/80 flex items-center justify-between p-1.5 bg-black/20 rounded hover:bg-white/5 cursor-pointer" onClick={() => { setWorkspacePath(p.folderPath!); handleSaveWorkspace(p.folderPath!); }}>
                         <span className="truncate">{p.name}</span>
                         <Badge variant="outline" className="text-[8px] bg-green-500/10 text-green-500 border-0">Scanned</Badge>
                       </div>
@@ -417,13 +424,16 @@ export function MachineControlWidget() {
                         size="sm"
                         className={`h-6 text-[10px] px-2 border-white/10 ${script === 'dev' || script === 'start' ? 'bg-primary text-primary-foreground font-bold hover:bg-primary/90' : 'bg-black/20 hover:bg-white/10 text-foreground'}`}
                         onClick={async () => {
-                          const originalLaunchers = customLaunchers;
                           try {
-                            await fetch("/api/machine/run-npm-script", {
-                              method: "POST",
-                              headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({ path: workspacePath, script })
-                            });
+                            const hasTerminal = widgets.some(
+                              (w) => w.type === "terminal" && w.metadata?.initialCwd === workspacePath
+                            );
+                            if (!hasTerminal) {
+                              await addWidget("terminal", { initialCwd: workspacePath });
+                            }
+                            setTimeout(() => {
+                              sendTerminalCommand(workspacePath, `npm run ${script}`);
+                            }, 500);
                           } catch(e) {}
                         }}
                       >
@@ -558,7 +568,7 @@ export function MachineControlWidget() {
               <div className="space-y-1.5 max-h-[150px] overflow-y-auto custom-scrollbar pr-1">
                 {gitRepos.length > 0 ? (
                   gitRepos.map((repo, i) => (
-                    <div key={i} className="flex flex-col gap-1 p-2 rounded-lg border border-white/10 bg-black/20 hover:border-primary/30 transition-colors cursor-pointer" onClick={() => { setWorkspacePath(repo.path); handleSaveWorkspace(); }}>
+                    <div key={i} className="flex flex-col gap-1 p-2 rounded-lg border border-white/10 bg-black/20 hover:border-primary/30 transition-colors cursor-pointer" onClick={() => { setWorkspacePath(repo.path); handleSaveWorkspace(repo.path); }}>
                       <div className="flex items-center justify-between overflow-hidden">
                         <div className="flex items-center gap-1.5 min-w-0">
                           <Folder className="w-3 h-3 text-blue-400 shrink-0" />
