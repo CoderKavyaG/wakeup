@@ -370,7 +370,8 @@ app.get('/git-status-all', async (req, res) => {
         uncommitted = statusOutput.split('\n').filter(l => l.trim()).length;
       }
       
-      const aheadOutput = await execPromise('git log origin/HEAD..HEAD --oneline 2>/dev/null');
+      const devNull = os.platform() === 'win32' ? 'nul' : '/dev/null';
+      const aheadOutput = await execPromise(`git log origin/HEAD..HEAD --oneline 2>${devNull}`);
       if (aheadOutput) {
         ahead = aheadOutput.split('\n').filter(l => l.trim()).length;
       }
@@ -462,6 +463,57 @@ app.post('/register-workspace', (req, res) => {
   res.json({ success: true });
 });
 
+// WebSocket PTY Terminal Support
+const { WebSocketServer } = require('ws');
+const { spawn } = require('child_process');
+
+const wss = new WebSocketServer({ port: 3132 });
+
+wss.on('connection', (ws, req) => {
+  const params = new URL(req.url, 'http://localhost').searchParams;
+  const cwd = params.get('cwd') || os.homedir();
+  const shell = process.platform === 'win32' ? 'cmd.exe' : 'bash';
+
+  const pty = spawn(shell, [], {
+    cwd,
+    env: process.env,
+    windowsHide: false
+  });
+
+  ws.on('message', data => {
+    try { pty.stdin.write(data.toString()) } catch(e) {}
+  });
+
+  pty.stdout.on('data', data => {
+    if (ws.readyState === ws.OPEN) ws.send(data.toString());
+  });
+  pty.stderr.on('data', data => {
+    if (ws.readyState === ws.OPEN) ws.send(data.toString());
+  });
+
+  ws.on('close', () => pty.kill());
+  pty.on('exit', () => { if (ws.readyState === ws.OPEN) ws.close() });
+});
+
+console.log('Terminal WS server on port 3132');
+
 app.listen(PORT, () => {
   console.log(`DevOS Agent running on port ${PORT}`);
 });
+
+const CRON_MS = 60 * 60 * 1000;
+
+async function runCron() {
+  try {
+    const res = await fetch('http://localhost:3000/api/intelligence', { method: 'POST' });
+    const data = await res.json();
+    console.log('[cron] intelligence refreshed:', data);
+  } catch(e) {
+    console.log('[cron] skipped — Next.js not ready yet');
+  }
+}
+
+// First run: wait 45s for Next.js to fully start
+setTimeout(runCron, 45000);
+setInterval(runCron, CRON_MS);
+
