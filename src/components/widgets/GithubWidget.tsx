@@ -59,6 +59,11 @@ export function GithubWidget() {
   useEffect(() => {
     const savedToken = localStorage.getItem("GITHUB_TOKEN");
     if (savedToken) setToken(savedToken);
+    const savedUsername = localStorage.getItem("GITHUB_USERNAME");
+    if (savedUsername) {
+      setUsername(savedUsername);
+      setInputUsername(savedUsername);
+    }
   }, []);
 
   const getRelativeTime = (dateStr: string) => {
@@ -111,7 +116,9 @@ export function GithubWidget() {
   const handleUpdateUser = (e: React.FormEvent) => {
     e.preventDefault();
     if (inputUsername.trim()) {
-      setUsername(inputUsername.trim());
+      const newUser = inputUsername.trim();
+      setUsername(newUser);
+      localStorage.setItem("GITHUB_USERNAME", newUser);
     }
   };
 
@@ -121,6 +128,7 @@ export function GithubWidget() {
     } else {
       localStorage.removeItem("GITHUB_TOKEN");
     }
+    localStorage.setItem("GITHUB_USERNAME", username);
     setShowSettings(false);
     fetchGithubData(username, token);
   };
