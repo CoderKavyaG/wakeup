@@ -53,6 +53,7 @@ export function ProjectsWidget() {
   
   // List toggle state
   const [activeListTab, setActiveListTab] = useState<"github" | "local">("github");
+  const [hasSynced, setHasSynced] = useState(false);
 
   const handlePickFolder = async (action: "import" | "link") => {
     setIsPickingFolder(true);
@@ -247,7 +248,12 @@ export function ProjectsWidget() {
 
     if (selectedProject?.githubUrl) {
       setCommitsLoading(true);
-      fetch(`/api/github/commits?projectId=${selectedProject.id}&days=14`)
+      const savedToken = localStorage.getItem("GITHUB_TOKEN");
+      const headers: HeadersInit = {};
+      if (savedToken) {
+        headers["Authorization"] = `Bearer ${savedToken}`;
+      }
+      fetch(`/api/github/commits?projectId=${selectedProject.id}&days=14`, { headers })
         .then(res => res.json())
         .then(data => {
           if (Array.isArray(data)) {
@@ -266,19 +272,28 @@ export function ProjectsWidget() {
 
   // Auto-Sync GitHub Repos on Mount
   useEffect(() => {
+    if (loading || projects.length === 0 || hasSynced) return;
+    
     let isMounted = true;
     const syncGithub = async () => {
       try {
-        const res = await fetch("/api/github?username=CoderKavyaG");
+        const savedUsername = localStorage.getItem("GITHUB_USERNAME") || "coderkavyag";
+        const savedToken = localStorage.getItem("GITHUB_TOKEN");
+        const headers: HeadersInit = {};
+        if (savedToken) {
+          headers["Authorization"] = `Bearer ${savedToken}`;
+        }
+        
+        const res = await fetch(`/api/github?username=${encodeURIComponent(savedUsername)}`, { headers });
         if (!res.ok) return;
         const data = await res.json();
         
-        if (data && data.repos) {
-          // get existing github urls
-          const existingUrls = new Set(projects.map(p => p.githubUrl).filter(Boolean));
+        if (data && data.repos && isMounted) {
+          const existingUrls = new Set(projects.map(p => p.githubUrl?.toLowerCase()).filter(Boolean));
           
           for (const repo of data.repos) {
-            if (!existingUrls.has(repo.html_url) && isMounted) {
+            const repoUrlLower = repo.html_url.toLowerCase();
+            if (!existingUrls.has(repoUrlLower) && isMounted) {
               await addProject({
                 name: repo.name,
                 description: repo.description || "",
@@ -286,19 +301,28 @@ export function ProjectsWidget() {
                 tags: [repo.language].filter(Boolean),
                 githubUrl: repo.html_url,
               });
-              existingUrls.add(repo.html_url); // add to set so we don't duplicate within same loop
+              existingUrls.add(repoUrlLower);
             }
           }
+          setHasSynced(true);
         }
       } catch (err) {
         console.error("Auto-sync failed", err);
       }
     };
-    if (projects.length > 0 || !loading) {
-       syncGithub();
-    }
+    
+    syncGithub();
     return () => { isMounted = false; };
-  }, []); // Run once on mount
+  }, [projects, loading, hasSynced]);
+
+  useEffect(() => {
+    const handleFilterStale = () => {
+      setShowStaleOnly(true);
+      setActiveListTab("github");
+    };
+    window.addEventListener("filter_stale_projects", handleFilterStale);
+    return () => window.removeEventListener("filter_stale_projects", handleFilterStale);
+  }, []);
 
   useEffect(() => {
     const fetchLocalStats = async () => {
@@ -336,7 +360,14 @@ export function ProjectsWidget() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const res = await fetch("/api/github?username=CoderKavyaG");
+        const savedUsername = localStorage.getItem("GITHUB_USERNAME") || "coderkavyag";
+        const savedToken = localStorage.getItem("GITHUB_TOKEN");
+        const headers: HeadersInit = {};
+        if (savedToken) {
+          headers["Authorization"] = `Bearer ${savedToken}`;
+        }
+        
+        const res = await fetch(`/api/github?username=${encodeURIComponent(savedUsername)}`, { headers });
         if (res.ok) {
           const data = await res.json();
           const stats: Record<string, any> = {};
@@ -493,10 +524,10 @@ export function ProjectsWidget() {
           >
              {activeListTab === "github" && (
               <>
-              {projects.filter(p => p.githubUrl).length === 0 && (
+              {projects.filter(p => p.githubUrl && !p.folderPath).length === 0 && (
                 <div className="text-center py-6 text-xs text-muted-foreground">No GitHub repositories synced yet.</div>
               )}
-              {projects.filter(p => p.githubUrl).sort((a, b) => {
+              {projects.filter(p => p.githubUrl && !p.folderPath).sort((a, b) => {
                 const aCommit = githubStats[a.githubUrl!.toLowerCase()]?.lastCommit;
                 const bCommit = githubStats[b.githubUrl!.toLowerCase()]?.lastCommit;
                 if (!aCommit) return 1;
@@ -588,6 +619,23 @@ export function ProjectsWidget() {
                           <Code2 className="w-3.5 h-3.5" />
                         </Button>
                       )}
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="w-6 h-6 shrink-0 hover:bg-red-500/10 text-white/50 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          if (confirm(`Are you sure you want to delete project "${project.name}"?`)) {
+                            await deleteProject(project.id);
+                            if (selectedProject?.id === project.id) {
+                              setSelectedProject(null);
+                            }
+                          }
+                        }}
+                        title="Delete Project"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
                     </div>
                   </div>
                 );
@@ -608,14 +656,14 @@ export function ProjectsWidget() {
                   <span className="text-xs font-medium">{isPickingFolder ? "Opening..." : "Import Local Project"}</span>
                 </Button>
               </div>
-              {projects.filter(p => !p.githubUrl && p.status !== "archived").filter(p => {
+              {projects.filter(p => (p.folderPath || !p.githubUrl) && p.status !== "archived").filter(p => {
                 if (!showStaleOnly) return true;
                 const daysAgo = (Date.now() - new Date(p.updatedAt).getTime()) / (1000 * 3600 * 24);
                 return daysAgo > 14;
               }).length === 0 && (
                 <div className="text-center py-6 text-xs text-muted-foreground">No local workspaces found.</div>
               )}
-              {projects.filter(p => !p.githubUrl && p.status !== "archived").filter(p => {
+              {projects.filter(p => (p.folderPath || !p.githubUrl) && p.status !== "archived").filter(p => {
                 if (!showStaleOnly) return true;
                 const daysAgo = (Date.now() - new Date(p.updatedAt).getTime()) / (1000 * 3600 * 24);
                 return daysAgo > 14;
@@ -681,6 +729,23 @@ export function ProjectsWidget() {
                           <Code2 className="w-3.5 h-3.5" />
                         </Button>
                       )}
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="w-6 h-6 shrink-0 hover:bg-red-500/10 text-white/50 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          if (confirm(`Are you sure you want to delete project "${project.name}"?`)) {
+                            await deleteProject(project.id);
+                            if (selectedProject?.id === project.id) {
+                              setSelectedProject(null);
+                            }
+                          }
+                        }}
+                        title="Delete Project"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
                     </div>
                   </div>
                 );
