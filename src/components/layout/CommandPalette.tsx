@@ -76,8 +76,13 @@ export function CommandPalette() {
       category: "Automation",
       icon: <GitPullRequest className="w-4 h-4 text-green-400" />,
       action: async () => {
-        const username = "coderkavyag";
-        await fetch(`/api/github?username=${username}&refresh=true`);
+        const username = localStorage.getItem("GITHUB_USERNAME") || "coderkavyag";
+        const savedToken = localStorage.getItem("GITHUB_TOKEN");
+        const headers: HeadersInit = {};
+        if (savedToken) {
+          headers["Authorization"] = `Bearer ${savedToken}`;
+        }
+        await fetch(`/api/github?username=${username}&refresh=true`, { headers });
         alert("GitHub cache refreshed successfully!");
       }
     },
