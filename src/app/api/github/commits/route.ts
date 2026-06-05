@@ -22,14 +22,12 @@ export async function GET(request: Request) {
     const projectId = searchParams.get("projectId"); 
     
     let token = request.headers.get("Authorization")?.replace("Bearer ", "").replace("token ", "") || process.env.GITHUB_TOKEN;
-    if (!token) {
-      return NextResponse.json({ error: "No GitHub token provided" }, { status: 401 });
-    }
-
     const headers: HeadersInit = {
-      "Authorization": `bearer ${token}`,
       "Accept": "application/vnd.github.v3+json",
     };
+    if (token) {
+      headers["Authorization"] = `bearer ${token}`;
+    }
 
     const sinceDate = new Date();
     sinceDate.setDate(sinceDate.getDate() - days);
