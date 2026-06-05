@@ -25,41 +25,70 @@ export async function GET(request: Request) {
       }
     }
 
-    if (!token) {
-      return NextResponse.json({ error: "No GitHub token provided and no valid cache found." }, { status: 401 });
-    }
-
     const headers: HeadersInit = {
-      "Authorization": `bearer ${token}`,
       "Accept": "application/vnd.github.v3+json",
     };
-
-    // 2. Fetch Repositories
-    const reposRes = await fetch(`https://api.github.com/users/${username}/repos?sort=pushed&per_page=100`, {
-      headers,
-      next: { revalidate: 60 }
-    });
-    
-    if (!reposRes.ok) {
-      if (existingCache) return NextResponse.json(existingCache.data);
-      throw new Error(`GitHub API returned status ${reposRes.status}`);
+    if (token) {
+      headers["Authorization"] = `bearer ${token}`;
     }
 
-    const reposData = await reposRes.json();
+    // 2. Fetch Repositories (Fetch user/repos if authenticated to get private repos, fall back to users/username/repos)
+    // We paginate to retrieve all repositories up to 5 pages (500 repos)
+    let reposData: any[] = [];
+    let page = 1;
+    let hasMore = true;
+    while (hasMore && page <= 5) {
+      const url = token 
+        ? `https://api.github.com/user/repos?sort=pushed&per_page=100&page=${page}`
+        : `https://api.github.com/users/${username}/repos?sort=pushed&per_page=100&page=${page}`;
 
-    // 3. Process Repositories
-    let processedRepos = (reposData as any[]).map((r: any) => ({
-      id: r.id,
-      name: r.name,
-      description: r.description || null,
-      html_url: r.html_url,
-      updated_at: r.pushed_at || r.updated_at,
-      stargazers_count: r.stargazers_count,
-      forks_count: r.forks,
-      language: r.language || null,
-      open_issues_count: r.open_issues_count || 0,
-      last_commit_message: null
-    }));
+      const reposRes = await fetch(url, {
+        headers,
+        next: { revalidate: 60 }
+      });
+      
+      if (!reposRes.ok) {
+        if (reposData.length > 0) {
+          break;
+        }
+        if (existingCache) return NextResponse.json(existingCache.data);
+        throw new Error(`GitHub API returned status ${reposRes.status}`);
+      }
+
+      const pageData = await reposRes.json();
+      if (!Array.isArray(pageData) || pageData.length === 0) {
+        hasMore = false;
+      } else {
+        reposData = [...reposData, ...pageData];
+        if (pageData.length < 100) {
+          hasMore = false;
+        } else {
+          page++;
+        }
+      }
+    }
+
+    // 3. Process Repositories (de-duplicate just in case)
+    const seenIds = new Set();
+    let processedRepos = (reposData as any[])
+      .filter((r: any) => {
+        if (seenIds.has(r.id)) return false;
+        seenIds.add(r.id);
+        return true;
+      })
+      .map((r: any) => ({
+        id: r.id,
+        name: r.name,
+        owner: r.owner?.login || username,
+        description: r.description || null,
+        html_url: r.html_url,
+        updated_at: r.pushed_at || r.updated_at,
+        stargazers_count: r.stargazers_count,
+        forks_count: r.forks,
+        language: r.language || null,
+        open_issues_count: r.open_issues_count || 0,
+        last_commit_message: null
+      }));
 
     // Only enrich top 15 most recently updated repos to avoid rate limits
     processedRepos = processedRepos.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
@@ -67,8 +96,8 @@ export async function GET(request: Request) {
     for (let i = 0; i < Math.min(15, processedRepos.length); i++) {
       const r = processedRepos[i];
       try {
-        // Fetch last commit
-        const commitRes = await fetch(`https://api.github.com/repos/${username}/${r.name}/commits?per_page=1`, { headers });
+        // Fetch last commit using repository owner
+        const commitRes = await fetch(`https://api.github.com/repos/${r.owner}/${r.name}/commits?per_page=1`, { headers });
         if (commitRes.ok) {
           const commitsData = await commitRes.json();
           if (commitsData && commitsData.length > 0) {
@@ -77,7 +106,7 @@ export async function GET(request: Request) {
         }
         
         // Fetch accurate issues count (excluding PRs) using Search API
-        const issueRes = await fetch(`https://api.github.com/search/issues?q=repo:${username}/${r.name}+type:issue+state:open&per_page=1`, { headers });
+        const issueRes = await fetch(`https://api.github.com/search/issues?q=repo:${r.owner}/${r.name}+type:issue+state:open&per_page=1`, { headers });
         if (issueRes.ok) {
           const issueData = await issueRes.json();
           r.open_issues_count = issueData.total_count !== undefined ? issueData.total_count : r.open_issues_count;
@@ -178,7 +207,7 @@ export async function GET(request: Request) {
     // 5. Fetch Parallel Commits for active repos (Cap to 20 to avoid rate limits)
     const commitPromises = activeRepos.slice(0, 20).map(async (repo) => {
       try {
-        const cRes = await fetch(`https://api.github.com/repos/${username}/${repo.name}/commits?per_page=1`, {
+        const cRes = await fetch(`https://api.github.com/repos/${repo.owner}/${repo.name}/commits?per_page=1`, {
           headers
         });
         if (cRes.ok) {
@@ -208,7 +237,7 @@ export async function GET(request: Request) {
 
     const payload = {
       username,
-      repos: processedRepos.slice(0, 30),
+      repos: processedRepos,
       commits,
       stats: {
         totalRepos: processedRepos.length,
