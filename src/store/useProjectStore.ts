@@ -82,10 +82,18 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       if (!res.ok) throw new Error("Failed to add project");
       const savedProject = await res.json();
 
-      // Replace temp project with real saved project
-      set((state) => ({
-        projects: state.projects.map((p) => (p.id === tempId ? savedProject : p)),
-      }));
+      // Replace temp project with real saved project, checking for duplicates
+      set((state) => {
+        const alreadyExists = state.projects.some((p) => p.id === savedProject.id && p.id !== tempId);
+        if (alreadyExists) {
+          return {
+            projects: state.projects.filter((p) => p.id !== tempId)
+          };
+        }
+        return {
+          projects: state.projects.map((p) => (p.id === tempId ? savedProject : p)),
+        };
+      });
     } catch (err) {
       // Revert optimistic update
       const errorMessage = err instanceof Error ? err.message : 'An error occurred';
