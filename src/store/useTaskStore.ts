@@ -15,7 +15,7 @@ interface TaskState {
   loading: boolean;
   error: string | null;
   fetchTasks: () => Promise<void>;
-  addTask: (task: Omit<Task, "id" | "completed">) => Promise<void>;
+  addTask: (task: Omit<Task, "id" | "completed" | "createdAt">) => Promise<void>;
   toggleTask: (id: string) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
 }
