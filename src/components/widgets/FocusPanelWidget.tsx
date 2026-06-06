@@ -40,6 +40,20 @@ export function FocusPanelWidget() {
   // Tasks State
   const [showDone, setShowDone] = useState(false);
 
+  // Local Date Calculations
+  const getLocalDateString = (date = new Date()) => {
+    const offset = date.getTimezoneOffset();
+    const localDate = new Date(date.getTime() - (offset * 60 * 1000));
+    return localDate.toISOString().split('T')[0];
+  };
+
+  const todayStr = getLocalDateString();
+  const [selectedDate, setSelectedDate] = useState(todayStr);
+
+  const maxDate = new Date();
+  maxDate.setDate(new Date().getDate() + 15);
+  const maxDateStr = getLocalDateString(maxDate);
+
   // ── TASKS LOGIC ──
   const parseTaskInput = (text: string) => {
     let title = text;
@@ -142,7 +156,8 @@ export function FocusPanelWidget() {
           for (const item of data.items) {
             if (item.category === "task") {
               const parsed = parseTaskInput(item.content);
-              addTask({ title: parsed.title, priority: parsed.priority, dueDate: parsed.dueDate, projectId: currentTaggedProject?.id });
+              const taskDate = selectedDate || parsed.dueDate || todayStr;
+              addTask({ title: parsed.title, priority: parsed.priority, dueDate: taskDate, projectId: currentTaggedProject?.id });
             } else {
               await addNote(item.content, currentTaggedProject?.id, item.category);
             }
@@ -150,7 +165,8 @@ export function FocusPanelWidget() {
         } else {
           if (data.category === "task") {
             const parsed = parseTaskInput(content);
-            addTask({ title: parsed.title, priority: parsed.priority, dueDate: parsed.dueDate, projectId: currentTaggedProject?.id });
+            const taskDate = selectedDate || parsed.dueDate || todayStr;
+            addTask({ title: parsed.title, priority: parsed.priority, dueDate: taskDate, projectId: currentTaggedProject?.id });
           } else {
             await addNote(content, currentTaggedProject?.id, data.category || "general note");
           }
@@ -159,13 +175,15 @@ export function FocusPanelWidget() {
         const isTask = content.length < 100 || /^(fix|do|make|create|deploy|update|urgent|add)\b/i.test(content);
         if (isTask) {
           const parsed = parseTaskInput(content);
-          addTask({ title: parsed.title, priority: parsed.priority, dueDate: parsed.dueDate, projectId: currentTaggedProject?.id });
+          const taskDate = selectedDate || parsed.dueDate || todayStr;
+          addTask({ title: parsed.title, priority: parsed.priority, dueDate: taskDate, projectId: currentTaggedProject?.id });
         } else {
           await addNote(content, currentTaggedProject?.id, "general note");
         }
       } finally {
         setIsClassifying(false);
         setTaggedProject(null);
+        setSelectedDate(todayStr);
       }
     }
   };
@@ -194,8 +212,8 @@ export function FocusPanelWidget() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  const pendingTasks = tasks.filter(t => !t.completed);
-  const completedTasks = tasks.filter(t => t.completed);
+  const pendingTasks = tasks.filter(t => !t.completed && t.dueDate === todayStr);
+  const completedTasks = tasks.filter(t => t.completed && t.dueDate === todayStr);
 
   const getPriorityColor = (p: string) => {
     if (p === "high") return "bg-red-500";
@@ -242,25 +260,50 @@ export function FocusPanelWidget() {
             onChange={handleInputChange}
             onKeyDown={handleUnifiedEnter}
             placeholder="Type anything... AI will sort into Tasks or Brain Dump"
-            className="min-h-[60px] max-h-[140px] overflow-y-auto text-sm resize-none bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 p-3 pb-10 custom-scrollbar scrollbar-hide"
+            className="min-h-[60px] max-h-[140px] overflow-y-auto text-sm resize-none bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 p-3 pb-2 focus:outline-none custom-scrollbar scrollbar-hide"
           />
           
-          <div className="absolute bottom-2 right-2 flex items-center gap-2">
-            {isClassifying && (
-              <div className="flex items-center text-[10px] text-primary gap-1 mr-1">
-                <Loader2 className="w-3 h-3 animate-spin" /> Classifying...
+          <div className="flex items-center justify-between px-3 py-2 border-t border-white/5 bg-black/10 rounded-b-xl shrink-0">
+            <div className="flex items-center gap-2">
+              {/* Date picker for tasks */}
+              <div className="flex items-center gap-1.5 bg-[#0f0f11] border border-white/10 rounded-md px-2 py-0.5">
+                <span className="text-[9px] font-bold text-muted-foreground uppercase">Deadline:</span>
+                <input 
+                  type="date" 
+                  value={selectedDate} 
+                  min={todayStr}
+                  max={maxDateStr}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="bg-transparent border-none text-[11px] text-foreground font-mono focus:outline-none focus:ring-0 w-[110px] select-none [color-scheme:dark]"
+                />
               </div>
-            )}
-            <Button 
-              size="icon"
-              variant="secondary"
-              className="w-7 h-7 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:bg-white/5 disabled:text-white/40 transition-all"
-              onClick={handleSubmit}
-              disabled={!unifiedInput.trim() || isClassifying}
-              title="Submit to AI (Ctrl+Enter)"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </Button>
+
+              {taggedProject && (
+                <div className="flex items-center gap-1 bg-primary/20 text-primary text-[10px] px-2.5 py-0.5 rounded-md font-bold border border-primary/20">
+                  @{taggedProject.name}
+                  <button onClick={() => setTaggedProject(null)} className="hover:text-white transition-colors">
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              {isClassifying && (
+                <div className="flex items-center text-[10px] text-primary gap-1">
+                  <Loader2 className="w-3 h-3 animate-spin" /> Classifying...
+                </div>
+              )}
+              <Button 
+                size="icon"
+                className="w-7 h-7 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:bg-white/5 disabled:text-white/40 transition-all"
+                onClick={handleSubmit}
+                disabled={!unifiedInput.trim() || isClassifying}
+                title="Submit (Ctrl+Enter)"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -283,13 +326,6 @@ export function FocusPanelWidget() {
             {projects.filter(p => p.name.toLowerCase().includes(projectSearch.toLowerCase())).length === 0 && (
               <div className="px-3 py-2 text-xs text-muted-foreground">No projects found</div>
             )}
-          </div>
-        )}
-
-        {taggedProject && (
-          <div className="absolute bottom-2 left-5 flex items-center gap-1 bg-primary/20 text-primary text-[10px] px-2 py-0.5 rounded-full font-bold z-10">
-            @{taggedProject.name}
-            <button onClick={() => setTaggedProject(null)}><X className="w-3 h-3 hover:text-white" /></button>
           </div>
         )}
 
