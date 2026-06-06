@@ -25,6 +25,33 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Project name is required" }, { status: 400 });
     }
 
+    // Check if project already exists to prevent duplication
+    let existingProject = null;
+    if (githubUrl) {
+      existingProject = await prisma.project.findFirst({
+        where: {
+          githubUrl: {
+            equals: githubUrl,
+            mode: "insensitive"
+          }
+        }
+      });
+    }
+    if (!existingProject && folderPath) {
+      existingProject = await prisma.project.findFirst({
+        where: {
+          folderPath: {
+            equals: folderPath,
+            mode: "insensitive"
+          }
+        }
+      });
+    }
+
+    if (existingProject) {
+      return NextResponse.json(existingProject);
+    }
+
     const project = await prisma.project.create({
       data: {
         name,
