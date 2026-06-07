@@ -1,6 +1,6 @@
 import { streamText, createTextStreamResponse } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
-import prisma from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 
 const openrouter = createOpenAI({
   baseURL: "https://openrouter.ai/api/v1",
@@ -27,29 +27,61 @@ export async function POST(request: Request) {
       return Response.json({ error: "Query is required" }, { status: 400 });
     }
 
-    const lowerQuery = query.toLowerCase();
+    // 1. FRESH DB PULL FOR EACH REQUEST
+    const [dbProjects, dbTasks, notes, commits] = await Promise.all([
+      prisma.project.findMany({ include: { links: true }, take: 20 }),
+      prisma.task.findMany({ orderBy: { createdAt: 'desc' } }),
+      prisma.note.findMany({ orderBy: { createdAt: 'desc' }, take: 10 }),
+      prisma.commit.findMany({
+        where: { date: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } },
+        orderBy: { date: 'desc' },
+        take: 50
+      })
+    ]);
 
-    // 1. SMART ROUTING: Stale Projects (Direct DB bypass without AI)
-    if (lowerQuery.includes("stale")) {
-      const cutoff = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
-      const staleProjects = await prisma.project.findMany({ 
-        where: { updatedAt: { lt: cutoff }, status: { not: "completed" } } 
-      });
-      
-      if (staleProjects.length === 0) {
-        return new Response("No stale projects! Everything has been touched recently.", { headers: { "Content-Type": "text/plain" } });
-      }
-      
-      const responseText = staleProjects.map(p => {
-        const days = Math.floor((Date.now() - new Date(p.updatedAt).getTime()) / (1000 * 60 * 60 * 24));
-        return `• ${p.name} (Stale for ${days} days)`;
-      }).join("\n");
-      
-      return new Response(`Here are your stale projects:\n\n${responseText}`, { headers: { "Content-Type": "text/plain" } });
+    // Map DB fields to prompt requirements in memory
+    const projects = dbProjects.map(p => ({
+      ...p,
+      health: p.projectHealth,
+      tasks: dbTasks.filter(t => t.projectId === p.id)
+    }));
+
+    const tasks = dbTasks.filter(t => !t.completed).slice(0, 30);
+
+    // 2. COMPUTE DERIVED SIGNALS
+    const now = Date.now();
+    const stale = projects.filter(p => (now - new Date(p.updatedAt).getTime()) > 14 * 86400000);
+    const overdue = tasks.filter(t => t.dueDate && new Date(t.dueDate) < new Date());
+    const todayTasks = tasks.filter(t => {
+      if (!t.dueDate) return false;
+      const d = new Date(t.dueDate);
+      const today = new Date();
+      return d.toDateString() === today.toDateString();
+    });
+
+    // 3. SMART INTENT ROUTING (Direct DB bypass before AI)
+    const q = query.toLowerCase();
+
+    if (q.includes('stale')) {
+      const list = stale.map(p => `${p.name} — ${Math.floor((now - new Date(p.updatedAt).getTime())/86400000)}d ago`).join('\n');
+      const responseMsg = stale.length === 0 ? 'All projects are active.' : `${stale.length} stale projects:\n${list}`;
+      return Response.json({ response: responseMsg, result: responseMsg });
     }
 
+    if (q.includes('overdue')) {
+      const list = overdue.map(t => `"${t.title}" — due ${new Date(t.dueDate!).toLocaleDateString()}`).join('\n');
+      const responseMsg = overdue.length === 0 ? 'No overdue tasks.' : `${overdue.length} overdue:\n${list}`;
+      return Response.json({ response: responseMsg, result: responseMsg });
+    }
+
+    if (q.includes('today') && (q.includes('task') || q.includes('do'))) {
+      const list = todayTasks.map(t => `"${t.title}" [${t.priority}]`).join('\n');
+      const responseMsg = todayTasks.length === 0 ? 'No tasks due today.' : `Today's tasks:\n${list}`;
+      return Response.json({ response: responseMsg, result: responseMsg });
+    }
+
+    // 4. CHOOSE MODEL AND VERIFY CONFIGURATION
     let modelInstance = null;
-    
     if (process.env.GROQ_API_KEY) {
       modelInstance = groq("llama-3.3-70b-versatile");
     } else if (process.env.OPENROUTER_API_KEY) {
@@ -60,70 +92,42 @@ export async function POST(request: Request) {
       return Response.json({ error: "Please configure your OPENROUTER_API_KEY or GROQ_API_KEY in .env to enable AI answers." }, { status: 500 });
     }
 
-    // 2. FETCH LIVE CONTEXT
-    const projects = await prisma.project.findMany();
-    const staleCount = projects.filter(p => p.updatedAt < new Date(Date.now() - 14 * 24 * 60 * 60 * 1000)).length;
-    const tasks = await prisma.task.findMany({ where: { completed: false }, orderBy: { createdAt: 'desc' }, take: 20 });
-    const notes = await prisma.note.findMany({ orderBy: { createdAt: 'desc' }, take: 10 });
+    // 5. COMMIT SUMMARY GROUPED BY REPO
+    const byRepo = commits.reduce((acc, c) => {
+      acc[c.repoName] = acc[c.repoName] || [];
+      acc[c.repoName].push(c.message);
+      return acc;
+    }, {} as Record<string, string[]>);
 
-    // 3. SMART ROUTING MODIFIERS
-    let additionalInstructions = "";
-    let filteredProjects = projects;
-    let filteredTasks = tasks;
-    let filteredNotes = notes;
+    const commitSummary = Object.entries(byRepo)
+      .map(([repo, msgs]) => `  ${repo} (${msgs.length} commits): ${msgs.slice(0,3).join(' | ')}`)
+      .join('\n');
 
-    if (lowerQuery.includes("work on") || lowerQuery.includes("focus")) {
-      additionalInstructions = "\nCRITICAL INSTRUCTION: The user is asking what to focus on. Pick EXACTLY ONE project and ONE task from the context below and explain briefly why she should work on it.";
-    } else if (lowerQuery.includes("summarize")) {
-      const targetProject = projects.find(p => lowerQuery.includes(p.name.toLowerCase()));
-      if (targetProject) {
-        filteredProjects = [targetProject];
-        filteredTasks = tasks.filter(t => t.projectId === targetProject.id && !t.completed);
-        filteredNotes = notes;
-        additionalInstructions = `\nCRITICAL INSTRUCTION: Summarize the project "${targetProject.name}" based on its tasks and data.`;
-      }
-    } else if (lowerQuery.match(/\b(built|last few days|this week|commits|progress|what did i do|summary)\b/)) {
-      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-      const recentCommits = await prisma.commit.findMany({
-        where: { date: { gte: sevenDaysAgo } },
-        orderBy: { date: 'desc' }
-      });
-      
-      const commitSummary: Record<string, { count: number, messages: string[] }> = {};
-      recentCommits.forEach((c: any) => {
-        if (!commitSummary[c.repoName]) {
-          commitSummary[c.repoName] = { count: 0, messages: [] };
-        }
-        commitSummary[c.repoName].count++;
-        if (commitSummary[c.repoName].messages.length < 5) {
-          commitSummary[c.repoName].messages.push(c.message);
-        }
-      });
-      
-      const commitStr = Object.entries(commitSummary)
-        .map(([repo, data]) => `${repo} (${data.count} commits): ${data.messages.join(", ")}`)
-        .join("\n");
-        
-      additionalInstructions = `\nCRITICAL INSTRUCTION: The user is asking for a dev diary/progress summary. Based on the RECENT COMMITS below, return a short, human-readable changelog. Start with "Here's what you built recently:" followed by bullet points per project.\n\nRECENT COMMITS (last 7 days):\n${commitStr || "No recent commits."}`;
-    }
+    // 6. BUILD FRESH CONTEXT SYSTEM PROMPT
+    const systemPrompt = `You are the AI brain of DevOS — Kavya's personal developer operating system.
+Kavya is a student developer based in India, building multiple projects simultaneously.
+You have live access to her workspace data. Be specific, direct, and actionable.
+Never give generic advice. Always reference actual project names, task titles, or commit messages.
+Keep answers under 120 words unless asked for detail. No bullet points unless listing >3 items.
 
-    // 4. BUILD PROMPT
-    const systemPrompt = `You are Kavya's personal dev OS assistant. You have access to her live workspace data. Be direct, specific, and actionable. Never be generic. Reference actual project names, task names, and dates.
-${additionalInstructions}
+LIVE WORKSPACE DATA:
+Projects (${projects.length} total, ${stale.length} stale):
+${projects.map(p => `  ${p.name} [${p.status}] health:${p.health ?? 'unknown'} tasks:${p.tasks.filter(t=>!t.completed).length} open`).join('\n')}
 
-LIVE CONTEXT:
-Projects (${filteredProjects.length} total, ${staleCount} stale):
-${filteredProjects.map(p => `- ${p.name} [${p.status}] last updated ${new Date(p.updatedAt).toISOString().split('T')[0]} | tasks: ${tasks.filter(t=>!t.completed && t.projectId === p.id).length} open`).join('\n')}
+Stale projects (no activity >14d): ${stale.map(p=>p.name).join(', ') || 'none'}
 
-Open tasks (${filteredTasks.length}):
-${filteredTasks.map(t => `- ${t.title} [${t.priority}] due: ${t.dueDate ? new Date(t.dueDate).toISOString().split('T')[0] : 'no date'}`).join('\n')}
+Open tasks (${tasks.length} total, ${overdue.length} overdue, ${todayTasks.length} due today):
+${tasks.slice(0,10).map(t => `  "${t.title}" [${t.priority}]${t.dueDate ? ` due ${new Date(t.dueDate).toLocaleDateString()}` : ''}`).join('\n')}
 
-Recent notes:
-${filteredNotes.map(n => `- ${n.content.slice(0,80)}`).join('\n')}
+This week's commits (${commits.length} total):
+${commitSummary || '  No recent commits'}
 
-Today is ${new Date().toDateString()}.`;
+Recent brain dump:
+${notes.slice(0,5).map(n => `  "${n.content.slice(0,60)}"`).join('\n') || '  Empty'}
 
-    // 5. CALL AI
+Today is ${new Date().toLocaleDateString('en-IN', { weekday:'long', day:'numeric', month:'long', year:'numeric' })}.`;
+
+    // 7. CALL AI MODEL AND STREAM TEXT RESPONSE
     const result = streamText({
       model: modelInstance,
       system: systemPrompt,
