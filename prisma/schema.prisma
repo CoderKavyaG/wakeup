@@ -206,3 +206,13 @@ model ProjectMemory {
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 }
+
+model AIInsight {
+  id        String   @id @default(cuid())
+  type      String   // 'daily_brief' | 'stale_warning' | 'overdue' | 'commit_summary'
+  content   String
+  metadata  Json?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+}
