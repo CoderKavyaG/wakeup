@@ -28,6 +28,8 @@ export interface Project {
   health?: number | null;
   healthSignals?: string | null;
 
+  vercelProjectId?: string;
+
   updatedAt: string;
 }
 

@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useProjectStore, Project, ProjectStatus } from "@/store/useProjectStore";
 import { useNoteStore } from "@/store/useNoteStore";
 import { useTaskStore } from "@/store/useTaskStore";
+import { useBootstrapStore } from "@/store/useBootstrapStore";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -41,6 +42,36 @@ export function ProjectsWidget() {
   const { projects, deleteProject, updateProject, addProject, loading } = useProjectStore();
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const currentProject = projects.find(p => p.id === selectedProject?.id) || selectedProject;
+
+  const vercel = useBootstrapStore(s => s.vercel);
+  const setVercelToken = useBootstrapStore(s => s.setVercelToken);
+  const removeVercelToken = useBootstrapStore(s => s.removeVercelToken);
+
+  const [tokenInput, setTokenInput] = useState("");
+  const [savingToken, setSavingToken] = useState(false);
+
+  const handleSaveToken = async () => {
+    if (!tokenInput.trim()) return;
+    setSavingToken(true);
+    try {
+      await setVercelToken(tokenInput.trim());
+      setTokenInput("");
+    } catch (err: any) {
+      alert(`Failed to save Vercel token: ${err.message}`);
+    } finally {
+      setSavingToken(false);
+    }
+  };
+
+  const handleMapProject = async (vercelProjId: string) => {
+    if (!currentProject) return;
+    try {
+      await updateProject(currentProject.id, { vercelProjectId: vercelProjId });
+      setSelectedProject({ ...currentProject, vercelProjectId: vercelProjId });
+    } catch (err) {
+      alert("Failed to map project");
+    }
+  };
   
   // New Feedback State
   
@@ -1201,6 +1232,187 @@ export function ProjectsWidget() {
             {activeTab === "control_room" && (
               <div className="space-y-6 pb-4">
                 
+                {/* Vercel Integration Section */}
+                <div className="space-y-3 p-4 rounded-xl bg-black/30 border border-white/5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-[#0070f3]" />
+                      <h4 className="text-xs font-semibold text-foreground">Vercel Integration</h4>
+                    </div>
+                    {vercel?.hasToken && (
+                      <button
+                        onClick={removeVercelToken}
+                        className="text-[9px] text-red-400 hover:text-red-300 font-bold uppercase tracking-wider cursor-pointer"
+                      >
+                        Disconnect
+                      </button>
+                    )}
+                  </div>
+
+                  {!vercel?.hasToken ? (
+                    <div className="space-y-2 pt-1">
+                      <p className="text-[10px] text-muted-foreground leading-normal">
+                        Connect Vercel to see real visit stats, deployments, and live status.
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="password"
+                          placeholder="Vercel Token (ve_...)"
+                          value={tokenInput}
+                          onChange={e => setTokenInput(e.target.value)}
+                          className="h-8 text-xs bg-black/40 border-white/10 focus-visible:ring-[#0070f3]/30 flex-1"
+                        />
+                        <Button
+                          size="sm"
+                          onClick={handleSaveToken}
+                          disabled={savingToken || !tokenInput}
+                          className="h-8 bg-[#0070f3] hover:bg-[#0070f3]/95 text-white font-semibold text-xs shrink-0 cursor-pointer"
+                        >
+                          {savingToken ? "Connecting..." : "Connect"}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3 pt-1">
+                      {/* Vercel Project Mapping */}
+                      {!currentProject.vercelProjectId ? (
+                        <div className="space-y-2">
+                          <p className="text-[10px] text-yellow-400/80 leading-normal">
+                            ⚠️ Vercel project not mapped. Match it below:
+                          </p>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger className="w-full text-left text-xs font-semibold px-3 py-2 rounded-lg border bg-black/40 border-white/10 text-muted-foreground hover:bg-white/5 flex items-center justify-between outline-none cursor-pointer">
+                              Select Vercel Project...
+                              <ChevronRight className="w-3.5 h-3.5 rotate-90" />
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start" className="bg-[#0f0f11] border-white/10 text-foreground w-[240px] max-h-[200px] overflow-y-auto shadow-xl custom-scrollbar">
+                              {vercel.projects?.length === 0 ? (
+                                <DropdownMenuItem disabled className="text-xs text-muted-foreground">
+                                  No projects found on Vercel
+                                </DropdownMenuItem>
+                              ) : (
+                                vercel.projects?.map((vp: any) => (
+                                  <DropdownMenuItem
+                                    key={vp.id}
+                                    className="text-xs font-semibold cursor-pointer focus:bg-white/10"
+                                    onClick={() => handleMapProject(vp.id)}
+                                  >
+                                    {vp.name}
+                                  </DropdownMenuItem>
+                                ))
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {/* Visit Stats & Sparkline */}
+                          {(() => {
+                            const projectAnalytics = vercel.analytics?.[currentProject.id];
+                            const rawVisits = projectAnalytics?.data?.map((d: any) => d.visits ?? d.views ?? 0) || [];
+                            const visits = [...Array(7)].map((_, i) => rawVisits[i] ?? 0);
+                            const totalVisits = visits.reduce((a, b) => a + b, 0);
+
+                            // Calculate trend
+                            const firstHalf = visits[0] + visits[1] + visits[2];
+                            const secondHalf = visits[4] + visits[5] + visits[6];
+                            const change = firstHalf > 0 ? ((secondHalf - firstHalf) / firstHalf) * 100 : 0;
+                            const isPositive = change >= 0;
+
+                            const maxVisits = Math.max(...visits, 1);
+
+                            return (
+                              <div className="flex items-center justify-between p-3 rounded-lg bg-white/[0.02] border border-white/5">
+                                <div className="space-y-1">
+                                  <span className="text-[9px] font-bold uppercase text-muted-foreground tracking-widest leading-none">Visit Stats</span>
+                                  <div className="flex items-baseline gap-2">
+                                    <span className="text-lg font-bold font-mono text-white leading-none">{totalVisits}</span>
+                                    <span className="text-[10px] text-muted-foreground font-sans">visits</span>
+                                  </div>
+                                  {totalVisits > 0 && (
+                                    <span className={`text-[10px] font-bold flex items-center gap-1 ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
+                                      {isPositive ? '↑' : '↓'} {Math.round(Math.abs(change))}% this week
+                                    </span>
+                                  )}
+                                </div>
+
+                                {/* Sparkline */}
+                                <div className="h-8 flex items-end gap-1.5 pb-1 select-none pr-1">
+                                  {visits.map((v, idx) => {
+                                    const heightPercent = Math.max(15, Math.round((v / maxVisits) * 100));
+                                    return (
+                                      <div
+                                        key={idx}
+                                        style={{ height: `${heightPercent}%` }}
+                                        className="w-1.5 bg-[#0070f3]/60 hover:bg-[#0070f3] rounded-t transition-all duration-300"
+                                        title={`${v} visits`}
+                                      />
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          })()}
+
+                          {/* Deployments Section */}
+                          <div className="space-y-2">
+                            <span className="text-[9px] font-bold uppercase text-muted-foreground tracking-widest px-0.5">Deployments</span>
+                            {(() => {
+                              const projectDeployments = vercel.deployments
+                                ?.filter((dep: any) => dep.projectId === currentProject.vercelProjectId)
+                                ?.slice(0, 3) || [];
+
+                              if (projectDeployments.length === 0) {
+                                return (
+                                  <p className="text-[10px] text-muted-foreground text-center py-2">
+                                    No deployments found.
+                                  </p>
+                                );
+                              }
+
+                              const getDeployStatusClass = (state: string) => {
+                                const s = state.toUpperCase();
+                                if (s === "READY") return "bg-green-500 shadow-green-500/50";
+                                if (s === "ERROR") return "bg-red-500 shadow-red-500/50";
+                                if (s === "BUILDING") return "bg-amber-500 shadow-amber-500/50 animate-pulse";
+                                return "bg-zinc-500 shadow-zinc-500/50";
+                              };
+
+                              return (
+                                <div className="space-y-2">
+                                  {projectDeployments.map((dep: any) => {
+                                    const depAgo = Math.floor((Date.now() - dep.created) / (1000 * 60 * 60));
+                                    const timeAgo = depAgo < 24 ? `${depAgo}h ago` : `${Math.floor(depAgo / 24)}d ago`;
+                                    const commitMsg = dep.meta?.githubCommitMessage || dep.name || "Manual deploy";
+                                    const branch = dep.meta?.githubCommitRef || "main";
+
+                                    return (
+                                      <div key={dep.uid} className="flex items-center justify-between p-2 rounded-lg bg-white/[0.01] border border-white/5 hover:bg-white/[0.03] transition-colors gap-2">
+                                        <div className="flex items-center gap-2.5 min-w-0">
+                                          <div className={`w-2 h-2 rounded-full shrink-0 shadow-sm ${getDeployStatusClass(dep.state)}`} title={dep.state} />
+                                          <span className="text-xs text-foreground font-medium truncate" title={commitMsg}>
+                                            {commitMsg}
+                                          </span>
+                                        </div>
+                                        <div className="flex items-center gap-2 shrink-0">
+                                          <span className="text-[9px] text-muted-foreground font-mono">{timeAgo}</span>
+                                          <Badge className="text-[8px] py-0 px-1.5 uppercase bg-white/5 text-muted-foreground border-white/10 font-bold shrink-0">
+                                            {branch}
+                                          </Badge>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 {/* Live Link Section */}
                 {selectedProject.liveUrl && (
                   <div className="space-y-2">

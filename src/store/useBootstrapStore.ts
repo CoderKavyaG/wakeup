@@ -14,13 +14,23 @@ interface DerivedSignals {
   totalToday: number;
 }
 
+export interface VercelData {
+  hasToken: boolean;
+  deployments: any[];
+  projects: any[];
+  analytics: Record<string, any>;
+}
+
 interface BootstrapState {
   loaded: boolean;
   loading: boolean;
   error: string | null;
   derived: DerivedSignals | null;
+  vercel: VercelData | null;
   lastBootstrapped: number | null;
-  bootstrap: () => Promise<void>;
+  bootstrap: (force?: boolean) => Promise<void>;
+  setVercelToken: (token: string) => Promise<void>;
+  removeVercelToken: () => Promise<void>;
 }
 
 export const useBootstrapStore = create<BootstrapState>((set, get) => ({
@@ -28,13 +38,14 @@ export const useBootstrapStore = create<BootstrapState>((set, get) => ({
   loading: false,
   error: null,
   derived: null,
+  vercel: null,
   lastBootstrapped: null,
 
-  bootstrap: async () => {
+  bootstrap: async (force = false) => {
     // Guard: don't double-fetch if already loading or recently loaded (<30s ago)
     const { loading, lastBootstrapped } = get();
     if (loading) return;
-    if (lastBootstrapped && Date.now() - lastBootstrapped < 30_000) return;
+    if (!force && lastBootstrapped && Date.now() - lastBootstrapped < 30_000) return;
 
     set({ loading: true, error: null });
 
@@ -59,6 +70,7 @@ export const useBootstrapStore = create<BootstrapState>((set, get) => ({
         loaded: true,
         loading: false,
         derived: data.derived ?? null,
+        vercel: data.vercel ?? null,
         lastBootstrapped: Date.now(),
       });
     } catch (e) {
@@ -67,4 +79,35 @@ export const useBootstrapStore = create<BootstrapState>((set, get) => ({
       set({ loading: false, error: message });
     }
   },
+
+  setVercelToken: async (token: string) => {
+    const res = await fetch("/api/vercel", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token })
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "Failed to update token");
+    }
+    await get().bootstrap(true);
+  },
+
+  removeVercelToken: async () => {
+    const res = await fetch("/api/vercel", {
+      method: "DELETE"
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "Failed to remove token");
+    }
+    set({
+      vercel: {
+        hasToken: false,
+        deployments: [],
+        projects: [],
+        analytics: {}
+      }
+    });
+  }
 }));

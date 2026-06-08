@@ -49,6 +49,7 @@ model Project {
   notes                Note[]
   userId               String?
   user                 User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vercelProjectId      String?
 }
 
 model Commit {
@@ -162,6 +163,7 @@ model User {
   googleId      String?   @unique
   role          String    @default("user") // "user", "admin"
   avatar        String?
+  vercelToken   String?   // Vercel API Integration Token
   createdAt     DateTime  @default(now())
 
   // Relations
