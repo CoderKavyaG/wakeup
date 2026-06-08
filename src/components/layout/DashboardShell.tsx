@@ -8,7 +8,7 @@ import { Lock, Unlock, Bookmark, X, Search } from "lucide-react";
 import { Button } from "../ui/button";
 import { QuickLinksWidget } from "../widgets/QuickLinksWidget";
 import { AnimatePresence, motion } from "framer-motion";
-import { SessionBriefing } from "./SessionBriefing";
+import AmbientBar from "./AmbientBar";
 import { Download } from "lucide-react";
 import { useBootstrapStore } from "@/store/useBootstrapStore";
 
@@ -135,7 +135,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         </div>
       </div>
 
-      <SessionBriefing />
+      <AmbientBar />
 
       {/* Main Workspace */}
       <main className="flex-1 overflow-y-auto p-6 relative">

@@ -6,7 +6,6 @@ export type WidgetType =
   | "github" 
   | "focus" 
   | "machine"
-  | "clock"
   | "terminal";
 
 interface WidgetInstance {
@@ -40,7 +39,6 @@ const widgetConfigs: { [key in WidgetType]: { minW: number, minH: number, defaul
   github: { minW: 3, minH: 3, defaultW: 4, defaultH: 4 },
   focus: { minW: 3, minH: 4, defaultW: 4, defaultH: 4 },
   machine: { minW: 4, minH: 6, defaultW: 6, defaultH: 6 },
-  clock: { minW: 2, minH: 3, defaultW: 3, defaultH: 4 },
   terminal: { minW: 4, minH: 6, defaultW: 6, defaultH: 8 },
 };
 
@@ -80,9 +78,15 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
       const data = await res.json();
       
       if (data) {
+        const widgets = ((data.widgets as WidgetInstance[]) || []).filter(w => (w.type as string) !== "clock");
+        const layouts = { ...((data.layouts as { [key: string]: any[] }) || defaultLayouts) };
+        if (layouts.lg) {
+          layouts.lg = layouts.lg.filter((l: any) => !l.i.startsWith("clock-"));
+        }
+        
         set({
-          layouts: (data.layouts as { [key: string]: Layout }) || defaultLayouts,
-          widgets: (data.widgets as WidgetInstance[]) || defaultWidgets,
+          layouts: layouts as any,
+          widgets,
           loading: false
         });
       } else {

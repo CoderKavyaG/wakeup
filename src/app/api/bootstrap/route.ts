@@ -29,6 +29,33 @@ export async function GET() {
       }),
     ]);
 
+    let finalLayoutState = layoutState;
+    if (layoutState) {
+      const widgets = (layoutState.widgets as any[]) || [];
+      const hasClock = widgets.some((w: any) => w.type === "clock");
+      if (hasClock) {
+        const cleanedWidgets = widgets.filter((w: any) => w.type !== "clock");
+        const clockIds = widgets.filter((w: any) => w.type === "clock").map((w: any) => w.id);
+        const layouts = (layoutState.layouts as Record<string, any[]>) || {};
+        const cleanedLayouts: Record<string, any[]> = {};
+        for (const [breakpoint, items] of Object.entries(layouts)) {
+          if (Array.isArray(items)) {
+            cleanedLayouts[breakpoint] = items.filter(item => !clockIds.includes(item.i));
+          } else {
+            cleanedLayouts[breakpoint] = items;
+          }
+        }
+
+        finalLayoutState = await prisma.layoutState.update({
+          where: { id: "global-layout" },
+          data: {
+            widgets: cleanedWidgets,
+            layouts: cleanedLayouts
+          }
+        });
+      }
+    }
+
     // Compute derived signals server-side — never re-compute in widgets
     const staleProjects = projects.filter(
       (p) => new Date(p.updatedAt) < staleCutoff
@@ -48,7 +75,7 @@ export async function GET() {
       incompleteTasks,
       notes,
       urls,
-      layoutState,
+      layoutState: finalLayoutState,
       derived: {
         staleProjects: staleProjects.map((p) => p.id),
         overdueTasks: overdueTasks.map((t) => t.id),

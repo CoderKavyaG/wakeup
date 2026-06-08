@@ -24,7 +24,6 @@ import {
   CornerDownLeft,
   GitBranch,
   Crosshair,
-  Clock,
 } from "lucide-react";
 
 // ─────────────────────────────────────────────
@@ -37,7 +36,6 @@ const ADD_WIDGET_OPTIONS = [
   { type: "github", name: "GitHub Monitor", desc: "Commits, streaks, and repo health", icon: <GitBranch className="w-4 h-4 text-primary" /> },
   { type: "focus", name: "Focus Panel", desc: "Tasks and brain dump", icon: <Crosshair className="w-4 h-4 text-primary" /> },
   { type: "machine", name: "Machine Control", desc: "Ports, launcher, workspace files", icon: <Terminal className="w-4 h-4 text-primary" /> },
-  { type: "clock", name: "Clock & Time", desc: "IST + US time zones", icon: <Clock className="w-4 h-4 text-primary" /> },
   { type: "terminal", name: "Terminal", desc: "Embedded terminal with agent connection", icon: <Terminal className="w-4 h-4 text-primary" /> },
 ];
 
