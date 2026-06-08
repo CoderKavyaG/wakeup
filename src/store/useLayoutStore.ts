@@ -9,7 +9,7 @@ export type WidgetType =
   | "clock"
   | "terminal";
 
-export interface WidgetInstance {
+interface WidgetInstance {
   id: string;
   type: WidgetType;
   metadata?: Record<string, any>;

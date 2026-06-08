@@ -179,9 +179,9 @@ export {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
-  AlertDialogMedia,
-  AlertDialogOverlay,
-  AlertDialogPortal,
+  
+  
+  
   AlertDialogTitle,
   AlertDialogTrigger,
 }

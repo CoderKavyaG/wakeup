@@ -17,15 +17,11 @@
   "dependencies": {
     "@ai-sdk/openai": "^3.0.64",
     "@base-ui/react": "^1.4.1",
-    "@clerk/nextjs": "^7.3.7",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
-    "@neondatabase/serverless": "^1.1.0",
-    "@prisma/adapter-neon": "^7.8.0",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
-    "@tanstack/react-query": "^5.100.11",
     "ai": "^6.0.185",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -53,7 +49,6 @@
     "@types/pg": "^8.20.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@types/react-grid-layout": "^1.3.6",
     "@types/ws": "^8.18.1",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
@@ -82,5 +77,10 @@
       "runAfterFinish": true,
       "createStartMenuShortcut": true
     }
+  },
+  "knip": {
+    "ignore": [
+      "electron/preload.js"
+    ]
   }
 }

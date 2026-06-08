@@ -25,7 +25,7 @@ export function cosineSimilarity(a: number[], b: number[]): number {
 }
 
 // Chunk text by sentences (minimal approach)
-export function chunkText(text: string, maxSize: number = 500): string[] {
+function chunkText(text: string, maxSize: number = 500): string[] {
   const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
   const chunks: string[] = [];
   let current = "";
