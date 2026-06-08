@@ -1,10 +1,17 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
 
 const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes cache TTL
 
 export async function GET(request: Request) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+    const userId = session.user.id;
+
     const { searchParams } = new URL(request.url);
     const username = searchParams.get("username") || "coderkavyag";
     
@@ -12,7 +19,7 @@ export async function GET(request: Request) {
     let token = request.headers.get("Authorization")?.replace("Bearer ", "").replace("token ", "") || process.env.GITHUB_TOKEN;
     
     // 1. Check cache first
-    const cacheId = `github-cache-${username}`;
+    const cacheId = `github-cache-${username}-${userId}`;
     const existingCache = await prisma.githubCache.findUnique({
       where: { id: cacheId },
     });
@@ -259,6 +266,7 @@ export async function GET(request: Request) {
       create: {
         id: cacheId,
         data: payload,
+        userId,
       },
     });
 

@@ -1,13 +1,28 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+    const userId = session.user.id;
+
     const { projectId } = await req.json();
     if (!projectId) {
       return NextResponse.json({ error: "Missing projectId" }, { status: 400 });
+    }
+
+    // Verify ownership first
+    const ownerProject = await prisma.project.findUnique({
+      where: { id: projectId },
+    });
+    if (!ownerProject || ownerProject.userId !== userId) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
 
     // Since Project does not have a direct tasks relation in the schema, we query it separately.

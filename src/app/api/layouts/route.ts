@@ -1,10 +1,18 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
 
 export async function GET() {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+    const userId = session.user.id;
+    const layoutId = `global-layout-${userId}`;
+
     const layoutState = await prisma.layoutState.findUnique({
-      where: { id: "global-layout" },
+      where: { id: layoutId },
     });
     
     if (!layoutState) {
@@ -20,19 +28,27 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+    const userId = session.user.id;
+    const layoutId = `global-layout-${userId}`;
+
     const body = await request.json();
     const { layouts, widgets } = body;
 
     const layoutState = await prisma.layoutState.upsert({
-      where: { id: "global-layout" },
+      where: { id: layoutId },
       update: {
         layouts: layouts || {},
         widgets: widgets || [],
       },
       create: {
-        id: "global-layout",
+        id: layoutId,
         layouts: layouts || {},
         widgets: widgets || [],
+        userId,
       },
     });
 

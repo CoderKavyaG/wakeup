@@ -59,6 +59,16 @@ function createWindow() {
     mainWindow.show()
   })
 
+  mainWindow.webContents.on('did-finish-load', async () => {
+    try {
+      const cookies = await mainWindow.webContents.session.cookies.get({ url: `http://localhost:${NEXT_PORT}` })
+      const hasSession = cookies.some(c => c.name.includes('session-token'))
+      console.log('[Electron] Checked auth session. Active session:', hasSession)
+    } catch (e) {
+      console.error('[Electron] Failed to inspect cookies:', e)
+    }
+  })
+
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url)
     return { action: 'deny' }

@@ -1,9 +1,15 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
 
 const AGENT_URL = "http://localhost:3131";
 
 export async function GET(request: Request) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+
     const { pathname, searchParams } = new URL(request.url);
     const action = pathname.split('/').pop();
     
@@ -29,6 +35,11 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+
     const { pathname } = new URL(request.url);
     const action = pathname.split('/').pop();
     const body = await request.json();

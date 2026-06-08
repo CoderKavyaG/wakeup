@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
 
 const parseGithubUrl = (url: string) => {
   const regex = /github\.com\/([^/]+)\/([^/]+)/i;
@@ -16,6 +17,12 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+    const userId = session.user.id;
+
     const { searchParams } = new URL(request.url);
     const username = searchParams.get("username") || "CoderKavyaG";
     const days = parseInt(searchParams.get("days") || "7", 10);
@@ -33,7 +40,7 @@ export async function GET(request: Request) {
     sinceDate.setDate(sinceDate.getDate() - days);
     const sinceIso = sinceDate.toISOString();
 
-    const whereClause: any = { githubUrl: { not: null } };
+    const whereClause: any = { githubUrl: { not: null }, userId };
     if (projectId) {
       whereClause.id = projectId;
     }

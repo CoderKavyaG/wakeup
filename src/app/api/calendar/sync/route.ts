@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { auth } from "@/auth";
 
 interface CalendarEvent {
   id: string;
@@ -78,6 +79,12 @@ function escapeICSString(str: string): string {
 
 export async function GET(request: Request) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+    const userId = session.user.id;
+
     const { searchParams } = new URL(request.url);
     const format = searchParams.get("format") || "ics"; // ics or json
     const includeCompleted = searchParams.get("includeCompleted") === "true";
@@ -86,6 +93,7 @@ export async function GET(request: Request) {
 
     // 1. Fetch tasks as calendar events
     const tasks = await prisma.task.findMany({
+      where: { userId },
       orderBy: { dueDate: "asc" },
     });
 
@@ -108,6 +116,7 @@ export async function GET(request: Request) {
 
     // 2. Fetch projects and create milestones
     const projects = await prisma.project.findMany({
+      where: { userId },
       orderBy: { updatedAt: "desc" },
     });
 
@@ -158,6 +167,10 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
     const body = await request.json();
     const { action, provider, credentials } = body;
 

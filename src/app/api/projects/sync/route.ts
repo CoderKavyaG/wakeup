@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
 
 const parseGithubUrl = (url: string) => {
   const regex = /github\.com\/([^\/]+)\/([^\/]+)/i;
@@ -15,18 +16,24 @@ const parseGithubUrl = (url: string) => {
 
 export async function POST(request: Request) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+    const userId = session.user.id;
+
     const { projectId } = await request.json();
 
     if (!projectId) {
       return NextResponse.json({ error: "Missing project ID." }, { status: 400 });
     }
 
-    const project = await prisma.project.findUnique({
-      where: { id: projectId }
+    const project = await prisma.project.findFirst({
+      where: { id: projectId, userId }
     });
 
     if (!project) {
-      return NextResponse.json({ error: "Project not found." }, { status: 404 });
+      return NextResponse.json({ error: "Project not found or unauthorized." }, { status: 404 });
     }
 
     if (!project.githubUrl) {

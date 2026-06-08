@@ -47,6 +47,8 @@ model Project {
   commits              Commit[]
   links                ProjectLink[]
   notes                Note[]
+  userId               String?
+  user                 User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Commit {
@@ -82,6 +84,8 @@ model Task {
   projectId String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Note {
@@ -92,6 +96,8 @@ model Note {
   project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Url {
@@ -101,6 +107,8 @@ model Url {
   category  String   @default("other") // "docs" | "deployment" | "github" | "other"
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model LayoutState {
@@ -109,12 +117,16 @@ model LayoutState {
   widgets   Json     // Enabled widgets list
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model GithubCache {
   id        String   @id @default("global-cache")
   data      Json
   updatedAt DateTime @updatedAt
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 // ==========================================
@@ -143,20 +155,30 @@ model Trend {
 }
 
 model User {
-  id          Int          @id @default(autoincrement())
-  email       String       @unique
-  password    String?
-  googleId    String?      @unique
-  name        String?
-  role        String       @default("user") // "user", "admin"
-  createdAt   DateTime     @default(now())
-  savedTrends SavedTrend[]
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  password      String    // bcrypt hashed (no longer optional)
+  googleId      String?   @unique
+  role          String    @default("user") // "user", "admin"
+  avatar        String?
+  createdAt     DateTime  @default(now())
+
+  // Relations
+  projects      Project[]
+  tasks         Task[]
+  notes         Note[]
+  urls          Url[]
+  layouts       LayoutState[]
+  insights      AIInsight[]
+  githubCaches  GithubCache[]
+  savedTrends   SavedTrend[]
 }
 
 model SavedTrend {
   id          Int       @id @default(autoincrement())
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId      Int
+  userId      String
   trend       Trend?    @relation(fields: [trendId], references: [id], onDelete: Cascade)
   trendId     Int?
   title       String
@@ -220,4 +242,6 @@ model AIInsight {
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
   expiresAt DateTime
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

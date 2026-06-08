@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { auth } from "@/auth";
 
 interface SearchRequest {
   query: string;
@@ -38,6 +39,12 @@ function calculateRelevance(query: string, text: string, isTitle: boolean = fals
 
 export async function POST(request: Request) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+    const userId = session.user.id;
+
     const body: SearchRequest = await request.json();
     const { query, filters } = body;
 
@@ -49,7 +56,9 @@ export async function POST(request: Request) {
 
     // 1. Search Projects
     if (!filters?.types || filters.types.includes("project")) {
-      const projects = await prisma.project.findMany();
+      const projects = await prisma.project.findMany({
+        where: { userId },
+      });
 
       projects.forEach((project) => {
         const titleScore = calculateRelevance(query, project.name, true);
@@ -91,7 +100,9 @@ export async function POST(request: Request) {
 
     // 2. Search Tasks
     if (!filters?.types || filters.types.includes("task")) {
-      const tasks = await prisma.task.findMany();
+      const tasks = await prisma.task.findMany({
+        where: { userId },
+      });
 
       tasks.forEach((task) => {
         const titleScore = calculateRelevance(query, task.title, true);
@@ -130,7 +141,9 @@ export async function POST(request: Request) {
 
     // 3. Search Notes
     if (!filters?.types || filters.types.includes("note")) {
-      const notes = await prisma.note.findMany();
+      const notes = await prisma.note.findMany({
+        where: { userId },
+      });
 
       notes.forEach((note) => {
         const contentScore = calculateRelevance(query, note.content, false);
@@ -155,7 +168,9 @@ export async function POST(request: Request) {
 
     // 4. Search URLs
     if (!filters?.types || filters.types.includes("url")) {
-      const urls = await prisma.url.findMany();
+      const urls = await prisma.url.findMany({
+        where: { userId },
+      });
 
       urls.forEach((url) => {
         const labelScore = calculateRelevance(query, url.label, true);
@@ -191,7 +206,7 @@ export async function POST(request: Request) {
     // 5. Search GitHub data (recent commits/PRs from notes/projects)
     if (!filters?.types || filters.types.includes("github")) {
       const projects = await prisma.project.findMany({
-        where: { githubUrl: { not: null } },
+        where: { userId, githubUrl: { not: null } },
       });
 
       projects.forEach((project) => {

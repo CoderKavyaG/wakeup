@@ -130,6 +130,8 @@ async function handlePushEvent(payload: GithubWebhookPayload) {
     await prisma.note.create({
       data: {
         content: noteContent,
+        projectId: project.id,
+        userId: project.userId,
       },
     });
   }
@@ -153,6 +155,8 @@ async function handlePullRequestEvent(payload: GithubWebhookPayload) {
   await prisma.note.create({
     data: {
       content: noteContent,
+      projectId: project.id,
+      userId: project.userId,
     },
   });
 
@@ -184,13 +188,15 @@ async function handleIssueEvent(payload: GithubWebhookPayload) {
   await prisma.note.create({
     data: {
       content: noteContent,
+      projectId: project.id,
+      userId: project.userId,
     },
   });
 
   // If issue is opened, optionally create a task
   if (action === "opened") {
     const existingTask = await prisma.task.findFirst({
-      where: { title: { contains: issue.title } },
+      where: { title: { contains: issue.title }, userId: project.userId },
     });
 
     if (!existingTask) {
@@ -200,6 +206,8 @@ async function handleIssueEvent(payload: GithubWebhookPayload) {
           priority: "medium",
           completed: issue.state === "closed",
           dueDate: null,
+          projectId: project.id,
+          userId: project.userId,
         },
       });
     }
@@ -209,6 +217,12 @@ async function handleIssueEvent(payload: GithubWebhookPayload) {
 async function handleRepositoryEvent(payload: GithubWebhookPayload) {
   if (!payload.repository) return;
 
+  const project = await prisma.project.findFirst({
+    where: { githubUrl: payload.repository.html_url },
+  });
+
+  if (!project) return;
+
   const action = payload.action || "updated";
 
   // Track repository metadata changes
@@ -217,6 +231,8 @@ async function handleRepositoryEvent(payload: GithubWebhookPayload) {
   await prisma.note.create({
     data: {
       content: noteContent,
+      projectId: project.id,
+      userId: project.userId,
     },
   });
 }

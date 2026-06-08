@@ -32,31 +32,43 @@ export async function POST(request: Request) {
       );
     }
 
+    // Retrieve owner user dynamically
+    const owner = await prisma.user.findFirst({
+      orderBy: { createdAt: "asc" }
+    });
+    if (!owner) {
+      return NextResponse.json(
+        { success: false, message: "No registered user found in the system." },
+        { status: 500 }
+      );
+    }
+    const userId = owner.id;
+
     let response: IDEResponse = { success: false };
 
     switch (command) {
       case "get-current-project":
-        response = await handleGetCurrentProject(context);
+        response = await handleGetCurrentProject(userId, context);
         break;
 
       case "create-task-from-selection":
-        response = await handleCreateTaskFromSelection(context);
+        response = await handleCreateTaskFromSelection(userId, context);
         break;
 
       case "create-note-from-file":
-        response = await handleCreateNoteFromFile(context);
+        response = await handleCreateNoteFromFile(userId, context);
         break;
 
       case "get-active-tasks":
-        response = await handleGetActiveTasks();
+        response = await handleGetActiveTasks(userId);
         break;
 
       case "get-project-context":
-        response = await handleGetProjectContext(context);
+        response = await handleGetProjectContext(userId, context);
         break;
 
       case "quick-capture":
-        response = await handleQuickCapture(context);
+        response = await handleQuickCapture(userId, context);
         break;
 
       case "open-in-ide":
@@ -81,13 +93,13 @@ export async function POST(request: Request) {
   }
 }
 
-async function handleGetCurrentProject(context?: IDECommand["context"]): Promise<IDEResponse> {
+async function handleGetCurrentProject(userId: string, context?: IDECommand["context"]): Promise<IDEResponse> {
   // Infer project from file path
   if (!context?.filePath) {
     return { success: false, message: "No file path provided" };
   }
 
-  const projects = await prisma.project.findMany();
+  const projects = await prisma.project.findMany({ where: { userId } });
   // Simple heuristic: match repo name from file path
   const matchedProject = projects.find((p) =>
     context.filePath?.toLowerCase().includes(p.name.toLowerCase())
@@ -110,7 +122,7 @@ async function handleGetCurrentProject(context?: IDECommand["context"]): Promise
   };
 }
 
-async function handleCreateTaskFromSelection(context?: IDECommand["context"]): Promise<IDEResponse> {
+async function handleCreateTaskFromSelection(userId: string, context?: IDECommand["context"]): Promise<IDEResponse> {
   if (!context?.selectedText) {
     return { success: false, message: "No selected text provided" };
   }
@@ -122,6 +134,7 @@ async function handleCreateTaskFromSelection(context?: IDECommand["context"]): P
         priority: "medium",
         completed: false,
         dueDate: null,
+        userId,
       },
     });
 
@@ -135,7 +148,7 @@ async function handleCreateTaskFromSelection(context?: IDECommand["context"]): P
   }
 }
 
-async function handleCreateNoteFromFile(context?: IDECommand["context"]): Promise<IDEResponse> {
+async function handleCreateNoteFromFile(userId: string, context?: IDECommand["context"]): Promise<IDEResponse> {
   if (!context?.selectedText && !context?.fileName) {
     return { success: false, message: "No content provided" };
   }
@@ -144,6 +157,7 @@ async function handleCreateNoteFromFile(context?: IDECommand["context"]): Promis
     const note = await prisma.note.create({
       data: {
         content: `[${context.fileName || "IDE"}] ${context.selectedText || ""}`,
+        userId,
       },
     });
 
@@ -157,10 +171,10 @@ async function handleCreateNoteFromFile(context?: IDECommand["context"]): Promis
   }
 }
 
-async function handleGetActiveTasks(): Promise<IDEResponse> {
+async function handleGetActiveTasks(userId: string): Promise<IDEResponse> {
   try {
     const tasks = await prisma.task.findMany({
-      where: { completed: false },
+      where: { completed: false, userId },
       orderBy: { priority: "desc" },
       take: 10,
     });
@@ -174,14 +188,14 @@ async function handleGetActiveTasks(): Promise<IDEResponse> {
   }
 }
 
-async function handleGetProjectContext(context?: IDECommand["context"]): Promise<IDEResponse> {
+async function handleGetProjectContext(userId: string, context?: IDECommand["context"]): Promise<IDEResponse> {
   try {
     if (!context?.filePath) {
       return { success: false, message: "No file path provided" };
     }
 
     // Get project info
-    const projectRes = await handleGetCurrentProject(context);
+    const projectRes = await handleGetCurrentProject(userId, context);
     if (!projectRes.success || !projectRes.data) {
       return projectRes;
     }
@@ -190,11 +204,12 @@ async function handleGetProjectContext(context?: IDECommand["context"]): Promise
 
     // Get related tasks and notes
     const tasks = await prisma.task.findMany({
-      where: { completed: false },
+      where: { completed: false, userId, projectId },
       take: 5,
     });
 
     const notes = await prisma.note.findMany({
+      where: { userId, projectId },
       take: 5,
       orderBy: { createdAt: "desc" },
     });
@@ -212,7 +227,7 @@ async function handleGetProjectContext(context?: IDECommand["context"]): Promise
   }
 }
 
-async function handleQuickCapture(context?: IDECommand["context"]): Promise<IDEResponse> {
+async function handleQuickCapture(userId: string, context?: IDECommand["context"]): Promise<IDEResponse> {
   if (!context?.selectedText) {
     return { success: false, message: "No content to capture" };
   }
@@ -221,6 +236,7 @@ async function handleQuickCapture(context?: IDECommand["context"]): Promise<IDER
     const note = await prisma.note.create({
       data: {
         content: context.selectedText,
+        userId,
       },
     });
 
@@ -253,11 +269,6 @@ async function handleOpenInIDE(context?: IDECommand["context"]): Promise<IDEResp
 }
 
 async function handleGetAISuggestions(context?: IDECommand["context"]): Promise<IDEResponse> {
-  // Future: Could integrate with AI to suggest:
-  // - Refactoring opportunities
-  // - Related tasks/docs
-  // - Similar code patterns
-
   if (!context?.selectedText) {
     return { success: false, message: "No code context provided" };
   }

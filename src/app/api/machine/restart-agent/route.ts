@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
 import cp from 'child_process';
 import os from 'os';
 
-export async function POST() {
+export async function POST(req: Request) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
   try {
     // Attempt to kill existing agent gracefully if endpoint exists
     await fetch("http://127.0.0.1:3131/kill", { method: "POST" }).catch(() => {});

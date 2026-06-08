@@ -1,22 +1,34 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
 
 export async function GET() {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+    const userId = session.user.id;
+
     // 1. Fetch all raw datasets from DB
     const projects = await prisma.project.findMany({
+      where: { userId },
       orderBy: { createdAt: "desc" }
     });
 
     const tasks = await prisma.task.findMany({
+      where: { userId },
       orderBy: { updatedAt: "desc" }
     });
 
     const notes = await prisma.note.findMany({
+      where: { userId },
       orderBy: { createdAt: "desc" }
     });
 
-    const caches = await prisma.githubCache.findMany();
+    const caches = await prisma.githubCache.findMany({
+      where: { userId }
+    });
 
     const timelineEvents: any[] = [];
 

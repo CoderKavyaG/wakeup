@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { generateEmbedding, cosineSimilarity } from "@/lib/embeddings";
+import { auth } from "@/auth";
 
 interface CommandRequest {
   query: string;
@@ -24,15 +25,15 @@ async function identifyCommand(query: string): Promise<string> {
   return process.env.OPENAI_API_KEY ? "semantic_search" : "next_action";
 }
 
-async function handleNextAction(): Promise<string> {
+async function handleNextAction(userId: string): Promise<string> {
   const projects = await prisma.project.findMany({
-    where: { status: "active" },
+    where: { status: "active", userId },
     orderBy: { updatedAt: "desc" },
     take: 3,
   });
 
   const tasks = await prisma.task.findMany({
-    where: { completed: false },
+    where: { completed: false, userId },
     orderBy: { priority: "desc" },
     take: 3,
   });
@@ -40,10 +41,11 @@ async function handleNextAction(): Promise<string> {
   return `Focus on: ${projects[0]?.name || "No active projects"}\nNext task: ${tasks[0]?.title || "All done!"}`;
 }
 
-async function handleStaleProjects(): Promise<string> {
+async function handleStaleProjects(userId: string): Promise<string> {
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   const stale = await prisma.project.findMany({
     where: {
+      userId,
       updatedAt: { lt: thirtyDaysAgo },
       status: { not: "completed" },
     },
@@ -55,16 +57,17 @@ async function handleStaleProjects(): Promise<string> {
   return `Stale projects:\n${stale.map((p) => `• ${p.name} (${Math.floor((Date.now() - p.updatedAt.getTime()) / (1000 * 60 * 60 * 24))} days)`).join("\n")}`;
 }
 
-async function handleWeeklySummary(): Promise<string> {
+async function handleWeeklySummary(userId: string): Promise<string> {
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const recentNotes = await prisma.note.findMany({
-    where: { createdAt: { gt: weekAgo } },
+    where: { createdAt: { gt: weekAgo }, userId },
     orderBy: { createdAt: "desc" },
     take: 10,
   });
 
   const completedTasks = await prisma.task.findMany({
     where: {
+      userId,
       completed: true,
       updatedAt: { gt: weekAgo },
     },
@@ -80,7 +83,7 @@ ${completedTasks.map((t) => `✓ ${t.title}`).join("\n")}
   return summary;
 }
 
-async function handleSemanticSearch(query: string): Promise<string> {
+async function handleSemanticSearch(query: string, userId: string): Promise<string> {
   if (!process.env.OPENAI_API_KEY) {
     return "Semantic search requires OpenAI API key. Use pattern-based commands instead.";
   }
@@ -88,6 +91,12 @@ async function handleSemanticSearch(query: string): Promise<string> {
   try {
     const embedding = await generateEmbedding(query);
     const memories = await prisma.memory.findMany({
+      where: {
+        OR: [
+          { project: { userId } },
+          { projectId: null }
+        ]
+      },
       take: 100,
       orderBy: { createdAt: "desc" },
     });
@@ -111,6 +120,12 @@ async function handleSemanticSearch(query: string): Promise<string> {
 
 export async function POST(request: Request) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+    const userId = session.user.id;
+
     const { query }: CommandRequest = await request.json();
 
     if (!query.trim()) {
@@ -122,16 +137,16 @@ export async function POST(request: Request) {
 
     switch (command) {
       case "next_action":
-        result = await handleNextAction();
+        result = await handleNextAction(userId);
         break;
       case "stale_projects":
-        result = await handleStaleProjects();
+        result = await handleStaleProjects(userId);
         break;
       case "weekly_summary":
-        result = await handleWeeklySummary();
+        result = await handleWeeklySummary(userId);
         break;
       case "semantic_search":
-        result = await handleSemanticSearch(query);
+        result = await handleSemanticSearch(query, userId);
         break;
       default:
         result = "Command not recognized.";

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { generateText } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
 
 const openrouter = createOpenAI({
   baseURL: "https://openrouter.ai/api/v1",
@@ -17,13 +18,19 @@ export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+    const userId = session.user.id;
+
     // 1. DATA PULL
     const [dbProjects, dbTasks, notes, commits] = await Promise.all([
-      prisma.project.findMany({ include: { links: true }, take: 20 }),
-      prisma.task.findMany({ orderBy: { createdAt: 'desc' } }),
-      prisma.note.findMany({ orderBy: { createdAt: 'desc' }, take: 10 }),
+      prisma.project.findMany({ where: { userId }, include: { links: true }, take: 20 }),
+      prisma.task.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } }),
+      prisma.note.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: 10 }),
       prisma.commit.findMany({
-        where: { date: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } },
+        where: { project: { userId }, date: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } },
         orderBy: { date: 'desc' },
         take: 50
       })
@@ -70,7 +77,7 @@ export async function POST(request: Request) {
       await prisma.aIInsight.upsert({
         where: { id: `stale-${p.id}` },
         update: { content, expiresAt: tomorrow, read: false },
-        create: { id: `stale-${p.id}`, type: 'stale_warning', content, expiresAt: tomorrow }
+        create: { id: `stale-${p.id}`, type: 'stale_warning', content, expiresAt: tomorrow, userId }
       });
     }
 
@@ -78,9 +85,9 @@ export async function POST(request: Request) {
     if (overdue.length > 0) {
       const content = `${overdue.length} overdue: ${overdue.slice(0,2).map(t=>t.title).join(', ')}`;
       await prisma.aIInsight.upsert({
-        where: { id: 'overdue-summary' },
+        where: { id: `overdue-summary-${userId}` },
         update: { content, expiresAt: tonight, read: false },
-        create: { id: 'overdue-summary', type: 'overdue', content, expiresAt: tonight }
+        create: { id: `overdue-summary-${userId}`, type: 'overdue', content, expiresAt: tonight, userId }
       });
     }
 
@@ -119,18 +126,24 @@ Write ONE sentence telling Kavya what to focus on today. Be specific. Name a pro
     }
 
     await prisma.aIInsight.upsert({
-      where: { id: 'daily-brief' },
+      where: { id: `daily-brief-${userId}` },
       update: { content: brief, read: false, expiresAt: tomorrow },
-      create: { id: 'daily-brief', type: 'daily_brief', content: brief, expiresAt: tomorrow }
+      create: { id: `daily-brief-${userId}`, type: 'daily_brief', content: brief, expiresAt: tomorrow, userId }
     });
 
     // Batch health update for all projects
     const { origin } = new URL(request.url);
+    const headers: HeadersInit = { "Content-Type": "application/json" };
+    const cookie = request.headers.get("cookie");
+    if (cookie) {
+      headers["cookie"] = cookie;
+    }
+
     for (const project of projects) {
       try {
         await fetch(`${origin}/api/projects/health`, {
           method: 'POST',
-          headers: { "Content-Type": "application/json" },
+          headers,
           body: JSON.stringify({ projectId: project.id })
         });
       } catch (err) {
@@ -148,8 +161,15 @@ Write ONE sentence telling Kavya what to focus on today. Be specific. Name a pro
 
 export async function GET() {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+    const userId = session.user.id;
+
     const insights = await prisma.aIInsight.findMany({
       where: {
+        userId,
         read: false,
         expiresAt: { gt: new Date() }
       },

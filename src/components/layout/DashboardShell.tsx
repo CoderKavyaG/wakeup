@@ -11,16 +11,23 @@ import { AnimatePresence, motion } from "framer-motion";
 import AmbientBar from "./AmbientBar";
 import { Download } from "lucide-react";
 import { useBootstrapStore } from "@/store/useBootstrapStore";
+import { useSession, signOut } from "next-auth/react";
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
+  const { data: session } = useSession();
   const { isLocked, toggleLock, resetLayout, clearLayout, setLayouts, saveCurrentLayout, loadSavedLayout, savedLayout } = useLayoutStore();
   const { isQuickLinksOpen, toggleQuickLinks } = useUrlStore();
   const loaded = useBootstrapStore((s) => s.loaded);
 
-  // Removed switchProfile logic as per request
+  // Calculate user initial
+  const userInitial = session?.user?.name
+    ? session.user.name[0].toUpperCase()
+    : session?.user?.email
+      ? session.user.email[0].toUpperCase()
+      : "D";
 
   return (
     <div className="h-screen w-full flex flex-col overflow-hidden bg-[#0f0f11] text-[#E8E9EB] relative">
@@ -63,11 +70,21 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               />
             </div>
           )}
-          <div className="w-7 h-7 rounded bg-foreground flex items-center justify-center font-bold text-background text-[13px] shadow-sm border border-white/10">
-            D
-          </div>
+          {session?.user?.image ? (
+            <img
+              src={session.user.image}
+              alt="Avatar"
+              className="w-7 h-7 rounded border border-white/10 object-cover shadow-sm"
+            />
+          ) : (
+            <div className="w-7 h-7 rounded bg-[#5B8DEF] flex items-center justify-center font-bold text-white text-[13px] shadow-sm border border-white/10 uppercase font-mono">
+              {userInitial}
+            </div>
+          )}
           <div className="flex items-center gap-2">
-            <h1 className="text-sm font-semibold tracking-tight text-foreground leading-none">DevOS</h1>
+            <h1 className="text-sm font-semibold tracking-tight text-foreground leading-none">
+              {session?.user?.name || "DevOS"}
+            </h1>
             <span className="w-1 h-1 rounded-full bg-white/20"></span>
             <p className="text-[10px] text-muted-foreground font-mono uppercase tracking-wider">
               {isLocked ? "Locked" : "Edit mode"}
@@ -89,7 +106,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             {isLocked ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
             {isLocked ? "Locked" : "Drag Mode"}
           </Button>
-
+ 
           <div className="w-px h-4 bg-white/10 mx-1"></div>
 
           {/* Cockpit Command Trigger */}
@@ -130,6 +147,18 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             className="h-6 text-[10px] uppercase tracking-wider font-bold px-2.5 rounded hover:bg-rose-500/10 hover:text-rose-400 text-muted-foreground"
           >
             Clear Grid
+          </Button>
+
+          <div className="w-px h-4 bg-white/10 mx-1"></div>
+
+          {/* Sign Out */}
+          <Button
+            onClick={() => signOut({ callbackUrl: "/login" })}
+            variant="ghost"
+            size="sm"
+            className="h-6 text-[10px] uppercase tracking-wider font-bold px-2.5 rounded hover:bg-rose-500/10 hover:text-rose-400 text-muted-foreground"
+          >
+            Sign Out
           </Button>
         </div>
         </div>

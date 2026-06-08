@@ -1,11 +1,19 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+    const userId = session.user.id;
+
     const projects = await prisma.project.findMany({
+      where: { userId },
       orderBy: { createdAt: "desc" },
     });
 
@@ -18,6 +26,12 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+    const userId = session.user.id;
+
     const body = await request.json();
     const { name, description, status, tags, githubUrl, liveUrl, folderPath } = body;
 
@@ -25,11 +39,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Project name is required" }, { status: 400 });
     }
 
-    // Check if project already exists to prevent duplication
+    // Check if project already exists to prevent duplication for this user
     let existingProject = null;
     if (githubUrl) {
       existingProject = await prisma.project.findFirst({
         where: {
+          userId,
           githubUrl: {
             equals: githubUrl,
             mode: "insensitive"
@@ -40,6 +55,7 @@ export async function POST(request: Request) {
     if (!existingProject && folderPath) {
       existingProject = await prisma.project.findFirst({
         where: {
+          userId,
           folderPath: {
             equals: folderPath,
             mode: "insensitive"
@@ -64,6 +80,7 @@ export async function POST(request: Request) {
         projectHealth: 100.0,
         momentumScore: 0.0,
         completionPercentage: 0.0,
+        userId,
       },
     });
 
@@ -76,11 +93,25 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+    const userId = session.user.id;
+
     const body = await request.json();
     const { id, ...updateData } = body;
 
     if (!id) {
       return NextResponse.json({ error: "Project ID is required" }, { status: 400 });
+    }
+
+    // Verify ownership
+    const project = await prisma.project.findUnique({
+      where: { id },
+    });
+    if (!project || project.userId !== userId) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
 
     const updatedProject = await prisma.project.update({
@@ -97,11 +128,25 @@ export async function PATCH(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+    const userId = session.user.id;
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
 
     if (!id) {
       return NextResponse.json({ error: "Project ID is required" }, { status: 400 });
+    }
+
+    // Verify ownership
+    const project = await prisma.project.findUnique({
+      where: { id },
+    });
+    if (!project || project.userId !== userId) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
 
     await prisma.project.delete({

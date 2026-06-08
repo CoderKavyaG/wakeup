@@ -1,17 +1,25 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
 
 export async function POST(request: Request) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+    const userId = session.user.id;
+
     const { repoName, username = "coderkavyag" } = await request.json();
 
     if (!repoName) {
       return NextResponse.json({ error: "Missing repository name." }, { status: 400 });
     }
 
-    // Check if repository already exists in project registry
+    // Check if repository already exists in project registry for this user
     const existingProject = await prisma.project.findFirst({
       where: {
+        userId,
         githubUrl: {
           contains: `github.com/${username}/${repoName}`,
           mode: 'insensitive'
@@ -77,6 +85,7 @@ export async function POST(request: Request) {
         momentumScore: repoData.stargazers_count > 0 ? repoData.stargazers_count * 10 : 10,
         projectHealth: 100.0,
         completionPercentage: 50.0, // Initial estimate for imported project
+        userId,
       },
     });
 

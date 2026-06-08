@@ -1,6 +1,7 @@
 import { streamText, createTextStreamResponse } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
 
 const openrouter = createOpenAI({
   baseURL: "https://openrouter.ai/api/v1",
@@ -20,6 +21,13 @@ interface CockpitRequest {
 
 export async function POST(request: Request) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return Response.json({ error: "unauthorized" }, { status: 401 });
+    }
+    const userId = session.user.id;
+    const userName = session.user.name || "Kavya";
+
     const body: CockpitRequest = await request.json();
     const { query } = body;
 
@@ -29,11 +37,14 @@ export async function POST(request: Request) {
 
     // 1. FRESH DB PULL FOR EACH REQUEST
     const [dbProjects, dbTasks, notes, commits] = await Promise.all([
-      prisma.project.findMany({ include: { links: true }, take: 20 }),
-      prisma.task.findMany({ orderBy: { createdAt: 'desc' } }),
-      prisma.note.findMany({ orderBy: { createdAt: 'desc' }, take: 10 }),
+      prisma.project.findMany({ where: { userId }, include: { links: true }, take: 20 }),
+      prisma.task.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } }),
+      prisma.note.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: 10 }),
       prisma.commit.findMany({
-        where: { date: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } },
+        where: {
+          project: { userId },
+          date: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
+        },
         orderBy: { date: 'desc' },
         take: 50
       })
@@ -104,9 +115,9 @@ export async function POST(request: Request) {
       .join('\n');
 
     // 6. BUILD FRESH CONTEXT SYSTEM PROMPT
-    const systemPrompt = `You are the AI brain of DevOS — Kavya's personal developer operating system.
-Kavya is a student developer based in India, building multiple projects simultaneously.
-You have live access to her workspace data. Be specific, direct, and actionable.
+    const systemPrompt = `You are the AI brain of DevOS — ${userName}'s personal developer operating system.
+${userName} is a developer, building multiple projects simultaneously.
+You have live access to their workspace data. Be specific, direct, and actionable.
 Never give generic advice. Always reference actual project names, task titles, or commit messages.
 Keep answers under 120 words unless asked for detail. No bullet points unless listing >3 items.
 

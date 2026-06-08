@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
 import cp from 'child_process';
 import path from "path";
 
-export async function POST() {
+export async function POST(req: Request) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
   try {
     const agentDir = "C:\\Users\\Kavya\\Projects\\wakeup\\devos-agent";
     

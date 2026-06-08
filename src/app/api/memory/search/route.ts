@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { generateEmbedding, cosineSimilarity } from "@/lib/embeddings";
+import { auth } from "@/auth";
 
 interface SearchRequest {
   query: string;
@@ -10,6 +11,12 @@ interface SearchRequest {
 
 export async function POST(request: Request) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+    const userId = session.user.id;
+
     const { query, projectId, limit = 5 }: SearchRequest = await request.json();
 
     if (!query.trim()) {
@@ -21,7 +28,9 @@ export async function POST(request: Request) {
 
     // Fetch all memories (limited scope for cost)
     let memories = await prisma.memory.findMany({
-      where: projectId ? { projectId } : {},
+      where: projectId 
+        ? { projectId, project: { userId } } 
+        : { OR: [ { project: { userId } }, { projectId: null } ] },
       take: 100, // Search within recent 100 memories
       orderBy: { createdAt: "desc" },
     });

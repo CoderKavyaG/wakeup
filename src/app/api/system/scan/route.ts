@@ -4,6 +4,7 @@ import { exec } from "child_process";
 import { promisify } from "util";
 import path from "path";
 import fs from "fs";
+import { auth } from "@/auth";
 
 const execPromise = promisify(exec);
 
@@ -63,6 +64,11 @@ const getPortTechnology = (port: number): string => {
 
 export async function GET() {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+
     // 1. Port scanning
     const portsToScan = [3000, 3001, 3002, 5000, 5173, 8000, 8080, 27017, 5432, 6379];
     const activePorts: any[] = [];

@@ -1,13 +1,22 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
 
 export async function GET() {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+    const userId = session.user.id;
+    const layoutId = `global-layout-${userId}`;
+
     const now = new Date();
     const staleCutoff = new Date(Date.now() - 14 * 86400000);
 
     const [projects, tasks, notes, urls, layoutState] = await Promise.all([
       prisma.project.findMany({
+        where: { userId },
         include: {
           links: true,
           commits: { orderBy: { date: "desc" }, take: 3 },
@@ -15,17 +24,20 @@ export async function GET() {
         orderBy: { updatedAt: "desc" },
       }),
       prisma.task.findMany({
+        where: { userId },
         orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
       }),
       prisma.note.findMany({
+        where: { userId },
         orderBy: { createdAt: "desc" },
         take: 50,
       }),
       prisma.url.findMany({
+        where: { userId },
         orderBy: { createdAt: "asc" },
       }),
-      prisma.layoutState.findFirst({
-        where: { id: "global-layout" },
+      prisma.layoutState.findUnique({
+        where: { id: layoutId },
       }),
     ]);
 
@@ -47,7 +59,7 @@ export async function GET() {
         }
 
         finalLayoutState = await prisma.layoutState.update({
-          where: { id: "global-layout" },
+          where: { id: layoutId },
           data: {
             widgets: cleanedWidgets,
             layouts: cleanedLayouts
