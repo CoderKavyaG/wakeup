@@ -130,6 +130,7 @@ export function ProjectsWidget() {
   const [linksLoading, setLinksLoading] = useState(false);
   const [pingingLinks, setPingingLinks] = useState(false);
   const [activeTab, setActiveTab] = useState<"overview" | "control_room">("overview");
+  const [isCreatingIssue, setIsCreatingIssue] = useState<string | null>(null); // note id being processed
 
   const pingLinks = async (projectId: string, showToast = true) => {
     setPingingLinks(true);
@@ -466,23 +467,31 @@ export function ProjectsWidget() {
     return <span className={`text-[10px] font-bold font-mono ml-1.5 ${colorClass}`} title="Project Health">{health}%</span>;
   };
 
-  const createGitHubIssue = async (feedbackText: string) => {
+  const createGitHubIssue = async (note: { id: string; content: string; category?: string }) => {
     if (!selectedProject?.githubUrl) return alert("No GitHub URL for this project.");
+    setIsCreatingIssue(note.id);
     try {
       const cleanUrl = selectedProject.githubUrl.replace(/\.git$/, '');
       const match = cleanUrl.match(/github\.com\/([^\/]+\/[^\/]+)/);
-      if (!match) return alert("Invalid GitHub URL");
+      if (!match) { alert("Invalid GitHub URL"); return; }
       let repo = match[1];
       repo = repo.split('?')[0].split('#')[0].replace(/\/$/, '');
+
+      // Build a smart title from category + first line of note
+      const firstLine = note.content.split('\n')[0].trim().substring(0, 80);
+      const catPrefix = note.category ? `[${note.category.charAt(0).toUpperCase() + note.category.slice(1)}] ` : '';
+      const issueTitle = `${catPrefix}${firstLine}`;
 
       const token = localStorage.getItem("GITHUB_TOKEN");
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (token) headers["Authorization"] = `Bearer ${token}`;
 
+      const issueBody = `**Reported via DevOS Brain Dump**\n\n${note.content}\n\n---\n*Auto-created from project note — ${new Date().toLocaleDateString()}*`;
+
       const res = await fetch("/api/github/issues/create", {
         method: "POST",
         headers,
-        body: JSON.stringify({ repo, title: "Feedback Review", body: feedbackText })
+        body: JSON.stringify({ repo, title: issueTitle, body: issueBody })
       });
       if (res.ok) {
         const data = await res.json();
@@ -495,6 +504,8 @@ export function ProjectsWidget() {
       }
     } catch (e: any) {
       alert(`Failed to connect to API: ${e.message}`);
+    } finally {
+      setIsCreatingIssue(null);
     }
   };
 
@@ -1045,60 +1056,83 @@ export function ProjectsWidget() {
                   </div>
 
                   <div className="space-y-3">
-                    {notes.filter(n => n.projectId === selectedProject.id).length > 0 ? (
-                      notes.filter(n => n.projectId === selectedProject.id).map(note => (
-                        <div key={note.id} className="group p-3 border border-white/5 bg-transparent hover:bg-white/5 transition-colors rounded-lg flex flex-col gap-2 relative">
-                          <div className="flex justify-between items-center">
-                            <p className="text-[9px] text-muted-foreground font-mono">{new Date(note.createdAt).toLocaleString()}</p>
-                            <div className="flex items-center gap-2">
-                              {(() => {
-                                const cat = note.category;
-                                if (!cat) return <Badge variant="secondary" className="text-[8px] py-0 px-1.5 uppercase bg-white/5 text-muted-foreground border-white/10 animate-pulse">classifying...</Badge>;
-                                let label = cat;
-                                let colorClass = "bg-primary/10 text-primary border-primary/20";
-                                if (cat === "bug report" || cat === "bug") {
-                                  label = "bug";
-                                  colorClass = "bg-red-500/15 text-red-400 border-red-500/20";
-                                } else if (cat === "feature idea" || cat === "idea") {
-                                  label = "idea";
-                                  colorClass = "bg-purple-500/15 text-purple-400 border-purple-500/20";
-                                } else if (cat === "general feedback" || cat === "feedback") {
-                                  label = "feedback";
-                                  colorClass = "bg-blue-500/15 text-blue-400 border-blue-500/20";
-                                } else if (cat === "general note" || cat === "note") {
-                                  label = "note";
-                                  colorClass = "bg-zinc-500/15 text-zinc-400 border-zinc-500/20";
-                                }
+                    {(() => {
+                      const projectNotes = notes.filter(n => n.projectId === selectedProject.id);
+                      if (projectNotes.length === 0) {
+                        return (
+                          <div className="text-center py-6 flex flex-col items-center gap-1">
+                            <span className="text-xs text-muted-foreground">No notes yet. Tag this project in Brain Dump using @{selectedProject.name}</span>
+                          </div>
+                        );
+                      }
+
+                      const categoryColors = {
+                        feedback: 'bg-orange-500/20 text-orange-300 border-orange-500/20',
+                        bug: 'bg-red-500/20 text-red-300 border-red-500/20',
+                        idea: 'bg-purple-500/20 text-purple-300 border-purple-500/20',
+                        note: 'bg-white/10 text-white/50 border-white/10'
+                      };
+
+                      return projectNotes.map(note => (
+                        <div key={note.id} className="group p-3 border border-white/5 bg-transparent hover:bg-white/[0.04] transition-colors rounded-lg flex flex-col gap-2 relative">
+                          <div className="flex justify-between items-center gap-2">
+                            {(() => {
+                              const cat = note.category;
+                              if (!cat || cat === 'classifying...') {
                                 return (
-                                  <Badge variant="secondary" className={`text-[8px] py-0 px-1.5 uppercase ${colorClass}`}>
-                                    {label}
+                                  <Badge variant="secondary" className="text-[8px] py-0 px-1.5 uppercase bg-white/5 text-muted-foreground border-white/10 animate-pulse shrink-0">
+                                    classifying...
                                   </Badge>
                                 );
-                              })()}
-                              <Button variant="ghost" size="icon" className="w-5 h-5 opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-400" onClick={() => notesStoreDeleteNote(note.id)}>
-                                <Trash2 className="w-3 h-3" />
-                              </Button>
-                            </div>
-                          </div>
-                          <p className="text-xs leading-relaxed text-foreground whitespace-pre-wrap pr-6 line-clamp-3">{note.content}</p>
-                          <div className="flex justify-end gap-2 mt-2">
-                            <Button size="sm" variant="outline" className="h-6 text-[9px] px-2 bg-transparent border-white/10 hover:bg-white/5" onClick={() => setViewNote(note)}>
-                              <Eye className="w-3 h-3 mr-1.5" /> Open
+                              }
+                              const validCat = (cat.toLowerCase() as keyof typeof categoryColors);
+                              const colorClass = categoryColors[validCat] || 'bg-white/10 text-white/50 border-white/10';
+                              return (
+                                <Badge variant="secondary" className={`text-[8px] py-0 px-1.5 uppercase shrink-0 ${colorClass}`}>
+                                  {cat}
+                                </Badge>
+                              );
+                            })()}
+                            
+                            <p className="text-[9px] text-muted-foreground font-mono ml-auto mr-1 truncate">
+                              {new Date(note.createdAt).toLocaleString()}
+                            </p>
+
+                            <Button variant="ghost" size="icon" className="w-5 h-5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-400" onClick={() => notesStoreDeleteNote(note.id)}>
+                              <Trash2 className="w-3 h-3" />
                             </Button>
+                          </div>
+                          <p className="text-xs leading-relaxed text-foreground/90 whitespace-pre-wrap pr-1 line-clamp-4">{note.content}</p>
+                          <div className="flex justify-end gap-2 mt-1">
+                            {/* Resolve — marks note as done by deleting it */}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-6 text-[9px] px-2 bg-green-500/10 border-green-500/20 text-green-400 hover:bg-green-500/20"
+                              onClick={() => notesStoreDeleteNote(note.id)}
+                            >
+                              <CheckCircle2 className="w-3 h-3 mr-1" /> Resolve
+                            </Button>
+                            {/* Open as Issue — only shown when project has a GitHub URL */}
                             {selectedProject.githubUrl && (
-                              <Button size="sm" variant="outline" className="h-6 text-[9px] px-2 bg-transparent border-white/10 hover:bg-white/5" onClick={() => createGitHubIssue(note.content)}>
-                                <GitBranch className="w-3 h-3 mr-1.5" /> Open as Issue
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={isCreatingIssue === note.id}
+                                className="h-6 text-[9px] px-2 bg-transparent border-white/10 hover:bg-blue-500/10 hover:border-blue-500/20 hover:text-blue-300 transition-colors"
+                                onClick={() => createGitHubIssue(note)}
+                              >
+                                {isCreatingIssue === note.id ? (
+                                  <><span className="w-3 h-3 mr-1 rounded-full border-2 border-current border-t-transparent animate-spin inline-block" /> Creating...</>
+                                ) : (
+                                  <><GitBranch className="w-3 h-3 mr-1" /> Open as Issue</>
+                                )}
                               </Button>
                             )}
                           </div>
                         </div>
-                      ))
-                    ) : (
-                      <div className="text-center py-6 flex flex-col items-center gap-1">
-                        <span className="text-xs text-muted-foreground">No notes or feedback recorded yet.</span>
-                        <span className="text-[10px] text-muted-foreground/60 italic">Tag a note to this project using @{selectedProject.name} in the Focus Panel</span>
-                      </div>
-                    )}
+                      ));
+                    })()}
                   </div>
                 </div>
 

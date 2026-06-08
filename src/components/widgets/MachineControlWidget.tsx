@@ -448,10 +448,10 @@ export function MachineControlWidget() {
         </div>
 
         {/* ── SECTION 2 & 3 CONTAINER ── */}
-        <div className={`flex flex-col bg-[#0f0f11] ${isNarrow ? "shrink-0" : "flex-1 min-h-0"}`}>
+        <div className={`flex flex-col bg-[#0f0f11] overflow-hidden ${isNarrow ? "shrink-0" : "flex-1 min-h-0"}`}>
           
-          {/* SECTION 2: PORTS & PROCESSES */}
-          <div className={`flex flex-col border-b border-white/10 ${isNarrow ? "shrink-0" : "flex-1 min-h-0"}`}>
+          {/* SECTION 2: PORTS & PROCESSES — scrolls internally, takes available space */}
+          <div className={`flex flex-col ${isNarrow ? "shrink-0" : "flex-1 min-h-0 overflow-hidden"}`} style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
             <div className="p-3 shrink-0 border-b border-white/10 bg-[#0f0f11] flex items-center justify-between">
               <div className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider flex items-center gap-1.5">
                 <Activity className="w-3.5 h-3.5" /> Ports
@@ -499,112 +499,113 @@ export function MachineControlWidget() {
             </ScrollArea>
           </div>
 
-          {/* SECTION 3: QUICK LAUNCHERS */}
+          {/* BOTTOM GROUP: Quick Launch + Git Repos — capped height, scrolls if compressed */}
           {!isShort && (
-            <div className="shrink-0 p-3 bg-[#0f0f11] border-t border-white/10">
-              <div className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider mb-2 flex items-center justify-between">
-              <span className="flex items-center gap-1.5"><Play className="w-3.5 h-3.5" /> Quick Launch</span>
-              <Button variant="ghost" size="sm" className="h-5 text-[9px] px-1.5 text-muted-foreground" onClick={() => setIsEditingLaunchers(!isEditingLaunchers)}>
-                {isEditingLaunchers ? "Done" : "Config"}
-              </Button>
-            </div>
-            
-            {isEditingLaunchers ? (
-              <div className="space-y-2 max-h-[150px] overflow-y-auto custom-scrollbar scrollbar-hide pr-1">
-                {customLaunchers.map((l, i) => (
-                  <div key={i} className="flex gap-2">
-                    <Input value={l.name} onChange={(e) => {
-                      const newL = [...customLaunchers];
-                      newL[i].name = e.target.value;
-                      saveLaunchers(newL);
-                    }} placeholder="Name" className="h-7 text-xs w-1/3 bg-black/20" />
-                    <Input value={l.command} onChange={(e) => {
-                      const newL = [...customLaunchers];
-                      newL[i].command = e.target.value;
-                      saveLaunchers(newL);
-                    }} placeholder="Command..." className="h-7 text-xs flex-1 bg-black/20" />
-                    <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-red-500 hover:bg-red-500/20 rounded" onClick={() => {
-                      const newL = customLaunchers.filter((_, idx) => idx !== i);
-                      saveLaunchers(newL);
-                    }}><XCircle className="w-3 h-3" /></Button>
-                  </div>
-                ))}
-                <div className="flex gap-2 pt-1">
-                  <Button variant="outline" size="sm" className="h-7 flex-1 text-[10px] border-dashed border-white/10 hover:bg-white/5" onClick={() => {
-                    saveLaunchers([...customLaunchers, { name: "New App", command: "" }]);
-                  }}>+ Add</Button>
-                  <Button variant="outline" size="sm" className="h-7 flex-1 text-[10px] border-dashed border-red-500/20 text-red-400 hover:bg-red-500/10" onClick={() => {
-                    saveLaunchers([
-                      { name: "VS Code", command: "VS Code" },
-                      { name: "Terminal", command: "Terminal" },
-                      { name: "Docker", command: "Docker Desktop" },
-                      { name: "Restart Agent", command: "RESTART_AGENT" }
-                    ]);
-                  }}>Reset Defaults</Button>
-                </div>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-2">
-                {customLaunchers.map((l, i) => (
-                  <Button key={i} variant="outline" size="sm" className={`h-8 text-[10px] bg-[#0f0f11] hover:bg-white/5 border-white/10 ${isTinyWidth ? "justify-center" : "justify-start"}`} onClick={() => handleLaunch(l.command)} disabled={agentOffline}>
-                    <Terminal className={`w-3 h-3 ${isTinyWidth ? "" : "mr-2"} text-primary`} /> {!isTinyWidth && l.name}
-                  </Button>
-                ))}
-              </div>
-            )}
-          </div>
-          )}
+            <div className="shrink-0 overflow-y-auto custom-scrollbar scrollbar-hide" style={{ maxHeight: '55%' }}>
 
-          {/* SECTION 4: GIT REPOS */}
-          {!isShort && (
-            <div className="shrink-0 p-3 bg-[#0f0f11] border-t border-white/10">
-              <div className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider mb-2 flex items-center justify-between">
-                <span className="flex items-center gap-1.5"><GitBranchIcon className="w-3.5 h-3.5" /> Repos</span>
-                <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-muted-foreground" onClick={fetchGitRepos} disabled={gitReposLoading || agentOffline}>
-                  <RefreshCw className={`w-3 h-3 ${gitReposLoading ? 'animate-spin' : ''}`} />
-                </Button>
-              </div>
-              
-              <div className="space-y-1.5 max-h-[150px] overflow-y-auto custom-scrollbar pr-1">
-                {gitRepos.length > 0 ? (
-                  gitRepos.map((repo, i) => (
-                    <div key={i} className="flex flex-col gap-1 p-2 rounded-lg border border-white/10 bg-black/20 hover:border-primary/30 transition-colors cursor-pointer" onClick={() => { setWorkspacePath(repo.path); handleSaveWorkspace(repo.path); }}>
-                      <div className="flex items-center justify-between overflow-hidden">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <Folder className="w-3 h-3 text-blue-400 shrink-0" />
-                          <span className="text-xs font-bold text-foreground truncate">{repo.name}</span>
-                          {repo.branch && (
-                            <Badge variant="outline" className="text-[8px] uppercase border-white/10 text-muted-foreground font-mono px-1.5 py-0 h-4 shrink-0">
-                              {repo.branch}
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          {repo.uncommitted > 0 && (
-                            <div className="flex items-center gap-1 text-[9px] text-amber-400 font-mono" title={`${repo.uncommitted} uncommitted`}>
-                              <div className="w-1.5 h-1.5 rounded-full bg-amber-400" /> {repo.uncommitted}
-                            </div>
-                          )}
-                          {repo.ahead > 0 && (
-                            <div className="flex items-center gap-1 text-[9px] text-blue-400 font-mono" title={`${repo.ahead} ahead`}>
-                              <div className="w-1.5 h-1.5 rounded-full bg-blue-400" /> {repo.ahead}
-                            </div>
-                          )}
-                        </div>
+              {/* Quick Launch */}
+              <div className="shrink-0 p-3 bg-[#0f0f11] border-t border-white/10">
+                <div className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider mb-2 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5"><Play className="w-3.5 h-3.5" /> Quick Launch</span>
+                  <Button variant="ghost" size="sm" className="h-5 text-[9px] px-1.5 text-muted-foreground" onClick={() => setIsEditingLaunchers(!isEditingLaunchers)}>
+                    {isEditingLaunchers ? "Done" : "Config"}
+                  </Button>
+                </div>
+                {isEditingLaunchers ? (
+                  <div className="space-y-2 max-h-[150px] overflow-y-auto custom-scrollbar scrollbar-hide pr-1">
+                    {customLaunchers.map((l, i) => (
+                      <div key={i} className="flex gap-2">
+                        <Input value={l.name} onChange={(e) => {
+                          const newL = [...customLaunchers];
+                          newL[i].name = e.target.value;
+                          saveLaunchers(newL);
+                        }} placeholder="Name" className="h-7 text-xs w-1/3 bg-black/20" />
+                        <Input value={l.command} onChange={(e) => {
+                          const newL = [...customLaunchers];
+                          newL[i].command = e.target.value;
+                          saveLaunchers(newL);
+                        }} placeholder="Command..." className="h-7 text-xs flex-1 bg-black/20" />
+                        <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-red-500 hover:bg-red-500/20 rounded" onClick={() => {
+                          const newL = customLaunchers.filter((_, idx) => idx !== i);
+                          saveLaunchers(newL);
+                        }}><XCircle className="w-3 h-3" /></Button>
                       </div>
-                      {repo.lastCommit && (
-                        <div className="text-[9px] font-mono text-muted-foreground truncate opacity-70">
-                          {repo.lastCommit}
-                        </div>
-                      )}
+                    ))}
+                    <div className="flex gap-2 pt-1">
+                      <Button variant="outline" size="sm" className="h-7 flex-1 text-[10px] border-dashed border-white/10 hover:bg-white/5" onClick={() => {
+                        saveLaunchers([...customLaunchers, { name: "New App", command: "" }]);
+                      }}>+ Add</Button>
+                      <Button variant="outline" size="sm" className="h-7 flex-1 text-[10px] border-dashed border-red-500/20 text-red-400 hover:bg-red-500/10" onClick={() => {
+                        saveLaunchers([
+                          { name: "VS Code", command: "VS Code" },
+                          { name: "Terminal", command: "Terminal" },
+                          { name: "Docker", command: "Docker Desktop" },
+                          { name: "Restart Agent", command: "RESTART_AGENT" }
+                        ]);
+                      }}>Reset Defaults</Button>
                     </div>
-                  ))
+                  </div>
                 ) : (
-                  <div className="text-center text-muted-foreground/50 text-[10px] py-4 uppercase tracking-widest">
-                    No repos tracked
+                  <div className="grid grid-cols-2 gap-2">
+                    {customLaunchers.map((l, i) => (
+                      <Button key={i} variant="outline" size="sm" className={`h-8 text-[10px] bg-[#0f0f11] hover:bg-white/5 border-white/10 ${isTinyWidth ? "justify-center" : "justify-start"}`} onClick={() => handleLaunch(l.command)} disabled={agentOffline}>
+                        <Terminal className={`w-3 h-3 ${isTinyWidth ? "" : "mr-2"} text-primary`} /> {!isTinyWidth && l.name}
+                      </Button>
+                    ))}
                   </div>
                 )}
               </div>
+
+              {/* Git Repos */}
+              <div className="shrink-0 p-3 bg-[#0f0f11] border-t border-white/10">
+                <div className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider mb-2 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5"><GitBranchIcon className="w-3.5 h-3.5" /> Repos</span>
+                  <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-muted-foreground" onClick={fetchGitRepos} disabled={gitReposLoading || agentOffline}>
+                    <RefreshCw className={`w-3 h-3 ${gitReposLoading ? 'animate-spin' : ''}`} />
+                  </Button>
+                </div>
+                <div className="space-y-1.5 max-h-[150px] overflow-y-auto custom-scrollbar pr-1">
+                  {gitRepos.length > 0 ? (
+                    gitRepos.map((repo, i) => (
+                      <div key={i} className="flex flex-col gap-1 p-2 rounded-lg border border-white/10 bg-black/20 hover:border-primary/30 transition-colors cursor-pointer" onClick={() => { setWorkspacePath(repo.path); handleSaveWorkspace(repo.path); }}>
+                        <div className="flex items-center justify-between overflow-hidden">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <Folder className="w-3 h-3 text-blue-400 shrink-0" />
+                            <span className="text-xs font-bold text-foreground truncate">{repo.name}</span>
+                            {repo.branch && (
+                              <Badge variant="outline" className="text-[8px] uppercase border-white/10 text-muted-foreground font-mono px-1.5 py-0 h-4 shrink-0">
+                                {repo.branch}
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {repo.uncommitted > 0 && (
+                              <div className="flex items-center gap-1 text-[9px] text-amber-400 font-mono" title={`${repo.uncommitted} uncommitted`}>
+                                <div className="w-1.5 h-1.5 rounded-full bg-amber-400" /> {repo.uncommitted}
+                              </div>
+                            )}
+                            {repo.ahead > 0 && (
+                              <div className="flex items-center gap-1 text-[9px] text-blue-400 font-mono" title={`${repo.ahead} ahead`}>
+                                <div className="w-1.5 h-1.5 rounded-full bg-blue-400" /> {repo.ahead}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        {repo.lastCommit && (
+                          <div className="text-[9px] font-mono text-muted-foreground truncate opacity-70">
+                            {repo.lastCommit}
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center text-muted-foreground/50 text-[10px] py-4 uppercase tracking-widest">
+                      No repos tracked
+                    </div>
+                  )}
+                </div>
+              </div>
+
             </div>
           )}
 

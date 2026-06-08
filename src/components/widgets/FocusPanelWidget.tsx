@@ -27,16 +27,47 @@ import {
 export function FocusPanelWidget() {
   const { tasks, addTask, toggleTask, deleteTask } = useTaskStore();
   const { notes, addNote, deleteNote, fetchNotes } = useNoteStore();
-  // Unified Input State
-  const [unifiedInput, setUnifiedInput] = useState("");
+  const [noteText, setNoteText] = useState('');
+  const [mentionQuery, setMentionQuery] = useState('');
+  const [showMentionMenu, setShowMentionMenu] = useState(false);
+  const [taggedProjectId, setTaggedProjectId] = useState<string | null>(null);
+  const [taggedProjectName, setTaggedProjectName] = useState<string | null>(null);
+  const [activeDropdownIndex, setActiveDropdownIndex] = useState(0);
+  const [isClassifying, setIsClassifying] = useState(false);
   const unifiedInputRef = useRef<HTMLTextAreaElement>(null);
 
   const { projects, fetchProjects } = useProjectStore();
-  const [showProjectDropdown, setShowProjectDropdown] = useState(false);
-  const [projectSearch, setProjectSearch] = useState("");
-  const [taggedProject, setTaggedProject] = useState<Project | null>(null);
-  const [isClassifying, setIsClassifying] = useState(false);
-  const [activeDropdownIndex, setActiveDropdownIndex] = useState(0);
+
+  function handleNoteInput(value: string) {
+    setNoteText(value)
+    // Detect @ trigger — supports project names with hyphens, dots, underscores
+    const atMatch = value.match(/@([^\s@]*)$/)
+    if (atMatch) {
+      setMentionQuery(atMatch[1].toLowerCase())
+      setShowMentionMenu(true)
+      setActiveDropdownIndex(0)
+    } else {
+      setShowMentionMenu(false)
+    }
+  }
+
+  const filteredProjects = projects.filter(p =>
+    p.name.toLowerCase().includes(mentionQuery)
+  ).slice(0, 6)
+
+  function selectMention(project: Project) {
+    // Replace the @partial text and refocus
+    const newText = noteText.replace(/@[^\s@]*$/, '') // remove the @partial mention
+    setNoteText(newText)
+    setTaggedProjectId(project.id)
+    setTaggedProjectName(project.name)
+    setShowMentionMenu(false)
+    setMentionQuery('')
+    // Refocus the textarea
+    setTimeout(() => {
+      unifiedInputRef.current?.focus();
+    }, 50);
+  }
 
   // Tasks State
   const [showDone, setShowDone] = useState(false);
@@ -93,47 +124,29 @@ export function FocusPanelWidget() {
     return { title: title || text, priority, dueDate };
   };
 
-  const selectProject = (project: Project) => {
-    setTaggedProject(project);
-    setShowProjectDropdown(false);
-    
-    // Remove the @search text from the input
-    const atIndex = unifiedInput.lastIndexOf("@");
-    if (atIndex !== -1) {
-      const beforeAt = unifiedInput.slice(0, atIndex);
-      const afterSearch = unifiedInput.slice(atIndex + 1 + projectSearch.length);
-      setUnifiedInput(beforeAt + afterSearch);
-    }
-    // Refocus the input
-    setTimeout(() => {
-      unifiedInputRef.current?.focus();
-    }, 50);
-  };
-
   const handleUnifiedEnter = async (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Escape") {
-      setShowProjectDropdown(false);
+      setShowMentionMenu(false);
       return;
     }
 
-    if (showProjectDropdown) {
-      const filtered = projects.filter(p => p.name.toLowerCase().startsWith(projectSearch.toLowerCase()));
+    if (showMentionMenu) {
       if (e.key === "ArrowDown") {
         e.preventDefault();
-        setActiveDropdownIndex(prev => (filtered.length > 0 ? (prev + 1) % filtered.length : 0));
+        setActiveDropdownIndex(prev => (filteredProjects.length > 0 ? (prev + 1) % filteredProjects.length : 0));
         return;
       }
       if (e.key === "ArrowUp") {
         e.preventDefault();
-        setActiveDropdownIndex(prev => (filtered.length > 0 ? (prev - 1 + filtered.length) % filtered.length : 0));
+        setActiveDropdownIndex(prev => (filteredProjects.length > 0 ? (prev - 1 + filteredProjects.length) % filteredProjects.length : 0));
         return;
       }
       if (e.key === "Enter") {
         e.preventDefault();
-        if (filtered.length > 0 && activeDropdownIndex >= 0 && activeDropdownIndex < filtered.length) {
-          selectProject(filtered[activeDropdownIndex]);
+        if (filteredProjects.length > 0 && activeDropdownIndex >= 0 && activeDropdownIndex < filteredProjects.length) {
+          selectMention(filteredProjects[activeDropdownIndex]);
         } else {
-          setShowProjectDropdown(false);
+          setShowMentionMenu(false);
         }
         return;
       }
@@ -146,77 +159,52 @@ export function FocusPanelWidget() {
   };
 
   const handleSubmit = async () => {
-    let currentTaggedProject = taggedProject;
-    let finalInput = unifiedInput;
+    if (noteText.trim()) {
+      const textToSubmit = noteText;
+      const projId = taggedProjectId;
+      const projName = taggedProjectName;
 
-    if (!currentTaggedProject) {
-      const match = unifiedInput.match(/@([a-zA-Z0-9_-]+)/);
-      if (match) {
-        const possibleProjectName = match[1];
-        const matchedProject = projects.find(p => p.name.toLowerCase() === possibleProjectName.toLowerCase());
-        if (matchedProject) {
-          currentTaggedProject = matchedProject;
-          finalInput = unifiedInput.replace(`@${possibleProjectName}`, "").trim();
-        }
-      }
-    }
-
-    if (finalInput.trim()) {
-      const content = finalInput.trim();
-      setUnifiedInput("");
-      setShowProjectDropdown(false);
-      
-      setIsClassifying(true);
       try {
-        // Optimistically add note first so it shows up instantly, getting the created note item
-        const savedNote = await addNote(content, currentTaggedProject?.id, undefined);
-        
-        if (savedNote && savedNote.id) {
-          // Trigger background classification
-          fetch("/api/ai/classify-note", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ text: content, noteId: savedNote.id })
+        setIsClassifying(true);
+        // 1. Save note to DB with projectId if tagged
+        const savedNote = await fetch('/api/notes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: textToSubmit, projectId: projId })
+        }).then(r => r.json());
+
+        // 2. Reset UI immediately — don't wait for classification
+        setNoteText('');
+        setTaggedProjectId(null);
+        setTaggedProjectName(null);
+        setShowMentionMenu(false);
+
+        // Fetch notes again to update the local store list (Zustand store fetchNotes)
+        await fetchNotes();
+
+        // 3. Background classification — fire and forget
+        if (projId) {
+          fetch('/api/ai/classify-note', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              noteId: savedNote.id,
+              content: textToSubmit,
+              projectName: projName
+            })
           })
-          .then(res => res.json())
-          .then(data => {
-            if (data.items && data.items.length > 0) {
-              const mainItem = data.items.find((item: any) => item.category !== "task") || data.items[0];
-              // Update local Zustand store directly to reflect without hard reload
-              useNoteStore.setState((state) => ({
-                notes: state.notes.map((n) => n.id === savedNote.id ? { ...n, category: mainItem.category } : n)
-              }));
-            }
+          .then(() => {
+            // Refresh notes so the category badge is updated in state
+            fetchNotes();
           })
-          .catch(err => console.error("Classification request failed", err));
+          .catch(() => {}); // silent fail
         }
       } catch (e) {
-        console.error("Failed to add note:", e);
-        // Fallback
-        await addNote(content, currentTaggedProject?.id, "general note");
+        console.error("Failed to save note", e);
       } finally {
         setIsClassifying(false);
-        setTaggedProject(null);
         setSelectedDate(todayStr);
       }
-    }
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const val = e.target.value;
-    setUnifiedInput(val);
-    const atIndex = val.lastIndexOf("@");
-    if (atIndex !== -1 && !taggedProject) {
-      const search = val.slice(atIndex + 1);
-      if (!search.includes(" ")) {
-        setShowProjectDropdown(true);
-        setProjectSearch(search);
-        setActiveDropdownIndex(0);
-      } else {
-        setShowProjectDropdown(false);
-      }
-    } else {
-      setShowProjectDropdown(false);
     }
   };
 
@@ -271,15 +259,15 @@ export function FocusPanelWidget() {
   const wordCount = notes.filter(n => !n.projectId).reduce((acc, note) => acc + (note.content.match(/\b\w+\b/g)?.length || 0), 0);
 
   return (
-    <div className="flex flex-col h-full text-foreground bg-[#0f0f11] rounded-xl overflow-hidden divide-y divide-border/40">
+    <div className="flex flex-col h-full text-foreground bg-[#0f0f11] rounded-xl divide-y divide-border/40" style={{ overflow: 'visible' }}>
       
       {/* ── UNIFIED INPUT SECTION ── */}
-      <div className="px-4 py-3 shrink-0 relative bg-[#0f0f11]">
+      <div className="px-4 py-3 shrink-0 bg-[#0f0f11]" style={{ position: 'relative', zIndex: 50 }}>
         <div className="relative flex flex-col bg-[#161619] border border-white/5 rounded-xl focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/50 transition-all shadow-sm">
           <Textarea 
             ref={unifiedInputRef as any}
-            value={unifiedInput}
-            onChange={handleInputChange}
+            value={noteText}
+            onChange={(e) => handleNoteInput(e.target.value)}
             onKeyDown={handleUnifiedEnter}
             placeholder="Type anything... AI will sort into Tasks or Brain Dump"
             className="min-h-[60px] max-h-[140px] overflow-y-auto text-sm resize-none bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 p-3 pb-2 focus:outline-none custom-scrollbar scrollbar-hide"
@@ -300,12 +288,13 @@ export function FocusPanelWidget() {
                 />
               </div>
 
-              {taggedProject && (
-                <div className="flex items-center gap-1 bg-purple-500/20 text-purple-400 text-[10px] px-2.5 py-0.5 rounded-md font-bold border border-purple-500/30">
-                  @{taggedProject.name}
-                  <button onClick={() => setTaggedProject(null)} className="hover:text-white transition-colors ml-1">
-                    <X className="w-3 h-3" />
-                  </button>
+              {taggedProjectName && (
+                <div className="flex items-center gap-1 mt-1">
+                  <span className="text-xs text-white/40">tagged:</span>
+                  <span className="text-xs bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded-full flex items-center gap-1 font-bold border border-purple-500/20">
+                    @{taggedProjectName}
+                    <button onClick={() => { setTaggedProjectId(null); setTaggedProjectName(null) }} className="text-purple-300/60 hover:text-purple-300 ml-1 font-bold">×</button>
+                  </span>
                 </div>
               )}
             </div>
@@ -320,7 +309,7 @@ export function FocusPanelWidget() {
                 size="icon"
                 className="w-7 h-7 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:bg-white/5 disabled:text-white/40 transition-all"
                 onClick={handleSubmit}
-                disabled={!unifiedInput.trim() || isClassifying}
+                disabled={!noteText.trim() || isClassifying}
                 title="Submit (Ctrl+Enter)"
               >
                 <ChevronRight className="w-4 h-4" />
@@ -329,27 +318,39 @@ export function FocusPanelWidget() {
           </div>
         </div>
 
-        {showProjectDropdown && (
-          <div className="absolute top-full left-4 right-4 mt-1 bg-[#1a1a1d] border border-white/10 rounded-lg shadow-xl z-50 max-h-40 overflow-y-auto">
-            {(() => {
-              const filtered = projects.filter(p => p.name.toLowerCase().startsWith(projectSearch.toLowerCase()));
-              if (filtered.length === 0) {
-                return <div className="px-3 py-2 text-xs text-muted-foreground">No projects found</div>;
-              }
-              return filtered.map((p, index) => (
-                <div 
-                  key={p.id} 
-                  className={`px-3 py-2 text-xs cursor-pointer transition-colors ${
-                    index === activeDropdownIndex 
-                      ? "bg-purple-500/20 text-purple-300 font-semibold animate-pulse" 
-                      : "text-foreground hover:bg-white/5"
-                  }`}
-                  onClick={() => selectProject(p)}
-                >
-                  {p.name}
-                </div>
-              ));
-            })()}
+        {/* @-mention dropdown — renders BELOW the input box */}
+        {showMentionMenu && filteredProjects.length > 0 && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '100%',
+              left: '16px',
+              right: '16px',
+              marginTop: '4px',
+              zIndex: 9999,
+            }}
+            className="bg-[#1a1a24] border border-purple-500/30 rounded-xl overflow-hidden shadow-2xl"
+          >
+            <div className="px-3 py-1.5 border-b border-white/5 flex items-center gap-1.5">
+              <span className="text-[9px] text-purple-400/70 font-bold uppercase tracking-widest">Tag a Project</span>
+            </div>
+            {filteredProjects.map((p, index) => (
+              <button
+                key={p.id}
+                onMouseDown={(e) => { e.preventDefault(); selectMention(p); }}
+                className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2.5 transition-colors ${
+                  index === activeDropdownIndex
+                    ? 'bg-purple-500/20 text-purple-200 font-semibold'
+                    : 'text-white/70 hover:bg-white/5 hover:text-white'
+                }`}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-green-400 flex-shrink-0 shadow-sm shadow-green-400/50" />
+                <span className="flex-1 truncate">{p.name}</span>
+                {index === activeDropdownIndex && (
+                  <span className="text-[9px] text-purple-400/60 ml-auto">↵ select</span>
+                )}
+              </button>
+            ))}
           </div>
         )}
 

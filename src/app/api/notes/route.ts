@@ -3,12 +3,11 @@ import { prisma } from "@/lib/prisma";
 
 export async function GET(request: Request) {
   try {
-    const { searchParams } = new URL(request.url);
-    const projectId = searchParams.get("projectId");
-
+    const url = new URL(request.url);
+    const projectId = url.searchParams.get('projectId')
     const notes = await prisma.note.findMany({
-      where: projectId ? { projectId } : undefined,
-      orderBy: { createdAt: "desc" },
+      where: projectId ? { projectId } : {},
+      orderBy: { createdAt: 'desc' }
     });
     return NextResponse.json(notes);
   } catch (error) {
