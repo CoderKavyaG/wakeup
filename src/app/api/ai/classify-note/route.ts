@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { generateObject } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { z } from "zod";
+import { prisma } from "@/lib/prisma";
 
 const openrouter = createOpenAI({
   baseURL: "https://openrouter.ai/api/v1",
@@ -10,7 +11,7 @@ const openrouter = createOpenAI({
 
 export async function POST(request: Request) {
   try {
-    const { text } = await request.json();
+    const { text, noteId } = await request.json();
 
     if (!text) {
       return NextResponse.json({ error: "Text is required" }, { status: 400 });
@@ -28,7 +29,17 @@ export async function POST(request: Request) {
       })
     });
 
-    return NextResponse.json({ items: result.object.items });
+    const items = result.object.items;
+
+    if (noteId && items && items.length > 0) {
+      const mainItem = items.find(item => item.category !== "task") || items[0];
+      await prisma.note.update({
+        where: { id: noteId },
+        data: { category: mainItem.category }
+      });
+    }
+
+    return NextResponse.json({ items });
   } catch (error) {
     console.error("Classification error:", error);
     const errorMessage = error instanceof Error ? error.message : "An error occurred";

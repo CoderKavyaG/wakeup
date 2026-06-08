@@ -13,7 +13,7 @@ interface NoteState {
   loading: boolean;
   error: string | null;
   fetchNotes: () => Promise<void>;
-  addNote: (content: string, projectId?: string, category?: string) => Promise<void>;
+  addNote: (content: string, projectId?: string, category?: string) => Promise<Note | undefined>;
   deleteNote: (id: string) => Promise<void>;
 }
 
@@ -63,6 +63,7 @@ export const useNoteStore = create<NoteState>((set, get) => ({
       set((state) => ({
         notes: state.notes.map((n) => (n.id === tempId ? savedNote : n)),
       }));
+      return savedNote;
     } catch (err) {
       // Revert optimistic update
       const errorMessage = err instanceof Error ? err.message : 'An error occurred';

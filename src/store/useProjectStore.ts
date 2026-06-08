@@ -25,6 +25,8 @@ export interface Project {
   momentumScore?: number;
   nextAction?: string;
   completionPercentage?: number;
+  health?: number | null;
+  healthSignals?: string | null;
 
   updatedAt: string;
 }

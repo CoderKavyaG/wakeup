@@ -124,6 +124,20 @@ Write ONE sentence telling Kavya what to focus on today. Be specific. Name a pro
       create: { id: 'daily-brief', type: 'daily_brief', content: brief, expiresAt: tomorrow }
     });
 
+    // Batch health update for all projects
+    const { origin } = new URL(request.url);
+    for (const project of projects) {
+      try {
+        await fetch(`${origin}/api/projects/health`, {
+          method: 'POST',
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ projectId: project.id })
+        });
+      } catch (err) {
+        console.error(`Failed to update health for project ${project.name}`, err);
+      }
+    }
+
     return NextResponse.json({ ok: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Intelligence generation error";

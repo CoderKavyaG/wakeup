@@ -38,6 +38,9 @@ model Project {
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
   
+  health               Int?
+  healthSignals        String?  // JSON array of signal strings
+
   // Relations (Phase 5)
   memories             Memory[]
   projectMemory        ProjectMemory?

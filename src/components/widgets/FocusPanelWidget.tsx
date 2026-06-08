@@ -26,16 +26,17 @@ import {
 
 export function FocusPanelWidget() {
   const { tasks, addTask, toggleTask, deleteTask } = useTaskStore();
-  const { notes, addNote, deleteNote } = useNoteStore();
+  const { notes, addNote, deleteNote, fetchNotes } = useNoteStore();
   // Unified Input State
   const [unifiedInput, setUnifiedInput] = useState("");
   const unifiedInputRef = useRef<HTMLTextAreaElement>(null);
 
-  const { projects } = useProjectStore();
+  const { projects, fetchProjects } = useProjectStore();
   const [showProjectDropdown, setShowProjectDropdown] = useState(false);
   const [projectSearch, setProjectSearch] = useState("");
   const [taggedProject, setTaggedProject] = useState<Project | null>(null);
   const [isClassifying, setIsClassifying] = useState(false);
+  const [activeDropdownIndex, setActiveDropdownIndex] = useState(0);
 
   // Tasks State
   const [showDone, setShowDone] = useState(false);
@@ -92,28 +93,52 @@ export function FocusPanelWidget() {
     return { title: title || text, priority, dueDate };
   };
 
-  const handleUnifiedEnter = async (e: React.KeyboardEvent) => {
+  const selectProject = (project: Project) => {
+    setTaggedProject(project);
+    setShowProjectDropdown(false);
+    
+    // Remove the @search text from the input
+    const atIndex = unifiedInput.lastIndexOf("@");
+    if (atIndex !== -1) {
+      const beforeAt = unifiedInput.slice(0, atIndex);
+      const afterSearch = unifiedInput.slice(atIndex + 1 + projectSearch.length);
+      setUnifiedInput(beforeAt + afterSearch);
+    }
+    // Refocus the input
+    setTimeout(() => {
+      unifiedInputRef.current?.focus();
+    }, 50);
+  };
+
+  const handleUnifiedEnter = async (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Escape") {
       setShowProjectDropdown(false);
-      setTaggedProject(null);
       return;
     }
 
-    if (e.key === "Enter") {
-      if (showProjectDropdown) {
-        const matches = projects.filter(p => p.name.toLowerCase().includes(projectSearch.toLowerCase()));
-        if (matches.length > 0) {
-          e.preventDefault();
-          setTaggedProject(matches[0]);
-          setShowProjectDropdown(false);
-          setUnifiedInput(prev => prev.slice(0, prev.lastIndexOf("@")));
-          return;
+    if (showProjectDropdown) {
+      const filtered = projects.filter(p => p.name.toLowerCase().startsWith(projectSearch.toLowerCase()));
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setActiveDropdownIndex(prev => (filtered.length > 0 ? (prev + 1) % filtered.length : 0));
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setActiveDropdownIndex(prev => (filtered.length > 0 ? (prev - 1 + filtered.length) % filtered.length : 0));
+        return;
+      }
+      if (e.key === "Enter") {
+        e.preventDefault();
+        if (filtered.length > 0 && activeDropdownIndex >= 0 && activeDropdownIndex < filtered.length) {
+          selectProject(filtered[activeDropdownIndex]);
         } else {
           setShowProjectDropdown(false);
         }
+        return;
       }
-
-      if (e.ctrlKey || e.metaKey) {
+    } else {
+      if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
         handleSubmit();
       }
@@ -143,43 +168,32 @@ export function FocusPanelWidget() {
       
       setIsClassifying(true);
       try {
-        const res = await fetch("/api/ai/classify-note", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: content })
-        });
-        if (!res.ok) throw new Error("Classification failed");
+        // Optimistically add note first so it shows up instantly, getting the created note item
+        const savedNote = await addNote(content, currentTaggedProject?.id, undefined);
         
-        const data = await res.json();
-        
-        if (data.items && Array.isArray(data.items)) {
-          for (const item of data.items) {
-            if (item.category === "task") {
-              const parsed = parseTaskInput(item.content);
-              const taskDate = selectedDate || parsed.dueDate || todayStr;
-              addTask({ title: parsed.title, priority: parsed.priority, dueDate: taskDate, projectId: currentTaggedProject?.id });
-            } else {
-              await addNote(item.content, currentTaggedProject?.id, item.category);
+        if (savedNote && savedNote.id) {
+          // Trigger background classification
+          fetch("/api/ai/classify-note", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: content, noteId: savedNote.id })
+          })
+          .then(res => res.json())
+          .then(data => {
+            if (data.items && data.items.length > 0) {
+              const mainItem = data.items.find((item: any) => item.category !== "task") || data.items[0];
+              // Update local Zustand store directly to reflect without hard reload
+              useNoteStore.setState((state) => ({
+                notes: state.notes.map((n) => n.id === savedNote.id ? { ...n, category: mainItem.category } : n)
+              }));
             }
-          }
-        } else {
-          if (data.category === "task") {
-            const parsed = parseTaskInput(content);
-            const taskDate = selectedDate || parsed.dueDate || todayStr;
-            addTask({ title: parsed.title, priority: parsed.priority, dueDate: taskDate, projectId: currentTaggedProject?.id });
-          } else {
-            await addNote(content, currentTaggedProject?.id, data.category || "general note");
-          }
+          })
+          .catch(err => console.error("Classification request failed", err));
         }
       } catch (e) {
-        const isTask = content.length < 100 || /^(fix|do|make|create|deploy|update|urgent|add)\b/i.test(content);
-        if (isTask) {
-          const parsed = parseTaskInput(content);
-          const taskDate = selectedDate || parsed.dueDate || todayStr;
-          addTask({ title: parsed.title, priority: parsed.priority, dueDate: taskDate, projectId: currentTaggedProject?.id });
-        } else {
-          await addNote(content, currentTaggedProject?.id, "general note");
-        }
+        console.error("Failed to add note:", e);
+        // Fallback
+        await addNote(content, currentTaggedProject?.id, "general note");
       } finally {
         setIsClassifying(false);
         setTaggedProject(null);
@@ -193,8 +207,14 @@ export function FocusPanelWidget() {
     setUnifiedInput(val);
     const atIndex = val.lastIndexOf("@");
     if (atIndex !== -1 && !taggedProject) {
-      setShowProjectDropdown(true);
-      setProjectSearch(val.slice(atIndex + 1));
+      const search = val.slice(atIndex + 1);
+      if (!search.includes(" ")) {
+        setShowProjectDropdown(true);
+        setProjectSearch(search);
+        setActiveDropdownIndex(0);
+      } else {
+        setShowProjectDropdown(false);
+      }
     } else {
       setShowProjectDropdown(false);
     }
@@ -202,6 +222,8 @@ export function FocusPanelWidget() {
 
   // Keyboard shortcut for task input
   useEffect(() => {
+    fetchNotes();
+    fetchProjects();
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "/" && document.activeElement?.tagName !== "INPUT" && document.activeElement?.tagName !== "TEXTAREA") {
         e.preventDefault();
@@ -279,9 +301,9 @@ export function FocusPanelWidget() {
               </div>
 
               {taggedProject && (
-                <div className="flex items-center gap-1 bg-primary/20 text-primary text-[10px] px-2.5 py-0.5 rounded-md font-bold border border-primary/20">
+                <div className="flex items-center gap-1 bg-purple-500/20 text-purple-400 text-[10px] px-2.5 py-0.5 rounded-md font-bold border border-purple-500/30">
                   @{taggedProject.name}
-                  <button onClick={() => setTaggedProject(null)} className="hover:text-white transition-colors">
+                  <button onClick={() => setTaggedProject(null)} className="hover:text-white transition-colors ml-1">
                     <X className="w-3 h-3" />
                   </button>
                 </div>
@@ -309,23 +331,25 @@ export function FocusPanelWidget() {
 
         {showProjectDropdown && (
           <div className="absolute top-full left-4 right-4 mt-1 bg-[#1a1a1d] border border-white/10 rounded-lg shadow-xl z-50 max-h-40 overflow-y-auto">
-            {projects.filter(p => p.name.toLowerCase().includes(projectSearch.toLowerCase())).map(p => (
-              <div 
-                key={p.id} 
-                className="px-3 py-2 text-xs hover:bg-white/10 cursor-pointer text-foreground"
-                onClick={() => {
-                  setTaggedProject(p);
-                  setShowProjectDropdown(false);
-                  setUnifiedInput(prev => prev.slice(0, prev.lastIndexOf("@")));
-                  unifiedInputRef.current?.focus();
-                }}
-              >
-                {p.name}
-              </div>
-            ))}
-            {projects.filter(p => p.name.toLowerCase().includes(projectSearch.toLowerCase())).length === 0 && (
-              <div className="px-3 py-2 text-xs text-muted-foreground">No projects found</div>
-            )}
+            {(() => {
+              const filtered = projects.filter(p => p.name.toLowerCase().startsWith(projectSearch.toLowerCase()));
+              if (filtered.length === 0) {
+                return <div className="px-3 py-2 text-xs text-muted-foreground">No projects found</div>;
+              }
+              return filtered.map((p, index) => (
+                <div 
+                  key={p.id} 
+                  className={`px-3 py-2 text-xs cursor-pointer transition-colors ${
+                    index === activeDropdownIndex 
+                      ? "bg-purple-500/20 text-purple-300 font-semibold animate-pulse" 
+                      : "text-foreground hover:bg-white/5"
+                  }`}
+                  onClick={() => selectProject(p)}
+                >
+                  {p.name}
+                </div>
+              ));
+            })()}
           </div>
         )}
 

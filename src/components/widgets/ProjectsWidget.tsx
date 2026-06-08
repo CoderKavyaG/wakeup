@@ -40,6 +40,7 @@ import {
 export function ProjectsWidget() {
   const { projects, deleteProject, updateProject, addProject, loading } = useProjectStore();
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const currentProject = projects.find(p => p.id === selectedProject?.id) || selectedProject;
   
   // New Feedback State
   
@@ -242,6 +243,22 @@ export function ProjectsWidget() {
     setActiveTab("overview");
     if (selectedProject?.id) {
       fetchLinks(selectedProject.id);
+      // Background health check
+      fetch("/api/projects/health", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId: selectedProject.id })
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.score !== undefined) {
+            updateProject(selectedProject.id, {
+              health: data.score,
+              healthSignals: JSON.stringify(data.signals)
+            });
+          }
+        })
+        .catch(err => console.error("Health check fetch error", err));
     } else {
       setProjectLinks([]);
     }
@@ -436,6 +453,19 @@ export function ProjectsWidget() {
     }
   };
 
+  const renderHealthScore = (health: number | null | undefined) => {
+    if (health === undefined || health === null) {
+      return <span className="text-white/20 text-[10px] select-none ml-1.5">—</span>;
+    }
+    let colorClass = "text-red-400";
+    if (health >= 80) {
+      colorClass = "text-green-400";
+    } else if (health >= 50) {
+      colorClass = "text-yellow-400";
+    }
+    return <span className={`text-[10px] font-bold font-mono ml-1.5 ${colorClass}`} title="Project Health">{health}%</span>;
+  };
+
   const createGitHubIssue = async (feedbackText: string) => {
     if (!selectedProject?.githubUrl) return alert("No GitHub URL for this project.");
     try {
@@ -559,6 +589,7 @@ export function ProjectsWidget() {
                       <div className="flex items-center gap-2">
                         <div className={`w-2 h-2 rounded-full shrink-0 shadow-sm ${!isStale ? "bg-green-500 shadow-green-500/50" : "bg-yellow-500 shadow-yellow-500/50"}`} />
                         <span className={`text-sm font-semibold truncate ${isSelected ? 'text-primary' : 'text-foreground'}`}>{project.name}</span>
+                        {renderHealthScore(project.health)}
                         {stats?.issues > 0 && (
                           <button 
                             onClick={(e) => { e.stopPropagation(); window.open(`${project.githubUrl}/issues`); }}
@@ -687,6 +718,7 @@ export function ProjectsWidget() {
                         title="Project Color"
                       />
                       <span className={`text-sm font-semibold truncate ${isSelected ? 'text-primary' : 'text-foreground'}`}>{project.name}</span>
+                      {renderHealthScore(project.health)}
                     </div>
                     
                     <div className="flex items-center gap-2 shrink-0">
@@ -756,16 +788,40 @@ export function ProjectsWidget() {
         </div>
       </div>
 
-      {/* ── DETAIL VIEW (Slides in) ── */}
-      {selectedProject && (
+       {selectedProject && currentProject && (
         <div className="w-2/3 flex flex-col h-full overflow-hidden pl-3">
           <div className="flex items-center justify-between mb-3 shrink-0 bg-[#0f0f11] p-3 rounded-xl border border-white/10">
             <div className="flex-1 min-w-0 pr-4 space-y-1">
               <div className="flex items-center gap-3">
-                <div className={`w-2.5 h-2.5 rounded-full shadow-sm ${selectedProject.githubUrl ? ((!githubStats[selectedProject.githubUrl.toLowerCase()] || (new Date().getTime() - new Date(githubStats[selectedProject.githubUrl.toLowerCase()].lastCommit).getTime() <= 45*24*3600*1000)) ? "bg-green-500 shadow-green-500/50" : "bg-yellow-500 shadow-yellow-500/50") : getStatusColor(selectedProject.status)}`} />
-                <h3 className="text-base font-bold text-foreground truncate">{selectedProject.name}</h3>
-                <span className="text-[10px] font-mono text-muted-foreground ml-1 mt-0.5">Updated: {new Date(selectedProject.updatedAt).toLocaleDateString()}</span>
+                <div className={`w-2.5 h-2.5 rounded-full shadow-sm ${currentProject.githubUrl ? ((!githubStats[currentProject.githubUrl.toLowerCase()] || (new Date().getTime() - new Date(githubStats[currentProject.githubUrl.toLowerCase()].lastCommit).getTime() <= 45*24*3600*1000)) ? "bg-green-500 shadow-green-500/50" : "bg-yellow-500 shadow-yellow-500/50") : getStatusColor(currentProject.status)}`} />
+                <h3 className="text-base font-bold text-foreground truncate">{currentProject.name}</h3>
+                <span className="text-[10px] font-mono text-muted-foreground ml-1 mt-0.5">Updated: {new Date(currentProject.updatedAt).toLocaleDateString()}</span>
+                {currentProject.health !== undefined && currentProject.health !== null && (
+                  <span className={`text-xs font-bold font-mono ml-2 px-2 py-0.5 rounded bg-black/30 border border-white/5 ${currentProject.health >= 80 ? "text-green-400" : currentProject.health >= 50 ? "text-yellow-400" : "text-red-400"}`}>
+                    Health: {currentProject.health}%
+                  </span>
+                )}
               </div>
+              
+              {/* Health Signals */}
+              {currentProject.healthSignals && (
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {(() => {
+                    try {
+                      const signals = JSON.parse(currentProject.healthSignals);
+                      if (Array.isArray(signals) && signals.length > 0) {
+                        return signals.map((sig: string) => (
+                          <span key={sig} className="px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-[8px] text-muted-foreground font-sans uppercase tracking-wider">
+                            {sig}
+                          </span>
+                        ));
+                      }
+                    } catch (e) {}
+                    return null;
+                  })()}
+                </div>
+              )}
+
               <div className="flex items-center gap-3 text-[10px] font-mono text-muted-foreground">
                 {selectedProject.githubUrl && (
                   <a href={selectedProject.githubUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 hover:text-foreground">
@@ -985,7 +1041,7 @@ export function ProjectsWidget() {
                 {/* Unified Feedback Feed */}
                 <div className="pt-2 space-y-4">
                   <div className="flex items-center justify-between pb-2 border-b border-white/10">
-                    <h3 className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest px-1">Next Feedbacks</h3>
+                    <h3 className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest px-1">Brain Dump</h3>
                   </div>
 
                   <div className="space-y-3">
@@ -995,11 +1051,30 @@ export function ProjectsWidget() {
                           <div className="flex justify-between items-center">
                             <p className="text-[9px] text-muted-foreground font-mono">{new Date(note.createdAt).toLocaleString()}</p>
                             <div className="flex items-center gap-2">
-                              {note.category && (
-                                <Badge variant="secondary" className="text-[8px] py-0 px-1.5 uppercase bg-primary/10 text-primary border-primary/20">
-                                  {note.category}
-                                </Badge>
-                              )}
+                              {(() => {
+                                const cat = note.category;
+                                if (!cat) return <Badge variant="secondary" className="text-[8px] py-0 px-1.5 uppercase bg-white/5 text-muted-foreground border-white/10 animate-pulse">classifying...</Badge>;
+                                let label = cat;
+                                let colorClass = "bg-primary/10 text-primary border-primary/20";
+                                if (cat === "bug report" || cat === "bug") {
+                                  label = "bug";
+                                  colorClass = "bg-red-500/15 text-red-400 border-red-500/20";
+                                } else if (cat === "feature idea" || cat === "idea") {
+                                  label = "idea";
+                                  colorClass = "bg-purple-500/15 text-purple-400 border-purple-500/20";
+                                } else if (cat === "general feedback" || cat === "feedback") {
+                                  label = "feedback";
+                                  colorClass = "bg-blue-500/15 text-blue-400 border-blue-500/20";
+                                } else if (cat === "general note" || cat === "note") {
+                                  label = "note";
+                                  colorClass = "bg-zinc-500/15 text-zinc-400 border-zinc-500/20";
+                                }
+                                return (
+                                  <Badge variant="secondary" className={`text-[8px] py-0 px-1.5 uppercase ${colorClass}`}>
+                                    {label}
+                                  </Badge>
+                                );
+                              })()}
                               <Button variant="ghost" size="icon" className="w-5 h-5 opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-400" onClick={() => notesStoreDeleteNote(note.id)}>
                                 <Trash2 className="w-3 h-3" />
                               </Button>
