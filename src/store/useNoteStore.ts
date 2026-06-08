@@ -13,6 +13,7 @@ interface NoteState {
   loading: boolean;
   error: string | null;
   fetchNotes: () => Promise<void>;
+  setNotes: (notes: Note[]) => void;
   addNote: (content: string, projectId?: string, category?: string) => Promise<Note | undefined>;
   deleteNote: (id: string) => Promise<void>;
 }
@@ -21,6 +22,8 @@ export const useNoteStore = create<NoteState>((set, get) => ({
   notes: [],
   loading: false,
   error: null,
+
+  setNotes: (notes) => set({ notes, loading: false }),
 
   fetchNotes: async () => {
     set({ loading: true, error: null });

@@ -210,8 +210,6 @@ export function FocusPanelWidget() {
 
   // Keyboard shortcut for task input
   useEffect(() => {
-    fetchNotes();
-    fetchProjects();
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "/" && document.activeElement?.tagName !== "INPUT" && document.activeElement?.tagName !== "TEXTAREA") {
         e.preventDefault();

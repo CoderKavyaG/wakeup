@@ -15,6 +15,7 @@ interface TaskState {
   loading: boolean;
   error: string | null;
   fetchTasks: () => Promise<void>;
+  setTasks: (tasks: Task[]) => void;
   addTask: (task: Omit<Task, "id" | "completed" | "createdAt">) => Promise<void>;
   toggleTask: (id: string) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
@@ -24,6 +25,8 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   tasks: [],
   loading: false,
   error: null,
+
+  setTasks: (tasks) => set({ tasks, loading: false }),
 
   fetchTasks: async () => {
     set({ loading: true, error: null });

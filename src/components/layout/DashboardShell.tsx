@@ -10,6 +10,7 @@ import { QuickLinksWidget } from "../widgets/QuickLinksWidget";
 import { AnimatePresence, motion } from "framer-motion";
 import { SessionBriefing } from "./SessionBriefing";
 import { Download } from "lucide-react";
+import { useBootstrapStore } from "@/store/useBootstrapStore";
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
@@ -17,11 +18,27 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   const { isLocked, toggleLock, resetLayout, clearLayout, setLayouts, saveCurrentLayout, loadSavedLayout, savedLayout } = useLayoutStore();
   const { isQuickLinksOpen, toggleQuickLinks } = useUrlStore();
+  const loaded = useBootstrapStore((s) => s.loaded);
 
   // Removed switchProfile logic as per request
 
   return (
-    <div className="h-screen w-full flex flex-col overflow-hidden bg-[#0f0f11] text-[#E8E9EB]">
+    <div className="h-screen w-full flex flex-col overflow-hidden bg-[#0f0f11] text-[#E8E9EB] relative">
+      <AnimatePresence>
+        {!loaded && (
+          <motion.div
+            key="bootstrap-progress"
+            className="fixed top-0 left-0 right-0 h-[2px] bg-[#5B8DEF] z-50 origin-left"
+            initial={{ scaleX: 0 }}
+            animate={{ scaleX: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{
+              scaleX: { duration: 1.5, ease: "easeOut" },
+              opacity: { duration: 0.3 }
+            }}
+          />
+        )}
+      </AnimatePresence>
       <CockpitCommand />
 
       {/* Top Controls Bar */}

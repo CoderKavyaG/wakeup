@@ -107,10 +107,6 @@ export function ProjectsWidget() {
   const { tasks } = useTaskStore();
   const { notes, fetchNotes, addNote: notesStoreAddNote, deleteNote: notesStoreDeleteNote } = useNoteStore();
 
-  useEffect(() => {
-    fetchNotes();
-  }, []);
-
   // GitHub Stats State
   const [githubStats, setGithubStats] = useState<Record<string, { lastCommit: string, issues: number, stars: number, lastCommitMsg: string | null }>>({});
   const [staleWarningCount, setStaleWarningCount] = useState(0);

@@ -14,6 +14,7 @@ interface UrlState {
   isQuickLinksOpen: boolean;
   toggleQuickLinks: () => void;
   fetchUrls: () => Promise<void>;
+  setUrls: (urls: ResourceUrl[]) => void;
   addUrl: (url: Omit<ResourceUrl, "id">) => Promise<void>;
   deleteUrl: (id: string) => Promise<void>;
   reorderUrls: (urls: ResourceUrl[]) => void;
@@ -25,6 +26,8 @@ export const useUrlStore = create<UrlState>((set, get) => ({
   error: null,
   isQuickLinksOpen: false,
   toggleQuickLinks: () => set((s) => ({ isQuickLinksOpen: !s.isQuickLinksOpen })),
+
+  setUrls: (urls) => set({ urls, loading: false }),
 
   fetchUrls: async () => {
     set({ loading: true, error: null });

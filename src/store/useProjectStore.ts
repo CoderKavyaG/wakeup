@@ -36,6 +36,7 @@ interface ProjectState {
   loading: boolean;
   error: string | null;
   fetchProjects: () => Promise<void>;
+  setProjects: (projects: Project[]) => void;
   addProject: (project: Omit<Project, "id" | "updatedAt">) => Promise<void>;
   updateProject: (id: string, updates: Partial<Project>) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
@@ -45,6 +46,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   projects: [],
   loading: false,
   error: null,
+
+  setProjects: (projects) => set({ projects, loading: false }),
 
   fetchProjects: async () => {
     set({ loading: true, error: null });
