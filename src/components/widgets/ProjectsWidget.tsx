@@ -543,7 +543,7 @@ export function ProjectsWidget() {
   };
 
   return (
-    <div className="flex h-full w-full overflow-hidden text-foreground bg-[#0f0f11] rounded-xl">
+    <div id="projects-widget" className="flex h-full w-full overflow-hidden text-foreground bg-[#0f0f11] rounded-xl">
       {/* ── COLLAPSED VIEW (Always visible) ── */}
       <div className={`flex flex-col h-full overflow-hidden transition-all duration-300 ${selectedProject ? "w-1/3 border-r border-white/10 pr-3" : "w-full"}`}>
         <div className="flex items-center justify-between mb-4 shrink-0 px-1 pt-1">

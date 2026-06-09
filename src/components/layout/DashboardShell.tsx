@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { CockpitCommand } from "./CockpitCommand";
+import { OnboardingGuide } from "./OnboardingGuide";
 import { useLayoutStore } from "@/store/useLayoutStore";
 import { useUrlStore } from "@/store/useUrlStore";
 import { Lock, Unlock, Bookmark, X, Search } from "lucide-react";
@@ -47,6 +48,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         )}
       </AnimatePresence>
       <CockpitCommand />
+      <OnboardingGuide />
 
       {/* Top Controls Bar */}
       <div className="shrink-0 px-6 pt-4 pb-3 flex items-center justify-between gap-4 select-none bg-[#0f0f11] border-b border-white/5" style={{ WebkitAppRegion: "drag" } as any}>
@@ -111,6 +113,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
           {/* Cockpit Command Trigger */}
           <button
+            id="cockpit-trigger"
             onClick={() => {
               const event = new KeyboardEvent('keydown', { key: 'k', metaKey: true });
               window.dispatchEvent(event);

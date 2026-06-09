@@ -406,6 +406,16 @@ export function CockpitCommand() {
       return true;
     }
 
+    if (lower === "help" || lower === "tour") {
+      localStorage.removeItem("devos_onboarded");
+      window.dispatchEvent(new Event("restart_onboarding"));
+      setConfirmation(`✓ Restarting onboarding tour...`);
+      setInput("");
+      setTimeout(() => setConfirmation(null), 3000);
+      closeOverlay();
+      return true;
+    }
+
     return false;
   };
 

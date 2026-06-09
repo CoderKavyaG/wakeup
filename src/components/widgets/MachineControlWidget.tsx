@@ -292,7 +292,7 @@ export function MachineControlWidget() {
   };
 
   return (
-    <div className={`flex flex-col h-full text-foreground bg-[#0f0f11] rounded-xl overflow-hidden divide-y divide-border/40 transition-all duration-1000 ${agentOffline ? "shadow-[0_0_15px_rgba(239,68,68,0.15)] border border-red-500/20" : "shadow-[0_0_15px_rgba(34,197,94,0.08)] border border-green-500/20"}`}>
+    <div id="machine-control-widget" className={`flex flex-col h-full text-foreground bg-[#0f0f11] rounded-xl overflow-hidden divide-y divide-border/40 transition-all duration-1000 ${agentOffline ? "shadow-[0_0_15px_rgba(239,68,68,0.15)] border border-red-500/20" : "shadow-[0_0_15px_rgba(34,197,94,0.08)] border border-green-500/20"}`}>
       
       {/* ── HEADER ── */}
       <div className="px-4 py-3 shrink-0 flex items-center justify-between bg-[#0f0f11]">
@@ -352,6 +352,7 @@ export function MachineControlWidget() {
               <div className="flex flex-col gap-2">
                 <div className="flex gap-2">
                   <Input 
+                    id="machine-control-input"
                     value={workspacePath}
                     onChange={e => setWorkspacePath(e.target.value)}
                     placeholder="Enter absolute path (e.g. C:\Users\...)"

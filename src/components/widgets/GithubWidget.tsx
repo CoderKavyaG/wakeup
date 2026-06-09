@@ -142,7 +142,13 @@ export function GithubWidget() {
           <h2 className="text-sm font-semibold tracking-tight text-foreground">GitHub Activity</h2>
         </div>
         <div className="flex items-center space-x-1.5">
-          <Button size="icon" variant="ghost" className="w-6 h-6 text-muted-foreground" onClick={() => setShowSettings(!showSettings)}>
+          <Button 
+            id="github-widget-settings-btn"
+            size="icon" 
+            variant="ghost" 
+            className="w-6 h-6 text-muted-foreground" 
+            onClick={() => setShowSettings(!showSettings)}
+          >
             <Settings className="w-3.5 h-3.5" />
           </Button>
           <form onSubmit={handleUpdateUser} className="flex items-center space-x-1.5">

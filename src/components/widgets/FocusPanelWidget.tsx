@@ -257,12 +257,13 @@ export function FocusPanelWidget() {
   const wordCount = notes.filter(n => !n.projectId).reduce((acc, note) => acc + (note.content.match(/\b\w+\b/g)?.length || 0), 0);
 
   return (
-    <div className="flex flex-col h-full text-foreground bg-[#0f0f11] rounded-xl divide-y divide-border/40" style={{ overflow: 'visible' }}>
+    <div id="focus-panel-widget" className="flex flex-col h-full text-foreground bg-[#0f0f11] rounded-xl divide-y divide-border/40" style={{ overflow: 'visible' }}>
       
       {/* ── UNIFIED INPUT SECTION ── */}
       <div className="px-4 py-3 shrink-0 bg-[#0f0f11]" style={{ position: 'relative', zIndex: 50 }}>
         <div className="relative flex flex-col bg-[#161619] border border-white/5 rounded-xl focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/50 transition-all shadow-sm">
           <Textarea 
+            id="focus-panel-textarea"
             ref={unifiedInputRef as any}
             value={noteText}
             onChange={(e) => handleNoteInput(e.target.value)}
