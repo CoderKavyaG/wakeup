@@ -30,6 +30,10 @@ export interface Project {
 
   vercelProjectId?: string;
 
+  phase: string;
+  coverImageUrl?: string | null;
+  ogImageUrl?: string | null;
+
   updatedAt: string;
 }
 
@@ -39,7 +43,7 @@ interface ProjectState {
   error: string | null;
   fetchProjects: () => Promise<void>;
   setProjects: (projects: Project[]) => void;
-  addProject: (project: Omit<Project, "id" | "updatedAt">) => Promise<void>;
+  addProject: (project: Omit<Project, "id" | "updatedAt" | "phase"> & { phase?: string }) => Promise<void>;
   updateProject: (id: string, updates: Partial<Project>) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
 }
@@ -67,6 +71,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   addProject: async (project) => {
     const tempId = `temp-${Date.now()}`;
     const newProject: Project = {
+      phase: "idea",
       ...project,
       id: tempId,
       updatedAt: new Date().toISOString(),

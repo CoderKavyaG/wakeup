@@ -41,12 +41,20 @@ model Project {
   health               Int?
   healthSignals        String?  // JSON array of signal strings
 
+  phase                String   @default("idea")  // "launched"|"in_development"|"sketching"|"idea"
+  coverImageUrl        String?
+  ogImageUrl           String?
+
   // Relations (Phase 5)
   memories             Memory[]
   projectMemory        ProjectMemory?
   commits              Commit[]
   links                ProjectLink[]
   notes                Note[]
+  ideas                Idea[]
+  mediaItems           MediaItem[]
+  projectTasks         ProjectTask[]
+  captureMessages      CaptureMessage[]
   userId               String?
   user                 User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   vercelProjectId      String?
@@ -175,6 +183,11 @@ model User {
   insights      AIInsight[]
   githubCaches  GithubCache[]
   savedTrends   SavedTrend[]
+  socialDrafts  SocialDraft[]
+  ideas           Idea[]
+  mediaItems      MediaItem[]
+  captureMessages CaptureMessage[]
+  projectTasks    ProjectTask[]
 }
 
 model SavedTrend {
@@ -247,3 +260,73 @@ model AIInsight {
   userId    String?
   user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
+
+model SocialDraft {
+  id        String   @id @default(cuid())
+  platform  String   // 'twitter' | 'linkedin'
+  content   String   @db.Text
+  status    String   @default("draft") // 'draft' | 'published'
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Idea {
+  id          String   @id @default(cuid())
+  projectId   String?  // null = global idea board, not tied to a project
+  project     Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  content     String   // The idea text
+  source      String   @default("manual") // "manual" | "telegram" | "whatsapp" | "cockpit"
+  status      String   @default("raw")    // "raw" | "validated" | "building" | "shelved"
+  starred     Boolean  @default(false)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model MediaItem {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  type        String   // "image" | "screenshot" | "sketch" | "chat_export" | "link_preview"
+  url         String   // either a stored path or external URL
+  thumbnailUrl String? // auto-generated or OG image
+  title       String?
+  description String?
+  mimeType    String?
+  sizeBytes   Int?
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+}
+
+model CaptureMessage {
+  id          String   @id @default(cuid())
+  source      String   // "telegram" | "whatsapp"
+  rawText     String   // original message
+  classified  String?  // "task" | "idea" | "note" — filled after AI classification
+  projectId   String?  // filled after @mention detection
+  project     Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  processed   Boolean  @default(false)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+}
+
+model ProjectTask {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title       String
+  completed   Boolean  @default(false)
+  priority    String   @default("medium") // "urgent" | "high" | "medium" | "low"
+  dueDate     DateTime?
+  milestone   String?  // group tasks under milestone labels
+  order       Int      @default(0)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+}
+
