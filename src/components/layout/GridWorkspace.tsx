@@ -1,17 +1,19 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Responsive, WidthProvider, Layout } from "react-grid-layout/legacy";
+import { Responsive, WidthProvider } from "react-grid-layout/legacy";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
-import { useLayoutStore, WidgetType } from "@/store/useLayoutStore";
+import { useLayoutStore } from "@/store/useLayoutStore";
 import { ProjectsWidget } from "../widgets/ProjectsWidget";
 import { GithubWidget } from "../widgets/GithubWidget";
 import { FocusPanelWidget } from "../widgets/FocusPanelWidget";
 import { MachineControlWidget } from "../widgets/MachineControlWidget";
 import { TerminalWidget } from "../widgets/TerminalWidget";
-import { X, GripHorizontal } from "lucide-react";
-import { Button } from "../ui/button";
+import { PortfolioWidget } from "../widgets/PortfolioWidget";
+import { SocialWidget } from "../widgets/SocialWidget";
+import { WidgetShell } from "./WidgetShell";
+import { FolderOpen, GitBranch, Crosshair, Terminal, Globe, Zap } from "lucide-react";
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
 
@@ -50,11 +52,35 @@ export function GridWorkspace() {
         return <FocusPanelWidget />;
       case "machine":
         return <MachineControlWidget />;
-
+      case "portfolio":
+        return <PortfolioWidget />;
+      case "social":
+        return <SocialWidget />;
       case "terminal":
         return <TerminalWidget initialCwd={widget.metadata?.initialCwd} />;
       default:
         return <p className="text-muted-foreground text-sm">Unknown widget: {widget.type}</p>;
+    }
+  };
+
+  const getWidgetShellConfig = (widget: any) => {
+    switch (widget.type) {
+      case "projects":
+        return { title: "projects", icon: <FolderOpen className="w-3.5 h-3.5 text-green-400" /> };
+      case "github":
+        return { title: "github monitor", icon: <GitBranch className="w-3.5 h-3.5 text-blue-400" /> };
+      case "focus":
+        return { title: "focus panel", icon: <Crosshair className="w-3.5 h-3.5 text-purple-400" /> };
+      case "machine":
+        return { title: "machine control", icon: <Terminal className="w-3.5 h-3.5 text-amber-400" /> };
+      case "terminal":
+        return { title: "terminal", icon: <Terminal className="w-3.5 h-3.5 text-zinc-400" /> };
+      case "portfolio":
+        return { title: "coderkavyag.me", icon: <Globe className="w-3.5 h-3.5 text-blue-400" /> };
+      case "social":
+        return { title: "social drafts", icon: <Zap className="w-3.5 h-3.5 text-amber-400" /> };
+      default:
+        return { title: widget.type, icon: <Terminal className="w-3.5 h-3.5 text-zinc-400" /> };
     }
   };
 
@@ -77,32 +103,25 @@ export function GridWorkspace() {
         isDraggable={!isLocked}
         isResizable={!isLocked}
       >
-        {widgets.map((widget) => (
-          <div key={widget.id} data-widget-type={widget.type} className="bg-card border border-border/80 rounded-xl shadow-md flex flex-col overflow-hidden hover:border-primary/20 transition-colors duration-200">
-            {/* Widget Header with Drag Handle & Close Button */}
-            <div className="h-9 border-b border-border/60 bg-popover/40 flex items-center justify-between px-3 shrink-0">
-              <div className="widget-drag-handle flex items-center space-x-1.5 cursor-grab active:cursor-grabbing flex-1 h-full select-none">
-                <GripHorizontal className="w-3.5 h-3.5 text-muted-foreground/60" />
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                  {widget.type}
-                </span>
-              </div>
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={() => removeWidget(widget.id)}
-                className="w-5 h-5 rounded-md text-muted-foreground/60 hover:text-foreground hover:bg-popover"
+        {widgets.map((widget) => {
+          const config = getWidgetShellConfig(widget);
+          return (
+            <div
+              key={widget.id}
+              data-widget-type={widget.type}
+              className="bg-[#0d0d10] border border-white/[0.06] rounded-xl shadow-md flex flex-col overflow-hidden hover:border-white/10 transition-colors duration-200"
+            >
+              <WidgetShell
+                title={config.title}
+                icon={config.icon}
+                widgetType={widget.type}
+                onClose={() => removeWidget(widget.id)}
               >
-                <X className="w-3 h-3" />
-              </Button>
+                {renderWidgetContent(widget)}
+              </WidgetShell>
             </div>
-            
-            {/* Widget Body */}
-            <div className="p-4 flex-1 overflow-hidden">
-              {renderWidgetContent(widget)}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </ResponsiveGridLayout>
     </div>
   );

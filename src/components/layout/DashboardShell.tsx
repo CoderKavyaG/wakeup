@@ -13,6 +13,8 @@ import AmbientBar from "./AmbientBar";
 import { Download } from "lucide-react";
 import { useBootstrapStore } from "@/store/useBootstrapStore";
 import { useSession, signOut } from "next-auth/react";
+import { useProjectOSStore } from "@/store/useProjectOSStore";
+import { ProjectOS } from "./ProjectOS";
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
@@ -22,6 +24,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const { isLocked, toggleLock, resetLayout, clearLayout, setLayouts, saveCurrentLayout, loadSavedLayout, savedLayout } = useLayoutStore();
   const { isQuickLinksOpen, toggleQuickLinks } = useUrlStore();
   const loaded = useBootstrapStore((s) => s.loaded);
+  const isProjectOSOpen = useProjectOSStore((s) => s.isOpen);
 
   // Calculate user initial
   const userInitial = session?.user?.name
@@ -201,6 +204,10 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           </button>
         </div>
       </main>
+
+      <AnimatePresence>
+        {isProjectOSOpen && <ProjectOS />}
+      </AnimatePresence>
     </div>
   );
 }
