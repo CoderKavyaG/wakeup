@@ -172,143 +172,435 @@ function OverviewTab({ project }: { project: Project }) {
 }
 
 // ── 2. Ideas Tab ──
+const STATUS_COLS = [
+  { id: 'raw',       label: 'Raw Ideas',  color: 'text-white/40',    borderColor: 'border-white/[0.06]',   dotColor: 'bg-white/30'    },
+  { id: 'validated', label: 'Validated',  color: 'text-blue-400/80', borderColor: 'border-blue-500/20',    dotColor: 'bg-blue-400'    },
+  { id: 'building',  label: 'Building',   color: 'text-green-400/80',borderColor: 'border-green-500/20',   dotColor: 'bg-green-400'   },
+  { id: 'shelved',   label: 'Shelved',    color: 'text-white/20',    borderColor: 'border-white/[0.04]',   dotColor: 'bg-white/20'    },
+];
+
+function timeAgoShort(date: string) {
+  const d = new Date(date);
+  const now = Date.now();
+  const diff = now - d.getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1)  return 'now';
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h`;
+  return `${Math.floor(h / 24)}d`;
+}
+
+interface Idea {
+  id: string;
+  content: string;
+  source: string;
+  status: string;
+  starred: boolean;
+  createdAt: string;
+  projectId: string | null;
+}
+
+interface IdeaCardProps {
+  idea: Idea;
+  projectId: string;
+  onUpdate: (id: string, updates: Partial<Idea>) => void;
+  onDelete: (id: string) => void;
+}
+
+function IdeaCard({ idea, projectId, onUpdate, onDelete }: IdeaCardProps) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(idea.content);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (editing && textareaRef.current) {
+      textareaRef.current.focus();
+      textareaRef.current.select();
+    }
+  }, [editing]);
+
+  const saveEdit = async () => {
+    const trimmed = draft.trim();
+    if (!trimmed || trimmed === idea.content) { setEditing(false); return; }
+    // Optimistic
+    onUpdate(idea.id, { content: trimmed });
+    setEditing(false);
+    try {
+      await fetch(`/api/projects/${projectId}/ideas?ideaId=${idea.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: trimmed }),
+      });
+    } catch {}
+  };
+
+  const handleStarClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onUpdate(idea.id, { starred: !idea.starred });
+    fetch(`/api/projects/${projectId}/ideas?ideaId=${idea.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ starred: !idea.starred }),
+    }).catch(() => {});
+  };
+
+  return (
+    <div className="bg-white/[0.03] border border-white/[0.06] rounded-lg p-3 group relative hover:border-white/10 transition-colors">
+      {/* Source badge */}
+      {idea.source !== 'manual' && (
+        <div className="flex items-center gap-1 mb-1.5">
+          <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400/70 border border-purple-500/20 font-mono">
+            via {idea.source}
+          </span>
+        </div>
+      )}
+
+      {/* Content — click to edit */}
+      {editing ? (
+        <textarea
+          ref={textareaRef}
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onBlur={saveEdit}
+          onKeyDown={e => {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveEdit(); }
+            if (e.key === 'Escape') { setDraft(idea.content); setEditing(false); }
+          }}
+          className="w-full bg-transparent text-xs text-white/80 resize-none outline-none leading-relaxed min-h-[60px] placeholder:text-white/20"
+          rows={3}
+        />
+      ) : (
+        <p
+          className="text-xs text-white/70 leading-relaxed cursor-text select-text"
+          onClick={() => setEditing(true)}
+        >
+          {idea.content}
+        </p>
+      )}
+
+      {/* Footer — shown on hover */}
+      <div className="flex items-center justify-between mt-2 pt-1.5 opacity-0 group-hover:opacity-100 transition-opacity border-t border-white/[0.04]">
+        <span className="text-[9px] text-white/25 font-mono">{timeAgoShort(idea.createdAt)}</span>
+        <div className="flex items-center gap-1">
+          {/* Star */}
+          <button
+            onClick={handleStarClick}
+            className={`w-5 h-5 flex items-center justify-center rounded transition-colors cursor-pointer ${idea.starred ? 'text-amber-400' : 'text-white/25 hover:text-amber-400'}`}
+            title={idea.starred ? 'Unstar' : 'Star idea'}
+          >
+            <Star className={`w-3 h-3 ${idea.starred ? 'fill-amber-400' : ''}`} />
+          </button>
+          {/* Status move */}
+          <select
+            value={idea.status}
+            onChange={e => onUpdate(idea.id, { status: e.target.value })}
+            onClick={e => e.stopPropagation()}
+            className="text-[9px] bg-black/50 border border-white/10 text-white/40 rounded px-1 py-0.5 outline-none cursor-pointer hover:text-white/70 transition-colors"
+          >
+            {STATUS_COLS.map(s => (
+              <option key={s.id} value={s.id}>{s.label}</option>
+            ))}
+          </select>
+          {/* Delete */}
+          <button
+            onClick={() => onDelete(idea.id)}
+            className="w-5 h-5 flex items-center justify-center text-white/20 hover:text-red-400 transition-colors cursor-pointer rounded"
+            title="Delete"
+          >
+            <Trash2 className="w-3 h-3" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function IdeasTab({ project }: { project: Project }) {
-  const [ideas, setIdeas] = useState<any[]>([]);
+  const [ideas, setIdeas] = useState<Idea[]>([]);
   const [loading, setLoading] = useState(false);
-  const [newIdea, setNewIdea] = useState("");
+  const [addingToCol, setAddingToCol] = useState<string | null>(null);
+  const [newIdeaText, setNewIdeaText] = useState('');
+  const [aiResponse, setAiResponse] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const addInputRef = useRef<HTMLTextAreaElement>(null);
 
   const fetchIdeas = async () => {
     setLoading(true);
     try {
       const res = await fetch(`/api/projects/${project.id}/ideas`);
       if (res.ok) setIdeas(await res.json());
-    } catch (e) {}
+    } catch {}
     finally { setLoading(false); }
   };
 
-  useEffect(() => {
-    fetchIdeas();
-  }, [project.id]);
+  useEffect(() => { fetchIdeas(); }, [project.id]);
 
-  const addIdea = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newIdea.trim()) return;
+  useEffect(() => {
+    if (addingToCol && addInputRef.current) {
+      addInputRef.current.focus();
+    }
+  }, [addingToCol]);
+
+  // Group ideas by status
+  const ideasByStatus = ideas.reduce((acc: Record<string, Idea[]>, idea) => {
+    const key = idea.status || 'raw';
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(idea);
+    return acc;
+  }, {});
+
+  // Optimistic update helper
+  const updateIdeaLocal = (id: string, updates: Partial<Idea>) => {
+    setIdeas(prev => prev.map(i => i.id === id ? { ...i, ...updates } : i));
+  };
+
+  // Handle status change (optimistic + API)
+  const handleStatusChange = async (id: string, newStatus: string) => {
+    updateIdeaLocal(id, { status: newStatus });
+    try {
+      await fetch(`/api/projects/${project.id}/ideas?ideaId=${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+    } catch {}
+  };
+
+  const handleDelete = async (id: string) => {
+    // Optimistic
+    setIdeas(prev => prev.filter(i => i.id !== id));
+    try {
+      await fetch(`/api/projects/${project.id}/ideas?ideaId=${id}`, { method: 'DELETE' });
+    } catch {}
+  };
+
+  const submitNewIdea = async (status: string) => {
+    const text = newIdeaText.trim();
+    if (!text) { setAddingToCol(null); return; }
+
+    // Optimistic temp card
+    const tempId = `temp-${Date.now()}`;
+    const tempIdea: Idea = {
+      id: tempId,
+      content: text,
+      source: 'manual',
+      status,
+      starred: false,
+      createdAt: new Date().toISOString(),
+      projectId: project.id,
+    };
+    setIdeas(prev => [tempIdea, ...prev]);
+    setNewIdeaText('');
+    setAddingToCol(null);
 
     try {
       const res = await fetch(`/api/projects/${project.id}/ideas`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: newIdea.trim() })
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: text, status }),
       });
       if (res.ok) {
-        const created = await res.json();
-        setIdeas(prev => [created, ...prev]);
-        setNewIdea("");
+        const saved = await res.json();
+        setIdeas(prev => prev.map(i => i.id === tempId ? saved : i));
+      } else {
+        setIdeas(prev => prev.filter(i => i.id !== tempId));
       }
-    } catch (e) {}
+    } catch {
+      setIdeas(prev => prev.filter(i => i.id !== tempId));
+    }
   };
 
-  const toggleStar = async (ideaId: string, currentStarred: boolean) => {
+  // AI validation — streams from cockpit
+  const askAI = async () => {
+    const rawIdeas = ideas.filter(i => i.status === 'raw').map(i => i.content);
+    if (rawIdeas.length === 0) {
+      setAiResponse('No raw ideas to evaluate. Add some ideas to the Raw Ideas column first.');
+      return;
+    }
+    setAiLoading(true);
+    setAiResponse('');
     try {
-      const res = await fetch(`/api/projects/${project.id}/ideas?ideaId=${ideaId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ starred: !currentStarred })
+      const res = await fetch('/api/cockpit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: `I have these raw ideas for the project "${project.name}": ${rawIdeas.map((idea, i) => `${i + 1}. ${idea}`).join(' | ')}. Which one has the most potential and why? Consider: technical feasibility, user value, and how it fits with the project's current phase (${project.phase}). Be direct, pick one winner and explain in 3-4 sentences.`
+        }),
       });
-      if (res.ok) {
-        setIdeas(prev => prev.map(i => i.id === ideaId ? { ...i, starred: !currentStarred } : i));
+
+      if (!res.ok || !res.body) {
+        setAiResponse('AI unavailable — check your GROQ_API_KEY or OPENROUTER_API_KEY.');
+        setAiLoading(false);
+        return;
       }
-    } catch (e) {}
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let fullText = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value);
+        // Parse SSE data lines
+        const lines = chunk.split('\n');
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6);
+            if (data === '[DONE]') continue;
+            try {
+              const parsed = JSON.parse(data);
+              const token = parsed.choices?.[0]?.delta?.content || '';
+              fullText += token;
+              setAiResponse(fullText);
+            } catch {
+              // Plain text stream
+              fullText += data;
+              setAiResponse(fullText);
+            }
+          } else if (line.trim() && !line.startsWith(':') && !line.startsWith('event:')) {
+            fullText += line;
+            setAiResponse(fullText);
+          }
+        }
+      }
+    } catch (e) {
+      setAiResponse('Failed to reach AI endpoint.');
+    }
+    setAiLoading(false);
   };
 
-  const changeStatus = async (ideaId: string, status: string) => {
-    try {
-      const res = await fetch(`/api/projects/${project.id}/ideas?ideaId=${ideaId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status })
-      });
-      if (res.ok) {
-        setIdeas(prev => prev.map(i => i.id === ideaId ? { ...i, status } : i));
-      }
-    } catch (e) {}
-  };
-
-  const deleteIdea = async (ideaId: string) => {
-    if (!confirm("Delete this idea?")) return;
-    try {
-      const res = await fetch(`/api/projects/${project.id}/ideas?ideaId=${ideaId}`, {
-        method: "DELETE"
-      });
-      if (res.ok) {
-        setIdeas(prev => prev.filter(i => i.id !== ideaId));
-      }
-    } catch (e) {}
-  };
-
-  const statusColors = {
-    raw: "bg-white/5 text-white/50 border-white/10",
-    validated: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-    building: "bg-purple-500/10 text-purple-400 border-purple-500/20",
-    shelved: "bg-white/5 text-white/20 border-white/5"
-  };
+  if (loading) {
+    return <div className="p-8 text-center text-xs text-white/30 animate-pulse">Loading ideas...</div>;
+  }
 
   return (
-    <div className="p-6 space-y-6 max-w-4xl">
-      <form onSubmit={addIdea} className="flex gap-2 bg-[#121217] border border-white/[0.04] p-3 rounded-xl">
-        <Input
-          value={newIdea}
-          onChange={e => setNewIdea(e.target.value)}
-          placeholder="I should add a vector search logic..."
-          className="flex-1 h-9 bg-black/40 border-white/10 text-xs text-white placeholder-white/20 rounded-lg focus-visible:ring-primary/20"
-        />
-        <Button type="submit" size="sm" className="h-9 px-4 bg-white text-black hover:bg-white/90 font-medium text-xs rounded-lg">
-          Add Idea
-        </Button>
-      </form>
+    <div className="p-6 flex flex-col h-full overflow-hidden">
+      {/* Header row */}
+      <div className="flex items-center justify-between mb-4 flex-shrink-0">
+        <div>
+          <h2 className="text-sm font-semibold text-white/80">Ideas Board</h2>
+          <p className="text-[10px] text-white/30 font-mono mt-0.5">{ideas.length} idea{ideas.length !== 1 ? 's' : ''} · click any card to edit</p>
+        </div>
+        <button
+          onClick={askAI}
+          disabled={aiLoading}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-300 hover:bg-purple-500/20 hover:text-purple-200 transition-all cursor-pointer disabled:opacity-50"
+        >
+          {aiLoading ? (
+            <>
+              <RefreshCw className="w-3 h-3 animate-spin" />
+              Thinking...
+            </>
+          ) : (
+            <>
+              <PlusCircle className="w-3 h-3" />
+              Ask AI: what should I build next?
+            </>
+          )}
+        </button>
+      </div>
 
-      {loading ? (
-        <div className="text-center text-xs text-white/30 py-8">Loading ideas...</div>
-      ) : ideas.length === 0 ? (
-        <div className="text-center text-xs text-white/20 py-12">No raw ideas saved for this project.</div>
-      ) : (
-        <div className="space-y-2">
-          {ideas.map((idea) => (
-            <div key={idea.id} className="p-3 bg-[#121217] border border-white/[0.04] rounded-xl flex items-center justify-between gap-3 group">
-              <div className="flex items-start gap-2.5 min-w-0 flex-1">
-                <button onClick={() => toggleStar(idea.id, idea.starred)} className="mt-0.5 text-white/20 hover:text-yellow-400 transition-colors shrink-0">
-                  <Star className={`w-3.5 h-3.5 ${idea.starred ? "fill-yellow-400 text-yellow-400" : ""}`} />
-                </button>
-                <div className="min-w-0">
-                  <p className="text-xs text-white/80 leading-relaxed font-sans">{idea.content}</p>
-                  <span className="text-[9px] text-white/25 font-mono">source: {idea.source} · {timeAgo(idea.createdAt)}</span>
+      {/* AI Response panel */}
+      {aiResponse && (
+        <div className="mb-4 flex-shrink-0 p-3 bg-purple-500/[0.06] border border-purple-500/20 rounded-xl relative">
+          <div className="flex items-start gap-2">
+            <span className="text-purple-400/60 text-[9px] font-mono uppercase tracking-wider mt-0.5 shrink-0">AI →</span>
+            <p className="text-xs text-white/70 leading-relaxed">{aiResponse}</p>
+          </div>
+          <button
+            onClick={() => setAiResponse('')}
+            className="absolute top-2 right-2 text-white/20 hover:text-white/50 transition-colors cursor-pointer"
+          >
+            <AlertCircle className="w-3 h-3" />
+          </button>
+        </div>
+      )}
+
+      {/* 4-column Kanban board */}
+      <div className="grid grid-cols-4 gap-3 flex-1 min-h-0">
+        {STATUS_COLS.map(col => {
+          const colIdeas = ideasByStatus[col.id] || [];
+          return (
+            <div
+              key={col.id}
+              className={`flex flex-col border ${col.borderColor} rounded-xl bg-white/[0.01] overflow-hidden`}
+            >
+              {/* Column header */}
+              <div className="px-3 pt-3 pb-2 flex-shrink-0">
+                <div className={`flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider ${col.color}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${col.dotColor} flex-shrink-0`} />
+                  {col.label}
+                  <span className="ml-auto opacity-50 font-mono">{colIdeas.length}</span>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 shrink-0">
-                <select
-                  value={idea.status}
-                  onChange={e => changeStatus(idea.id, e.target.value)}
-                  className="bg-black/40 border border-white/10 rounded-md text-[10px] text-white/60 py-1 px-1.5 focus:outline-none cursor-pointer"
+              {/* Idea cards — scrollable */}
+              <div className="flex flex-col gap-2 px-2 pb-2 flex-1 overflow-y-auto custom-scrollbar">
+                {colIdeas.map(idea => (
+                  <IdeaCard
+                    key={idea.id}
+                    idea={idea}
+                    projectId={project.id}
+                    onUpdate={(id, updates) => {
+                      if (updates.status && updates.status !== idea.status) {
+                        handleStatusChange(id, updates.status);
+                      } else {
+                        updateIdeaLocal(id, updates);
+                      }
+                    }}
+                    onDelete={handleDelete}
+                  />
+                ))}
+
+                {/* Inline add input */}
+                {addingToCol === col.id && (
+                  <div className="bg-white/[0.04] border border-white/10 rounded-lg p-2">
+                    <textarea
+                      ref={addInputRef}
+                      value={newIdeaText}
+                      onChange={e => setNewIdeaText(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitNewIdea(col.id); }
+                        if (e.key === 'Escape') { setAddingToCol(null); setNewIdeaText(''); }
+                      }}
+                      onBlur={() => submitNewIdea(col.id)}
+                      placeholder="Type an idea and press Enter..."
+                      className="w-full bg-transparent text-xs text-white/80 resize-none outline-none leading-relaxed placeholder:text-white/20"
+                      rows={2}
+                    />
+                    <div className="flex items-center gap-1 mt-1">
+                      <button
+                        onMouseDown={e => { e.preventDefault(); submitNewIdea(col.id); }}
+                        className="text-[9px] px-2 py-0.5 rounded bg-white/10 text-white/60 hover:bg-white/15 transition-colors cursor-pointer"
+                      >
+                        Add
+                      </button>
+                      <button
+                        onMouseDown={e => { e.preventDefault(); setAddingToCol(null); setNewIdeaText(''); }}
+                        className="text-[9px] px-2 py-0.5 rounded text-white/25 hover:text-white/50 transition-colors cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Column footer — add button */}
+              <div className="px-3 py-2 flex-shrink-0 border-t border-white/[0.04]">
+                <button
+                  onClick={() => { setAddingToCol(col.id); setNewIdeaText(''); }}
+                  className={`w-full text-left text-[11px] transition-colors cursor-pointer ${col.color} hover:opacity-80`}
                 >
-                  <option value="raw">Raw</option>
-                  <option value="validated">Validated</option>
-                  <option value="building">Building</option>
-                  <option value="shelved">Shelved</option>
-                </select>
-
-                <Badge variant="outline" className={`text-[8px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded border shrink-0 ${(statusColors as any)[idea.status] || statusColors.raw}`}>
-                  {idea.status}
-                </Badge>
-
-                <Button variant="ghost" size="icon" className="w-6 h-6 text-white/35 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => deleteIdea(idea.id)}>
-                  <Trash2 className="w-3.5 h-3.5" />
-                </Button>
+                  + add idea
+                </button>
               </div>
             </div>
-          ))}
-        </div>
-      )}
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -1142,8 +1434,8 @@ export function ProjectOS() {
                 ))}
               </div>
 
-              {/* Tab content — scrollable */}
-              <div className="flex-1 overflow-y-auto custom-scrollbar">
+              {/* Tab content — ideas fills, others scroll */}
+              <div className={`flex-1 min-h-0 ${activeTab === 'ideas' ? 'overflow-hidden' : 'overflow-y-auto custom-scrollbar'}`}>
                 {activeTab === 'overview' && <OverviewTab project={selectedProject} />}
                 {activeTab === 'ideas' && <IdeasTab project={selectedProject} />}
                 {activeTab === 'media' && <MediaVaultTab project={selectedProject} />}
