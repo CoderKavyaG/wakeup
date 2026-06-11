@@ -605,133 +605,326 @@ function IdeasTab({ project }: { project: Project }) {
   );
 }
 
-// ── 3. Media Tab ──
+// ── 3. Media Vault Tab ──
+interface MediaItem {
+  id: string;
+  type: string;
+  url: string;
+  thumbnailUrl?: string | null;
+  title?: string | null;
+  description?: string | null;
+  mimeType?: string | null;
+  sizeBytes?: number | null;
+  createdAt: string;
+}
+
+const MEDIA_FILTERS = ['all', 'image', 'screenshot', 'sketch', 'link_preview'] as const;
+
 function MediaVaultTab({ project }: { project: Project }) {
-  const [media, setMedia] = useState<any[]>([]);
+  const [media, setMedia] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [title, setTitle] = useState("");
-  const [url, setUrl] = useState("");
-  const [type, setType] = useState("screenshot");
+  const [uploading, setUploading] = useState(false);
+  const [linkUrl, setLinkUrl] = useState('');
+  const [linkLoading, setLinkLoading] = useState(false);
+  const [filter, setFilter] = useState<string>('all');
+  const [lightboxItem, setLightboxItem] = useState<MediaItem | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchMedia = async () => {
     setLoading(true);
     try {
       const res = await fetch(`/api/projects/${project.id}/media`);
       if (res.ok) setMedia(await res.json());
-    } catch (e) {}
+    } catch {}
     finally { setLoading(false); }
   };
 
-  useEffect(() => {
-    fetchMedia();
-  }, [project.id]);
+  useEffect(() => { fetchMedia(); }, [project.id]);
 
-  const addMedia = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!url.trim()) return;
+  // ── ESC closes lightbox ──
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && lightboxItem) {
+        e.stopPropagation();
+        setLightboxItem(null);
+      }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [lightboxItem]);
+
+  // ── File upload handler ──
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    setUploading(true);
+
+    const formData = new FormData();
+    Array.from(files).forEach(f => formData.append('files', f));
+    formData.append('type', 'image');
 
     try {
       const res = await fetch(`/api/projects/${project.id}/media`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type,
-          url: url.trim(),
-          title: title.trim() || undefined
-        })
+        method: 'POST',
+        body: formData,
       });
       if (res.ok) {
-        const created = await res.json();
-        setMedia(prev => [created, ...prev]);
-        setUrl("");
-        setTitle("");
+        const data = await res.json();
+        const items = Array.isArray(data) ? data : [data];
+        setMedia(prev => [...items, ...prev]);
       }
-    } catch (e) {}
+    } catch {}
+    finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
-  const deleteMedia = async (mediaId: string) => {
-    if (!confirm("Delete this media asset?")) return;
+  // ── Link preview handler ──
+  const handleLinkPreview = async (url: string) => {
+    if (!url.trim()) return;
+    let fullUrl = url.trim();
+    if (!fullUrl.startsWith('http')) fullUrl = 'https://' + fullUrl;
+
+    setLinkLoading(true);
+    setLinkUrl('');
+
+    // Optimistic temp card
+    const tempId = `temp-link-${Date.now()}`;
+    const tempItem: MediaItem = {
+      id: tempId, type: 'link_preview', url: fullUrl,
+      title: 'Fetching preview...', createdAt: new Date().toISOString(),
+    };
+    setMedia(prev => [tempItem, ...prev]);
+
     try {
-      const res = await fetch(`/api/projects/${project.id}/media?mediaId=${mediaId}`, {
-        method: "DELETE"
+      const res = await fetch(`/api/projects/${project.id}/media`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'link_preview', url: fullUrl }),
       });
       if (res.ok) {
-        setMedia(prev => prev.filter(m => m.id !== mediaId));
+        const saved = await res.json();
+        setMedia(prev => prev.map(m => m.id === tempId ? saved : m));
+      } else {
+        setMedia(prev => prev.filter(m => m.id !== tempId));
       }
-    } catch (e) {}
+    } catch {
+      setMedia(prev => prev.filter(m => m.id !== tempId));
+    }
+    setLinkLoading(false);
   };
+
+  // ── Delete media ──
+  const deleteMedia = async (mediaId: string) => {
+    setMedia(prev => prev.filter(m => m.id !== mediaId));
+    if (lightboxItem?.id === mediaId) setLightboxItem(null);
+    try {
+      await fetch(`/api/projects/${project.id}/media?mediaId=${mediaId}`, { method: 'DELETE' });
+    } catch {}
+  };
+
+  // ── Filter logic ──
+  const filteredItems = filter === 'all' ? media : media.filter(m => m.type === filter);
+
+  // ── Determine if URL is renderable as image ──
+  const isImageUrl = (url: string) =>
+    url.startsWith('/uploads/') || /\.(jpg|jpeg|png|gif|webp|svg|bmp|avif)(\?|$)/i.test(url) || url.startsWith('http');
+
+  if (loading) {
+    return <div className="p-8 text-center text-xs text-white/30 animate-pulse">Loading media...</div>;
+  }
 
   return (
-    <div className="p-6 space-y-6 max-w-5xl">
-      <form onSubmit={addMedia} className="grid grid-cols-4 gap-2 bg-[#121217] border border-white/[0.04] p-3 rounded-xl items-end">
-        <div className="space-y-1.5 col-span-1">
-          <label className="text-[10px] text-white/30 font-mono uppercase">Asset Type</label>
-          <select
-            value={type}
-            onChange={e => setType(e.target.value)}
-            className="w-full h-9 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-2 focus:outline-none focus:ring-1 focus:ring-primary/20"
-          >
-            <option value="screenshot">Screenshot</option>
-            <option value="sketch">Design Sketch</option>
-            <option value="chat_export">Slack / WhatsApp Export</option>
-            <option value="link_preview">External Link Preview</option>
-          </select>
-        </div>
-        <div className="space-y-1.5 col-span-1">
-          <label className="text-[10px] text-white/30 font-mono uppercase">Title</label>
-          <Input
-            value={title}
-            onChange={e => setTitle(e.target.value)}
-            placeholder="Dashboard Redesign v2"
-            className="h-9 bg-black/40 border-white/10 text-xs text-white rounded-lg focus-visible:ring-primary/20"
+    <div className="p-6 overflow-y-auto h-full custom-scrollbar">
+      {/* Upload toolbar */}
+      <div className="flex items-center gap-3 mb-4">
+        <label className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium rounded-lg bg-white/[0.06] border border-white/10 text-white/60 hover:bg-white/10 hover:text-white/80 transition-all cursor-pointer ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={handleUpload}
           />
-        </div>
-        <div className="space-y-1.5 col-span-2 flex gap-2 items-end">
-          <div className="flex-1 space-y-1.5">
-            <label className="text-[10px] text-white/30 font-mono uppercase">Asset URL or Filepath</label>
-            <Input
-              value={url}
-              onChange={e => setUrl(e.target.value)}
-              placeholder="https://example.com/asset.png"
-              className="h-9 bg-black/40 border-white/10 text-xs text-white rounded-lg focus-visible:ring-primary/20"
-            />
-          </div>
-          <Button type="submit" size="sm" className="h-9 px-4 bg-white text-black hover:bg-white/90 font-medium text-xs rounded-lg shrink-0">
-            Add Asset
-          </Button>
-        </div>
-      </form>
+          {uploading ? (
+            <><RefreshCw className="w-3 h-3 animate-spin" /> Uploading...</>
+          ) : (
+            <>
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-3.5 h-3.5"><path d="M8 12V3M4 7l4-4 4 4"/><path d="M2 14h12"/></svg>
+              Upload images
+            </>
+          )}
+        </label>
 
-      {loading ? (
-        <div className="text-center text-xs text-white/30 py-8">Loading media...</div>
-      ) : media.length === 0 ? (
-        <div className="text-center text-xs text-white/20 py-12">No media assets in the project vault.</div>
+        <div className="flex-1 flex items-center gap-2">
+          <input
+            value={linkUrl}
+            onChange={e => setLinkUrl(e.target.value)}
+            placeholder="Paste a URL to save a link preview..."
+            className="flex-1 h-8 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-3 focus:outline-none focus:ring-1 focus:ring-purple-500/30 placeholder:text-white/20 transition-colors"
+            onKeyDown={e => { if (e.key === 'Enter') handleLinkPreview(linkUrl); }}
+            disabled={linkLoading}
+          />
+          {linkUrl && (
+            <button
+              onClick={() => handleLinkPreview(linkUrl)}
+              disabled={linkLoading}
+              className="text-[10px] px-2 py-1 bg-purple-500/10 border border-purple-500/20 text-purple-300 rounded-md hover:bg-purple-500/20 transition-colors cursor-pointer disabled:opacity-50"
+            >
+              {linkLoading ? '...' : 'Preview'}
+            </button>
+          )}
+        </div>
+
+        <span className="text-[10px] text-white/20 font-mono shrink-0">{media.length} items</span>
+      </div>
+
+      {/* Filter pills */}
+      <div className="flex gap-1.5 mb-5">
+        {MEDIA_FILTERS.map(t => (
+          <button
+            key={t}
+            onClick={() => setFilter(t)}
+            className={`text-[10px] px-2.5 py-1 rounded-full transition-all cursor-pointer font-medium ${
+              filter === t
+                ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                : 'text-white/30 hover:text-white/50 border border-transparent hover:border-white/10'
+            }`}
+          >
+            {t === 'all' ? 'All' : t === 'link_preview' ? 'Link Preview' : t.charAt(0).toUpperCase() + t.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      {/* Masonry grid */}
+      {filteredItems.length === 0 ? (
+        <div className="text-center py-16">
+          <Image className="w-10 h-10 text-white/10 mx-auto mb-3" />
+          <div className="text-white/25 text-sm font-medium">No media yet</div>
+          <div className="text-white/15 text-[11px] mt-1">Upload screenshots, sketches, or paste a URL</div>
+        </div>
       ) : (
-        <div className="grid grid-cols-3 gap-4">
-          {media.map((item) => (
-            <div key={item.id} className="bg-[#121217] border border-white/[0.04] rounded-xl overflow-hidden group relative flex flex-col h-48">
-              <div className="flex-1 bg-black/40 relative flex items-center justify-center overflow-hidden">
-                {item.url.startsWith("http") ? (
-                  <img src={item.url} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-                ) : (
-                  <Image className="w-8 h-8 text-white/10" />
-                )}
-                <Badge variant="secondary" className="absolute top-2 left-2 text-[8px] uppercase bg-black/85 text-white/70 border border-white/10">
-                  {item.type}
-                </Badge>
-                <button
-                  onClick={() => deleteMedia(item.id)}
-                  className="absolute top-2 right-2 p-1.5 rounded-md bg-black/80 hover:bg-red-500 text-white/50 hover:text-white transition-colors opacity-0 group-hover:opacity-100 cursor-pointer"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-              <div className="p-3 flex-shrink-0 bg-[#14141a] border-t border-white/[0.04]">
-                <h4 className="text-xs font-semibold text-white/90 truncate">{item.title || "Untitled Asset"}</h4>
-                <p className="text-[10px] text-white/40 truncate font-mono mt-0.5">{item.url}</p>
+        <div style={{ columns: '3 220px', gap: '12px' }}>
+          {filteredItems.map(item => (
+            <div
+              key={item.id}
+              style={{ breakInside: 'avoid', marginBottom: '12px' }}
+              className="group relative rounded-xl overflow-hidden border border-white/[0.06] bg-white/[0.02] cursor-pointer hover:border-white/10 transition-colors"
+              onClick={() => setLightboxItem(item)}
+            >
+              {item.type === 'link_preview' ? (
+                // ── Link preview card ──
+                <div className="p-3 space-y-2">
+                  {item.thumbnailUrl && (
+                    <img
+                      src={item.thumbnailUrl}
+                      className="w-full rounded-lg object-cover max-h-36"
+                      loading="lazy"
+                      onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    />
+                  )}
+                  <div className="text-xs font-semibold text-white/70 leading-tight line-clamp-2">{item.title || 'Untitled'}</div>
+                  <div className="text-[9px] text-white/25 font-mono truncate">{item.url.replace(/^https?:\/\//, '')}</div>
+                  {item.description && (
+                    <p className="text-[11px] text-white/40 leading-relaxed line-clamp-3">{item.description}</p>
+                  )}
+                  <Badge variant="outline" className="text-[8px] uppercase text-purple-400/60 border-purple-500/20 bg-purple-500/5 font-mono tracking-wider">
+                    link preview
+                  </Badge>
+                </div>
+              ) : (
+                // ── Image card ──
+                <>
+                  {isImageUrl(item.url) ? (
+                    <img
+                      src={item.url}
+                      className="w-full object-cover"
+                      loading="lazy"
+                      onError={e => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                        const parent = (e.target as HTMLImageElement).parentElement;
+                        if (parent) {
+                          const placeholder = document.createElement('div');
+                          placeholder.className = 'w-full h-32 flex items-center justify-center bg-black/30';
+                          placeholder.innerHTML = '<span class="text-white/15 text-xs">Image unavailable</span>';
+                          parent.insertBefore(placeholder, e.target as HTMLImageElement);
+                        }
+                      }}
+                    />
+                  ) : (
+                    <div className="w-full h-32 flex items-center justify-center bg-black/30">
+                      <Image className="w-8 h-8 text-white/10" />
+                    </div>
+                  )}
+                  {/* Type badge */}
+                  <Badge variant="secondary" className="absolute top-2 left-2 text-[8px] uppercase bg-black/75 text-white/60 border border-white/10 backdrop-blur-sm font-mono tracking-wider">
+                    {item.type}
+                  </Badge>
+                  {/* Title bar */}
+                  {item.title && (
+                    <div className="p-2 bg-[#0c0c10] border-t border-white/[0.04]">
+                      <span className="text-[10px] text-white/50 truncate block">{item.title}</span>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Hover overlay */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-3">
+                <div className="flex items-center justify-between w-full">
+                  <span className="text-[10px] text-white/50 font-mono">{item.type}</span>
+                  <button
+                    onClick={e => { e.stopPropagation(); deleteMedia(item.id); }}
+                    className="w-6 h-6 flex items-center justify-center rounded-md bg-black/60 text-white/50 hover:text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer"
+                    title="Delete"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* ── Lightbox ── */}
+      {lightboxItem && (
+        <div
+          className="fixed inset-0 z-[60] bg-black/90 backdrop-blur-sm flex items-center justify-center cursor-zoom-out select-none"
+          onClick={() => setLightboxItem(null)}
+        >
+          <div className="relative max-w-[92vw] max-h-[90vh]" onClick={e => e.stopPropagation()}>
+            {lightboxItem.type === 'link_preview' ? (
+              <div className="bg-[#121217] border border-white/10 rounded-xl p-6 max-w-md space-y-3">
+                {lightboxItem.thumbnailUrl && (
+                  <img src={lightboxItem.thumbnailUrl} className="w-full rounded-lg object-cover max-h-56" />
+                )}
+                <h3 className="text-sm font-semibold text-white">{lightboxItem.title || 'Untitled'}</h3>
+                <a href={lightboxItem.url} target="_blank" className="text-[11px] text-purple-400 hover:underline font-mono block truncate">{lightboxItem.url}</a>
+                {lightboxItem.description && (
+                  <p className="text-xs text-white/50 leading-relaxed">{lightboxItem.description}</p>
+                )}
+              </div>
+            ) : (
+              <img
+                src={lightboxItem.url}
+                className="max-w-[90vw] max-h-[85vh] object-contain rounded-lg shadow-2xl"
+              />
+            )}
+            {lightboxItem.title && lightboxItem.type !== 'link_preview' && (
+              <div className="absolute -bottom-8 left-0 right-0 text-center">
+                <span className="text-xs text-white/40">{lightboxItem.title}</span>
+              </div>
+            )}
+          </div>
+          <button
+            onClick={() => setLightboxItem(null)}
+            className="absolute top-6 right-6 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white/60 hover:text-white flex items-center justify-center transition-colors cursor-pointer text-lg"
+          >
+            ✕
+          </button>
         </div>
       )}
     </div>

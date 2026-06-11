@@ -4,6 +4,25 @@ import { auth } from "@/auth";
 
 export const dynamic = "force-dynamic";
 
+// ── OG metadata fetcher (lightweight) ──
+async function fetchOGImage(url: string): Promise<string | null> {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 6000);
+    const res = await fetch(url, {
+      headers: { "User-Agent": "DevOS/1.0" },
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    const html = await res.text();
+    const ogImage = html.match(/<meta\s+property="og:image"\s+content="([^"]+)"/i)?.[1]
+                 || html.match(/<meta\s+content="([^"]+)"\s+property="og:image"/i)?.[1];
+    return ogImage || null;
+  } catch {
+    return null;
+  }
+}
+
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await auth();
@@ -14,7 +33,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const { id } = await params;
 
     const body = await request.json();
-    const { phase, name, description, status, coverImageUrl, ogImageUrl } = body;
+    const { phase, name, description, status, coverImageUrl, ogImageUrl, liveUrl } = body;
 
     // Verify ownership
     const project = await prisma.project.findUnique({
@@ -33,8 +52,21 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         ...(status !== undefined && { status }),
         ...(coverImageUrl !== undefined && { coverImageUrl }),
         ...(ogImageUrl !== undefined && { ogImageUrl }),
+        ...(liveUrl !== undefined && { liveUrl }),
       },
     });
+
+    // Auto-fetch OG image if liveUrl is set and ogImageUrl is still empty
+    if (updatedProject.liveUrl && !updatedProject.ogImageUrl) {
+      const fetchedOg = await fetchOGImage(updatedProject.liveUrl);
+      if (fetchedOg) {
+        const final = await prisma.project.update({
+          where: { id },
+          data: { ogImageUrl: fetchedOg },
+        });
+        return NextResponse.json(final);
+      }
+    }
 
     return NextResponse.json(updatedProject);
   } catch (error) {
