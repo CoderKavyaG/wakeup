@@ -91,6 +91,7 @@ model Task {
   priority  String   @default("medium") // "low" | "medium" | "high"
   dueDate   String?
   projectId String?
+  source    String   @default("manual")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   userId    String?
@@ -102,6 +103,7 @@ model Note {
   content   String   @db.Text
   projectId String?
   category  String?  // 'feedback' | 'bug' | 'idea' | 'note'
+  source    String   @default("manual")
   project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -188,6 +190,7 @@ model User {
   mediaItems      MediaItem[]
   captureMessages CaptureMessage[]
   projectTasks    ProjectTask[]
+  telegramLink    TelegramLink?
 }
 
 model SavedTrend {
@@ -329,4 +332,13 @@ model ProjectTask {
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt   DateTime @default(now())
 }
+
+model TelegramLink {
+  id        String   @id @default(cuid())
+  chatId    String   @unique
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  linkedAt  DateTime @default(now())
+}
+
 

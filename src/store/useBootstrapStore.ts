@@ -27,6 +27,8 @@ interface BootstrapState {
   error: string | null;
   derived: DerivedSignals | null;
   vercel: VercelData | null;
+  userId: string | null;
+  telegramLinked: boolean;
   lastBootstrapped: number | null;
   bootstrap: (force?: boolean) => Promise<void>;
   setVercelToken: (token: string) => Promise<void>;
@@ -39,6 +41,8 @@ export const useBootstrapStore = create<BootstrapState>((set, get) => ({
   error: null,
   derived: null,
   vercel: null,
+  userId: null,
+  telegramLinked: false,
   lastBootstrapped: null,
 
   bootstrap: async (force = false) => {
@@ -71,6 +75,8 @@ export const useBootstrapStore = create<BootstrapState>((set, get) => ({
         loading: false,
         derived: data.derived ?? null,
         vercel: data.vercel ?? null,
+        userId: data.userId ?? null,
+        telegramLinked: !!data.telegramLinked,
         lastBootstrapped: Date.now(),
       });
     } catch (e) {

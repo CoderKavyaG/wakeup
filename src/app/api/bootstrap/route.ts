@@ -14,7 +14,7 @@ export async function GET() {
     const now = new Date();
     const staleCutoff = new Date(Date.now() - 14 * 86400000);
 
-    const [projects, tasks, notes, urls, layoutState] = await Promise.all([
+    const [projects, tasks, notes, urls, layoutState, telegramLink] = await Promise.all([
       prisma.project.findMany({
         where: { userId },
         include: {
@@ -39,6 +39,9 @@ export async function GET() {
       prisma.layoutState.findUnique({
         where: { id: layoutId },
       }),
+      prisma.telegramLink.findUnique({
+        where: { userId }
+      })
     ]);
 
     let finalLayoutState = layoutState;
@@ -264,6 +267,8 @@ export async function GET() {
     const incompleteTasks = tasks.filter((t) => !t.completed);
 
     return NextResponse.json({
+      userId,
+      telegramLinked: !!telegramLink,
       projects,
       tasks,
       incompleteTasks,

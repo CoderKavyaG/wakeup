@@ -124,6 +124,8 @@ export function ProjectsWidget() {
   const loaded = useBootstrapStore(s => s.loaded);
   const setVercelToken = useBootstrapStore(s => s.setVercelToken);
   const removeVercelToken = useBootstrapStore(s => s.removeVercelToken);
+  const userId = useBootstrapStore(s => s.userId);
+  const telegramLinked = useBootstrapStore(s => s.telegramLinked);
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [githubUsernameInput, setGithubUsernameInput] = useState("");
@@ -1958,6 +1960,27 @@ export function ProjectsWidget() {
                 placeholder={vercel?.hasToken ? "configured (leave unchanged, or clear to disconnect)" : "ve_..."} 
               />
               <p className="text-[10px] text-muted-foreground">Used for analytics sparklines, deployments, and automated health checks.</p>
+            </div>
+            
+            <div className="border-t border-white/5 pt-4 space-y-2">
+              <label className="text-xs font-semibold text-muted-foreground flex items-center justify-between">
+                <span>Telegram Integration</span>
+                <span className={`text-[10px] uppercase tracking-wider font-mono font-bold ${telegramLinked ? 'text-green-400' : 'text-amber-400'}`}>
+                  {telegramLinked ? '● Connected' : '○ Not Linked'}
+                </span>
+              </label>
+              
+              <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-white/50 font-medium">Your Link Code:</span>
+                  <code className="text-xs font-mono font-bold text-purple-400 select-all bg-purple-500/10 px-1.5 py-0.5 rounded border border-purple-500/20">
+                    DEVOS-{userId ? userId.slice(0, 8) : 'unknown'}
+                  </code>
+                </div>
+                <p className="text-[10px] text-muted-foreground leading-relaxed">
+                  Message this code to the bot <a href="https://t.me/AssistmeOs_Bot" target="_blank" rel="noreferrer" className="text-purple-400 hover:underline">@AssistmeOs_Bot</a> to link your accounts. Once linked, you can capture tasks, ideas, or notes directly from chat!
+                </p>
+              </div>
             </div>
           </div>
           <DialogFooter>
