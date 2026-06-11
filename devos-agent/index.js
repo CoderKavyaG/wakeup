@@ -197,6 +197,103 @@ app.get('/stats', (req, res) => {
   });
 });
 
+// GET /read-files?topic=X&path=Y
+app.get('/read-files', async (req, res) => {
+  const topic = req.query.topic;
+  const targetPath = req.query.path || process.cwd();
+  if (!topic) {
+    return res.status(400).json({ error: 'Missing topic' });
+  }
+
+  try {
+    const filesFound = [];
+    const maxFiles = 3;
+    const maxLines = 200;
+    
+    function traverse(dir) {
+      if (filesFound.length >= 5) return;
+      let items = [];
+      try {
+        items = fs.readdirSync(dir, { withFileTypes: true });
+      } catch (e) {
+        return;
+      }
+
+      for (const item of items) {
+        if (filesFound.length >= 5) break;
+
+        const fullPath = path.join(dir, item.name);
+        const relativePath = path.relative(targetPath, fullPath);
+
+        const lowerName = item.name.toLowerCase();
+        if (
+          item.isDirectory() && (
+            lowerName === 'node_modules' ||
+            lowerName === '.next' ||
+            lowerName === 'dist' ||
+            lowerName === '.git' ||
+            lowerName === 'out' ||
+            lowerName === '.vercel'
+          )
+        ) {
+          continue;
+        }
+
+        if (item.isFile()) {
+          if (
+            lowerName === 'package-lock.json' ||
+            lowerName === 'yarn.lock' ||
+            lowerName === 'pnpm-lock.yaml' ||
+            lowerName.endsWith('.png') ||
+            lowerName.endsWith('.jpg') ||
+            lowerName.endsWith('.jpeg') ||
+            lowerName.endsWith('.gif') ||
+            lowerName.endsWith('.ico') ||
+            lowerName.endsWith('.pdf') ||
+            lowerName.endsWith('.zip') ||
+            lowerName.endsWith('.tsbuildinfo')
+          ) {
+            continue;
+          }
+
+          const matchName = item.name.toLowerCase().includes(topic.toLowerCase());
+          let matchContent = false;
+          let content = '';
+
+          try {
+            content = fs.readFileSync(fullPath, 'utf8');
+            if (content.toLowerCase().includes(topic.toLowerCase())) {
+              matchContent = true;
+            }
+          } catch (e) {}
+
+          if (matchName || matchContent) {
+            const lines = content.split('\n');
+            const cappedContent = lines.slice(0, maxLines).join('\n');
+            filesFound.push({
+              path: relativePath,
+              content: cappedContent,
+              truncated: lines.length > maxLines
+            });
+          }
+        } else if (item.isDirectory()) {
+          traverse(fullPath);
+        }
+      }
+    }
+
+    traverse(targetPath);
+
+    if (filesFound.length === 0) {
+      return res.json({ files: [], error: `No files found matching '${topic}' in workspace.` });
+    }
+
+    res.json({ files: filesFound.slice(0, maxFiles) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /git
 app.get('/git', (req, res) => {
   const targetPath = req.query.path;
@@ -496,6 +593,61 @@ wss.on('connection', (ws, req) => {
 });
 
 console.log('Terminal WS server on port 3132');
+
+// Scan helper for context generation
+async function scanForContext(targetPath) {
+  const meta = await scanDirectory(targetPath);
+  let rootFiles = [];
+  try {
+    const items = fs.readdirSync(targetPath, { withFileTypes: true });
+    rootFiles = items.map(item => ({
+      name: item.name,
+      isDirectory: item.isDirectory()
+    }));
+  } catch (e) {}
+
+  return {
+    ...meta,
+    rootFiles
+  };
+}
+
+// POST /generate-context - generate CLAUDE.md and AGENTS.md
+app.post('/generate-context', async (req, res) => {
+  const targetPath = req.body.path;
+  if (!targetPath) return res.status(400).json({ error: 'Missing path' });
+
+  try {
+    const scanned = await scanForContext(targetPath);
+    
+    // Call the Next.js API endpoint to run LLM generation
+    const response = await fetch('http://localhost:3000/api/projects/generate-context', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scanned })
+    });
+
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(errData.error || `Next.js API returned status ${response.status}`);
+    }
+
+    const { claudeMd, agentsMd } = await response.json();
+
+    if (!claudeMd || !agentsMd) {
+      throw new Error('Next.js API failed to return generated files');
+    }
+
+    // Write directly to project root
+    fs.writeFileSync(path.join(targetPath, 'CLAUDE.md'), claudeMd, 'utf8');
+    fs.writeFileSync(path.join(targetPath, 'AGENTS.md'), agentsMd, 'utf8');
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error generating context:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 app.listen(PORT, () => {
   console.log(`DevOS Agent running on port ${PORT}`);

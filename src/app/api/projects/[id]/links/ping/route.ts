@@ -22,8 +22,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
     
+    const { searchParams } = new URL(request.url);
+    const linkId = searchParams.get("linkId");
+
     const links = await prisma.projectLink.findMany({
-      where: { projectId: id }
+      where: { 
+        projectId: id,
+        ...(linkId ? { id: linkId } : {})
+      }
     });
 
     const pingResults = await Promise.all(

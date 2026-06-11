@@ -50,19 +50,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
 
-    const { url, label } = await request.json();
+    const { url, label, type: customType } = await request.json();
 
     if (!url || !label) {
       return NextResponse.json({ error: "URL and label are required" }, { status: 400 });
     }
 
-    let type = "other";
-    const lowerUrl = url.toLowerCase();
-    if (lowerUrl.includes("vercel.app")) type = "frontend";
-    else if (lowerUrl.includes("railway.app")) type = "backend";
-    else if (lowerUrl.includes("supabase.co")) type = "database";
-    else if (lowerUrl.includes("firebase")) type = "storage";
-    else if (lowerUrl.includes("sentry.io")) type = "monitoring";
+    let type = customType || "other";
+    if (!customType) {
+      const lowerUrl = url.toLowerCase();
+      if (lowerUrl.includes("vercel.app") || lowerUrl.includes("netlify.app") || lowerUrl.includes("github.io")) type = "frontend";
+      else if (lowerUrl.includes("railway.app") || lowerUrl.includes("heroku.com") || lowerUrl.includes("render.com")) type = "backend";
+      else if (lowerUrl.includes("supabase.co") || lowerUrl.includes("neon.tech") || lowerUrl.includes("mongodb.net") || lowerUrl.includes("postgres")) type = "database";
+      else if (lowerUrl.includes("firebase") || lowerUrl.includes("aws.amazon.com/s3") || lowerUrl.includes("cloudinary")) type = "storage";
+      else if (lowerUrl.includes("sentry.io") || lowerUrl.includes("datadoghq") || lowerUrl.includes("logflare") || lowerUrl.includes("upstash")) type = "monitoring";
+    }
 
     const newLink = await prisma.projectLink.create({
       data: {

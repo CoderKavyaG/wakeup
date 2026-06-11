@@ -138,15 +138,15 @@ export function GithubWidget() {
       {/* Header */}
       <div className="flex items-center justify-between mb-3 shrink-0">
         <div className="flex items-center space-x-2">
-          <GitBranch className="w-4 h-4 text-primary" />
-          <h2 className="text-sm font-semibold tracking-tight text-foreground">GitHub Activity</h2>
+          <GitBranch className="w-4 h-4 text-purple-400" />
+          <h2 className="text-sm font-semibold tracking-tight text-white">GitHub Activity</h2>
         </div>
         <div className="flex items-center space-x-1.5">
           <Button 
             id="github-widget-settings-btn"
             size="icon" 
             variant="ghost" 
-            className="w-6 h-6 text-muted-foreground" 
+            className="w-6 h-6 text-white/40 hover:text-white hover:bg-white/5" 
             onClick={() => setShowSettings(!showSettings)}
           >
             <Settings className="w-3.5 h-3.5" />
@@ -156,29 +156,29 @@ export function GithubWidget() {
               value={inputUsername}
               onChange={(e) => setInputUsername(e.target.value)}
               placeholder="Username"
-              className="h-6 w-24 text-xs bg-[#0f0f11] border-white/10 text-foreground placeholder:text-muted-foreground"
+              className="h-6 w-24 text-xs bg-white/[0.03] border-white/[0.08] text-white placeholder:text-white/20"
             />
-            <Button size="icon" type="submit" variant="ghost" className="w-6 h-6 border border-white/10" disabled={loading}>
-              <RefreshCw className={`w-3 h-3 text-muted-foreground ${loading ? 'animate-spin' : ''}`} />
+            <Button size="icon" type="submit" variant="ghost" className="w-6 h-6 border border-white/10 hover:bg-white/5" disabled={loading}>
+              <RefreshCw className={`w-3 h-3 text-white/50 ${loading ? 'animate-spin' : ''}`} />
             </Button>
           </form>
         </div>
       </div>
 
       {showSettings && (
-        <div className="mb-3 p-3 bg-[#0f0f11] border border-white/10 rounded-lg shrink-0 flex flex-col gap-2">
-          <p className="text-[10px] font-semibold text-muted-foreground uppercase">GitHub Access Token (PAT)</p>
+        <div className="mb-3 p-3 bg-white/[0.02] border border-white/[0.06] rounded-lg shrink-0 flex flex-col gap-2">
+          <p className="text-[10px] font-semibold text-white/40 uppercase">GitHub Access Token (PAT)</p>
           <div className="flex gap-2">
             <Input
               type="password"
               value={token}
               onChange={(e) => setToken(e.target.value)}
               placeholder="ghp_..."
-              className="h-7 text-xs flex-1"
+              className="h-7 text-xs flex-1 bg-white/[0.03] border-white/[0.08] text-white placeholder:text-white/20"
             />
-            <Button size="sm" onClick={handleSaveSettings} className="h-7 text-xs">Save</Button>
+            <Button size="sm" onClick={handleSaveSettings} className="h-7 text-xs bg-white text-black hover:bg-white/90">Save</Button>
           </div>
-          <p className="text-[9px] text-muted-foreground">Stored in local browser storage. Required for accurate commits & streaks.</p>
+          <p className="text-[9px] text-white/30">Stored in local browser storage. Required for accurate commits & streaks.</p>
         </div>
       )}
 
@@ -192,21 +192,21 @@ export function GithubWidget() {
       {/* Stats Grid */}
       {stats && (
         <div className="grid grid-cols-4 gap-1.5 mb-3 shrink-0">
-          <div className="p-2 border border-white/10 bg-[#0f0f11] rounded text-center flex flex-col justify-center">
-            <div className="text-[8px] uppercase font-bold text-muted-foreground">Streak</div>
-            <div className="text-xs font-mono font-semibold text-primary">{stats.currentStreak}d</div>
+          <div className="p-2 border border-white/[0.06] bg-white/[0.01] rounded text-center flex flex-col justify-center">
+            <div className="text-[8px] uppercase font-bold text-white/30">Streak</div>
+            <div className="text-xs font-mono font-semibold text-purple-400">{stats.currentStreak}d</div>
           </div>
-          <div className="p-2 border border-white/10 bg-[#0f0f11] rounded text-center flex flex-col justify-center">
-            <div className="text-[8px] uppercase font-bold text-muted-foreground">Contribs</div>
-            <div className="text-xs font-mono font-semibold text-foreground">{stats.totalContributions}</div>
+          <div className="p-2 border border-white/[0.06] bg-white/[0.01] rounded text-center flex flex-col justify-center">
+            <div className="text-[8px] uppercase font-bold text-white/30">Contribs</div>
+            <div className="text-xs font-mono font-semibold text-white/80">{stats.totalContributions}</div>
           </div>
-          <div className="p-2 border border-white/10 bg-[#0f0f11] rounded text-center flex flex-col justify-center">
-            <div className="text-[8px] uppercase font-bold text-muted-foreground">Active</div>
-            <div className="text-xs font-mono font-semibold text-foreground">{stats.activeReposCount}</div>
+          <div className="p-2 border border-white/[0.06] bg-white/[0.01] rounded text-center flex flex-col justify-center">
+            <div className="text-[8px] uppercase font-bold text-white/30">Active</div>
+            <div className="text-xs font-mono font-semibold text-white/80">{stats.activeReposCount}</div>
           </div>
-          <div className="p-2 border border-white/10 bg-[#0f0f11] rounded text-center flex flex-col justify-center">
-            <div className="text-[8px] uppercase font-bold text-muted-foreground">Stale</div>
-            <div className="text-xs font-mono font-semibold text-orange-400">{stats.staleReposCount}</div>
+          <div className="p-2 border border-white/[0.06] bg-white/[0.01] rounded text-center flex flex-col justify-center">
+            <div className="text-[8px] uppercase font-bold text-white/30">Stale</div>
+            <div className="text-xs font-mono font-semibold text-amber-400">{stats.staleReposCount}</div>
           </div>
         </div>
       )}
@@ -218,10 +218,12 @@ export function GithubWidget() {
           {/* Language Breakdown */}
           {stats && stats.languageBreakdown.length > 0 && (
             <div className="shrink-0 space-y-1">
-              <div className="text-[9px] font-bold uppercase text-muted-foreground tracking-wider">Languages</div>
-              <div className="flex h-1.5 rounded overflow-hidden w-full bg-border">
+              <div className="flex items-center justify-between pb-1 border-b border-white/[0.04] mb-1">
+                <span className="text-[10px] font-medium text-white/40 tracking-wider lowercase">languages</span>
+              </div>
+              <div className="flex h-1.5 rounded overflow-hidden w-full bg-white/[0.04]">
                 {stats.languageBreakdown.slice(0, 4).map((lang, idx) => {
-                  const colors = ["bg-primary", "bg-slate-400", "bg-slate-500", "bg-slate-600"];
+                  const colors = ["bg-purple-500", "bg-zinc-400", "bg-zinc-500", "bg-zinc-600"];
                   return (
                     <div 
                       key={lang.language} 
@@ -232,26 +234,28 @@ export function GithubWidget() {
                   );
                 })}
               </div>
-              <div className="flex flex-wrap gap-2 text-[8px] text-muted-foreground">
+              <div className="flex flex-wrap gap-2 text-[8px] text-white/30">
                 {stats.languageBreakdown.slice(0, 4).map((lang) => (
                   <div key={lang.language}>
-                    <span className="font-mono">{lang.language}</span> {lang.percentage}%
+                    <span className="font-mono text-white/50">{lang.language}</span> {lang.percentage}%
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          <div className="text-[9px] font-bold uppercase text-muted-foreground tracking-wider shrink-0 mt-2">Latest Commits</div>
-          <ScrollArea className="flex-1 border border-white/10 bg-[#0f0f11] rounded p-2 min-h-0 h-full w-full overflow-y-auto">
+          <div className="flex items-center justify-between pb-1 border-b border-white/[0.04] mb-1.5 shrink-0 mt-2">
+            <span className="text-[10px] font-medium text-white/40 tracking-wider lowercase">latest commits</span>
+          </div>
+          <ScrollArea className="flex-1 border border-white/[0.06] bg-white/[0.01] rounded p-2 min-h-0 h-full w-full overflow-y-auto">
             <div className="space-y-2">
               {commits.length === 0 ? (
                 <div className="text-center py-4 text-[9px] text-muted-foreground">No recent activity</div>
               ) : (
                 commits.map((commit, i) => (
-                  <div key={commit.sha + i} className="flex items-start space-x-1.5 text-[9px] pb-1.5 border-b border-white/10 last:border-0">
-                    <div className="mt-0.5 p-1 bg-primary/10 rounded shrink-0">
-                      <GitCommit className="w-2.5 h-2.5 text-primary" />
+                  <div key={commit.sha + i} className="flex items-start space-x-1.5 text-[9px] pb-1.5 border-b border-white/[0.04] last:border-0">
+                    <div className="mt-0.5 p-1 bg-purple-500/10 rounded shrink-0">
+                      <GitCommit className="w-2.5 h-2.5 text-purple-400" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-1">
@@ -272,8 +276,10 @@ export function GithubWidget() {
 
         {/* Right Column: Repositories */}
         <div className="flex flex-col h-full overflow-hidden space-y-2">
-          <div className="text-[9px] font-bold uppercase text-muted-foreground tracking-wider shrink-0">Repositories</div>
-          <ScrollArea className="flex-1 border border-white/10 bg-[#0f0f11] rounded p-2 min-h-0 h-full w-full overflow-y-auto">
+          <div className="flex items-center justify-between pb-1 border-b border-white/[0.04] mb-1.5 shrink-0">
+            <span className="text-[10px] font-medium text-white/40 tracking-wider lowercase">repositories</span>
+          </div>
+          <ScrollArea className="flex-1 border border-white/[0.06] bg-white/[0.01] rounded p-2 min-h-0 h-full w-full overflow-y-auto">
             <div className="space-y-1.5">
               {repos.length === 0 ? (
                 <div className="text-center py-4 text-[9px] text-muted-foreground">No repositories</div>
@@ -281,19 +287,19 @@ export function GithubWidget() {
                 repos.map((repo) => {
                   const isStale = new Date(repo.updated_at) < new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
                   return (
-                    <div key={repo.id} className="p-2 border border-white/10 bg-[#0f0f11] rounded flex flex-col justify-between gap-1">
+                    <div key={repo.id} className="p-2 border border-white/[0.06] bg-white/[0.01] rounded flex flex-col justify-between gap-1">
                       <div className="flex items-start justify-between gap-1">
-                        <a href={repo.html_url} target="_blank" rel="noopener noreferrer" className="font-bold text-sm text-foreground hover:text-primary truncate flex items-center gap-1">
+                        <a href={repo.html_url} target="_blank" rel="noopener noreferrer" className="font-bold text-xs text-white hover:text-purple-400 truncate flex items-center gap-1">
                           {repo.name}
                           <ExternalLink className="w-3 h-3 opacity-40 shrink-0" />
                         </a>
                         <div className="flex items-center gap-1 shrink-0">
                           {repo.open_issues_count > 0 && (
-                            <Badge variant="outline" className="text-[7px] uppercase bg-red-500/10 text-red-500 border-red-500/20 px-1 py-0 h-4">
+                            <Badge variant="outline" className="text-[7px] uppercase bg-red-400/10 text-red-400 border-red-400/20 px-1 py-0 h-4 rounded font-medium">
                               {repo.open_issues_count} Iss
                             </Badge>
                           )}
-                          <Badge variant="outline" className={`text-[7px] uppercase px-1 py-0 h-4 ${isStale ? 'bg-border text-muted-foreground' : 'bg-primary/10 text-primary'}`}>
+                          <Badge variant="outline" className={`text-[7px] uppercase px-1 py-0 h-4 rounded font-medium ${isStale ? 'bg-white/5 text-white/40 border border-white/10' : 'bg-purple-500/10 text-purple-400 border border-purple-500/20'}`}>
                             {isStale ? 'stale' : 'active'}
                           </Badge>
                         </div>

@@ -17,10 +17,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing projectId" }, { status: 400 });
     }
 
-    // Verify ownership first
-    const ownerProject = await prisma.project.findUnique({
-      where: { id: projectId },
-    });
+    // Verify ownership and get user vercel token
+    const [ownerProject, user] = await Promise.all([
+      prisma.project.findUnique({
+        where: { id: projectId },
+      }),
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { vercelToken: true }
+      })
+    ]);
     if (!ownerProject || ownerProject.userId !== userId) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
@@ -85,6 +91,49 @@ export async function POST(req: Request) {
     if (!project.githubUrl && !project.folderPath) {
       score -= 10;
       signals.push("no repo or folder linked");
+    }
+
+    // Signal 5: Vercel frontend live status auto-ping
+    if (project.vercelProjectId && user?.vercelToken) {
+      let vercelUrl = "";
+      if (user.vercelToken.startsWith("mock_")) {
+        vercelUrl = project.vercelProjectId === "prj_gridlock" ? "https://gridlock.vercel.app" : "https://wakeup.vercel.app";
+      } else {
+        try {
+          const vercelRes = await fetch(`https://api.vercel.com/v9/projects/${project.vercelProjectId}`, {
+            headers: { Authorization: `Bearer ${user.vercelToken}` }
+          });
+          if (vercelRes.ok) {
+            const data = await vercelRes.json();
+            const alias = data.targets?.production?.alias?.[0] || data.alias?.[0] || data.latestDeployments?.[0]?.url;
+            if (alias) {
+              vercelUrl = alias.startsWith("http") ? alias : `https://${alias}`;
+            }
+          }
+        } catch (e) {
+          console.error("Failed to fetch vercel project details in health check", e);
+        }
+      }
+
+      if (vercelUrl) {
+        let isUp = false;
+        let statusCode = 500;
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 4000);
+          const pingRes = await fetch(vercelUrl, { method: "HEAD", signal: controller.signal });
+          clearTimeout(timeoutId);
+          statusCode = pingRes.status;
+          isUp = pingRes.status >= 200 && pingRes.status < 300;
+        } catch (err) {
+          isUp = false;
+        }
+
+        if (!isUp) {
+          score -= 20;
+          signals.push(`vercel frontend down (${statusCode})`);
+        }
+      }
     }
 
     score = Math.max(0, Math.min(100, score));

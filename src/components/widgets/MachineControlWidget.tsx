@@ -356,12 +356,12 @@ export function MachineControlWidget() {
                     value={workspacePath}
                     onChange={e => setWorkspacePath(e.target.value)}
                     placeholder="Enter absolute path (e.g. C:\Users\...)"
-                    className="h-7 text-xs bg-[#0f0f11] border-white/10"
+                    className="h-7 text-xs bg-white/[0.03] border-white/[0.08] text-white placeholder:text-white/20"
                   />
-                  <Button size="sm" className="h-7 px-3 text-xs bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => handleSaveWorkspace()}>Save</Button>
+                  <Button size="sm" className="h-7 px-3 text-xs bg-white text-black hover:bg-white/90" onClick={() => handleSaveWorkspace()}>Save</Button>
                 </div>
                 {!workspacePath && (
-                  <span className="text-[10px] text-orange-400/80 italic">You must enter and save your project's folder path above to enable Git & file tracking.</span>
+                  <span className="text-[10px] text-amber-400/80 italic font-mono">You must enter and save your project's folder path above to enable Git & file tracking.</span>
                 )}
               </div>
             ) : (
@@ -505,10 +505,10 @@ export function MachineControlWidget() {
             <div className="shrink-0 overflow-y-auto custom-scrollbar scrollbar-hide" style={{ maxHeight: '55%' }}>
 
               {/* Quick Launch */}
-              <div className="shrink-0 p-3 bg-[#0f0f11] border-t border-white/10">
-                <div className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider mb-2 flex items-center justify-between">
+              <div className="shrink-0 p-3 bg-white/[0.01] border-t border-white/[0.04]">
+                <div className="text-[10px] font-bold uppercase text-white/40 tracking-wider mb-2 flex items-center justify-between">
                   <span className="flex items-center gap-1.5"><Play className="w-3.5 h-3.5" /> Quick Launch</span>
-                  <Button variant="ghost" size="sm" className="h-5 text-[9px] px-1.5 text-muted-foreground" onClick={() => setIsEditingLaunchers(!isEditingLaunchers)}>
+                  <Button variant="ghost" size="sm" className="h-5 text-[9px] px-1.5 text-white/40 hover:text-white hover:bg-white/5" onClick={() => setIsEditingLaunchers(!isEditingLaunchers)}>
                     {isEditingLaunchers ? "Done" : "Config"}
                   </Button>
                 </div>
@@ -520,23 +520,23 @@ export function MachineControlWidget() {
                           const newL = [...customLaunchers];
                           newL[i].name = e.target.value;
                           saveLaunchers(newL);
-                        }} placeholder="Name" className="h-7 text-xs w-1/3 bg-black/20" />
+                        }} placeholder="Name" className="h-7 text-xs w-1/3 bg-white/[0.03] border-white/[0.08] text-white" />
                         <Input value={l.command} onChange={(e) => {
                           const newL = [...customLaunchers];
                           newL[i].command = e.target.value;
                           saveLaunchers(newL);
-                        }} placeholder="Command..." className="h-7 text-xs flex-1 bg-black/20" />
-                        <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-red-500 hover:bg-red-500/20 rounded" onClick={() => {
+                        }} placeholder="Command..." className="h-7 text-xs flex-1 bg-white/[0.03] border-white/[0.08] text-white" />
+                        <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 text-red-400 hover:bg-red-400/20 rounded" onClick={() => {
                           const newL = customLaunchers.filter((_, idx) => idx !== i);
                           saveLaunchers(newL);
                         }}><XCircle className="w-3 h-3" /></Button>
                       </div>
                     ))}
                     <div className="flex gap-2 pt-1">
-                      <Button variant="outline" size="sm" className="h-7 flex-1 text-[10px] border-dashed border-white/10 hover:bg-white/5" onClick={() => {
+                      <Button variant="outline" size="sm" className="h-7 flex-1 text-[10px] bg-white/5 text-white/80 border border-white/10 hover:bg-white/10" onClick={() => {
                         saveLaunchers([...customLaunchers, { name: "New App", command: "" }]);
                       }}>+ Add</Button>
-                      <Button variant="outline" size="sm" className="h-7 flex-1 text-[10px] border-dashed border-red-500/20 text-red-400 hover:bg-red-500/10" onClick={() => {
+                      <Button variant="outline" size="sm" className="h-7 flex-1 text-[10px] bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20" onClick={() => {
                         saveLaunchers([
                           { name: "VS Code", command: "VS Code" },
                           { name: "Terminal", command: "Terminal" },
@@ -549,8 +549,8 @@ export function MachineControlWidget() {
                 ) : (
                   <div className="grid grid-cols-2 gap-2">
                     {customLaunchers.map((l, i) => (
-                      <Button key={i} variant="outline" size="sm" className={`h-8 text-[10px] bg-[#0f0f11] hover:bg-white/5 border-white/10 ${isTinyWidth ? "justify-center" : "justify-start"}`} onClick={() => handleLaunch(l.command)} disabled={agentOffline}>
-                        <Terminal className={`w-3 h-3 ${isTinyWidth ? "" : "mr-2"} text-primary`} /> {!isTinyWidth && l.name}
+                      <Button key={i} variant="outline" size="sm" className={`h-8 text-[10px] bg-white/5 text-white hover:bg-white/10 border-white/10 ${isTinyWidth ? "justify-center" : "justify-start"}`} onClick={() => handleLaunch(l.command)} disabled={agentOffline}>
+                        <Terminal className={`w-3 h-3 ${isTinyWidth ? "" : "mr-2"} text-purple-400`} /> {!isTinyWidth && l.name}
                       </Button>
                     ))}
                   </div>
@@ -558,17 +558,17 @@ export function MachineControlWidget() {
               </div>
 
               {/* Git Repos */}
-              <div className="shrink-0 p-3 bg-[#0f0f11] border-t border-white/10">
-                <div className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider mb-2 flex items-center justify-between">
-                  <span className="flex items-center gap-1.5"><GitBranchIcon className="w-3.5 h-3.5" /> Repos</span>
-                  <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-muted-foreground" onClick={fetchGitRepos} disabled={gitReposLoading || agentOffline}>
+              <div className="shrink-0 p-3 bg-white/[0.01] border-t border-white/[0.04]">
+                <div className="text-[10px] font-bold uppercase text-white/40 tracking-wider mb-2 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5"><GitBranchIcon className="w-3.5 h-3.5" /> repos</span>
+                  <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-white/40 hover:text-white hover:bg-white/5" onClick={fetchGitRepos} disabled={gitReposLoading || agentOffline}>
                     <RefreshCw className={`w-3 h-3 ${gitReposLoading ? 'animate-spin' : ''}`} />
                   </Button>
                 </div>
                 <div className="space-y-1.5 max-h-[150px] overflow-y-auto custom-scrollbar pr-1">
                   {gitRepos.length > 0 ? (
                     gitRepos.map((repo, i) => (
-                      <div key={i} className="flex flex-col gap-1 p-2 rounded-lg border border-white/10 bg-black/20 hover:border-primary/30 transition-colors cursor-pointer" onClick={() => { setWorkspacePath(repo.path); handleSaveWorkspace(repo.path); }}>
+                      <div key={i} className="flex flex-col gap-1 p-2 rounded-lg border border-white/[0.06] bg-white/[0.01] hover:border-purple-500/30 transition-colors cursor-pointer" onClick={() => { setWorkspacePath(repo.path); handleSaveWorkspace(repo.path); }}>
                         <div className="flex items-center justify-between overflow-hidden">
                           <div className="flex items-center gap-1.5 min-w-0">
                             <Folder className="w-3 h-3 text-blue-400 shrink-0" />

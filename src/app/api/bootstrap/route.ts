@@ -182,10 +182,16 @@ export async function GET() {
 
               if (matchedVercel) {
                 p.vercelProjectId = matchedVercel.id;
+                const alias = (matchedVercel as any).targets?.production?.alias?.[0] || (matchedVercel as any).alias?.[0] || (matchedVercel as any).latestDeployments?.[0]?.url;
+                const vercelUrl = alias ? (alias.startsWith("http") ? alias : `https://${alias}`) : null;
+                
                 projectsToUpdate.push(
                   prisma.project.update({
                     where: { id: p.id },
-                    data: { vercelProjectId: matchedVercel.id }
+                    data: { 
+                      vercelProjectId: matchedVercel.id,
+                      ...(vercelUrl ? { liveUrl: vercelUrl } : {})
+                    }
                   })
                 );
               }

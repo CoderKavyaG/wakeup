@@ -97,6 +97,11 @@ ipcMain.on('window-maximize', () => {
   else mainWindow?.maximize()
 })
 ipcMain.on('window-close', () => mainWindow?.hide()) // hide to tray, not quit
+ipcMain.handle('capture-screenshot', async () => {
+  if (!mainWindow) throw new Error('No active window');
+  const image = await mainWindow.webContents.capturePage();
+  return image.toJPEG(80).toString('base64');
+})
 
 app.whenReady().then(() => {
   startNextServer()

@@ -30,55 +30,92 @@ export async function GET(req: Request) {
   try {
     if (user.vercelToken.startsWith("mock_")) {
       if (type === 'deployments') {
-        return NextResponse.json({
-          deployments: [
-            {
-              uid: "dep_1",
-              projectId: "prj_wakeup",
-              state: "ERROR",
-              name: "wakeup",
-              created: Date.now() - 3600000,
-              meta: {
-                githubCommitMessage: "fix: resolve prisma memory leak in agent",
-                githubCommitRef: "main"
-              }
-            },
-            {
-              uid: "dep_2",
-              projectId: "prj_wakeup",
-              state: "BUILDING",
-              name: "wakeup",
-              created: Date.now() - 7200000,
-              meta: {
-                githubCommitMessage: "feat: add vercel live stats dashboard widget",
-                githubCommitRef: "main"
-              }
-            },
-            {
-              uid: "dep_3",
-              projectId: "prj_wakeup",
-              state: "READY",
-              name: "wakeup",
-              created: Date.now() - 86400000,
-              meta: {
-                githubCommitMessage: "fix: dashboard clock widget width overflow",
-                githubCommitRef: "main"
-              }
+        const vercelProjectId = searchParams.get('vercelProjectId') || searchParams.get('projectId');
+        let deploymentsList = [
+          {
+            uid: "dep_1",
+            projectId: "prj_wakeup",
+            state: "ERROR",
+            name: "wakeup",
+            created: Date.now() - 3600000,
+            meta: {
+              githubCommitMessage: "fix: resolve prisma memory leak in agent",
+              githubCommitRef: "main"
             }
-          ]
-        });
+          },
+          {
+            uid: "dep_2",
+            projectId: "prj_wakeup",
+            state: "BUILDING",
+            name: "wakeup",
+            created: Date.now() - 7200000,
+            meta: {
+              githubCommitMessage: "feat: add vercel live stats dashboard widget",
+              githubCommitRef: "main"
+            }
+          },
+          {
+            uid: "dep_3",
+            projectId: "prj_wakeup",
+            state: "READY",
+            name: "wakeup",
+            created: Date.now() - 86400000,
+            meta: {
+              githubCommitMessage: "fix: dashboard clock widget width overflow",
+              githubCommitRef: "main"
+            }
+          }
+        ];
+
+        if (vercelProjectId) {
+          if (vercelProjectId === "prj_gridlock") {
+            deploymentsList = [
+              {
+                uid: "dep_g1",
+                projectId: "prj_gridlock",
+                state: "READY",
+                name: "gridlock",
+                created: Date.now() - 1800000,
+                meta: {
+                  githubCommitMessage: "feat: initial commit for gridlock layout scheduler",
+                  githubCommitRef: "main"
+                }
+              }
+            ];
+          } else {
+            deploymentsList = deploymentsList.filter(d => d.projectId === vercelProjectId);
+          }
+        }
+
+        return NextResponse.json({ deployments: deploymentsList });
       }
 
       if (type === 'analytics') {
+        const period = searchParams.get('period');
+        const isLastWeek = period === 'lastweek';
         return NextResponse.json({
-          data: [
-            { visits: 12 },
-            { visits: 24 },
+          data: isLastWeek ? [
+            { visits: 10 },
+            { visits: 15 },
             { visits: 8 },
-            { visits: 42 },
-            { visits: 19 },
-            { visits: 31 },
-            { visits: 55 }
+            { visits: 20 },
+            { visits: 12 },
+            { visits: 18 },
+            { visits: 22 }
+          ] : [
+            { visits: 15 },
+            { visits: 25 },
+            { visits: 12 },
+            { visits: 45 },
+            { visits: 20 },
+            { visits: 35 },
+            { visits: 58 }
+          ],
+          uniqueVisitors: isLastWeek ? 85 : 176,
+          topPaths: [
+            { path: "/", visits: isLastWeek ? 60 : 120 },
+            { path: "/blog", visits: isLastWeek ? 20 : 45 },
+            { path: "/projects", visits: isLastWeek ? 15 : 35 }
           ]
         });
       }
@@ -102,7 +139,12 @@ export async function GET(req: Request) {
     }
 
     if (type === 'deployments') {
-      const res = await fetch(`${VERCEL_API}/v6/deployments?limit=10`, { headers });
+      const vercelProjectId = searchParams.get('vercelProjectId') || searchParams.get('projectId');
+      let urlStr = `${VERCEL_API}/v6/deployments?limit=10`;
+      if (vercelProjectId) {
+        urlStr += `&projectId=${vercelProjectId}`;
+      }
+      const res = await fetch(urlStr, { headers });
       if (!res.ok) {
         return NextResponse.json({ error: `Vercel API returned status ${res.status}` }, { status: res.status });
       }
@@ -114,8 +156,14 @@ export async function GET(req: Request) {
       if (!projectId) {
         return NextResponse.json({ error: "Missing projectId" }, { status: 400 });
       }
+      const period = searchParams.get('period');
+      const days = period === 'lastweek' ? 14 : 7;
+      const toDays = period === 'lastweek' ? 7 : 0;
+      const from = Date.now() - days * 86400000;
+      const to = Date.now() - toDays * 86400000;
+
       const res = await fetch(
-        `${VERCEL_API}/v1/web/analytics/timeseries?projectId=${projectId}&from=${Date.now() - 7*86400000}&to=${Date.now()}&granularity=day`,
+        `${VERCEL_API}/v1/web/analytics/timeseries?projectId=${projectId}&from=${from}&to=${to}&granularity=day`,
         { headers }
       );
       if (!res.ok) {

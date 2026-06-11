@@ -28,7 +28,12 @@ export default function AmbientBar() {
   const staleCount = derived?.totalStale ?? 0
 
   const vercel = useBootstrapStore(s => s.vercel)
-  const hasFailedDeploy = vercel?.deployments?.some((dep: any) => dep.state?.toUpperCase() === "ERROR")
+  const failedPortfolioDeploy = vercel?.deployments?.find((dep: any) => {
+    const isError = dep.state?.toUpperCase() === "ERROR"
+    if (!isError) return false
+    const n = (dep.name || "").toLowerCase()
+    return n.includes("coderkavyag") || n.includes("portfolio") || n.includes("kavya")
+  })
 
   return (
     <div className="w-full h-10 flex items-center justify-between px-4 border-b border-white/[0.04] bg-[#0a0a0f] select-none shrink-0 z-30">
@@ -50,10 +55,10 @@ export default function AmbientBar() {
 
       {/* Right: live signals */}
       <div className="flex items-center gap-3">
-        {hasFailedDeploy && (
-          <span className="text-[11px] text-red-400/80 flex items-center gap-1">
-            <span className="w-1 h-1 rounded-full bg-red-400 animate-pulse inline-block" />
-            deploy failed
+        {failedPortfolioDeploy && (
+          <span className="text-[11px] text-red-400/85 flex items-center gap-1 font-mono uppercase font-bold bg-red-400/10 px-2 py-0.5 rounded border border-red-500/20">
+            <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse inline-block" />
+            portfolio deploy failed
           </span>
         )}
         {overdueCount > 0 && (

@@ -6,7 +6,9 @@ export type WidgetType =
   | "github" 
   | "focus" 
   | "machine"
-  | "terminal";
+  | "terminal"
+  | "portfolio"
+  | "social";
 
 interface WidgetInstance {
   id: string;
@@ -40,6 +42,8 @@ const widgetConfigs: { [key in WidgetType]: { minW: number, minH: number, defaul
   focus: { minW: 3, minH: 4, defaultW: 4, defaultH: 4 },
   machine: { minW: 4, minH: 6, defaultW: 6, defaultH: 6 },
   terminal: { minW: 4, minH: 6, defaultW: 6, defaultH: 8 },
+  portfolio: { minW: 3, minH: 3, defaultW: 4, defaultH: 5 },
+  social: { minW: 3, minH: 4, defaultW: 4, defaultH: 5 },
 };
 
 const defaultLayouts: { [key: string]: Layout } = {

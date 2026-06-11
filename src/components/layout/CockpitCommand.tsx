@@ -24,6 +24,8 @@ import {
   CornerDownLeft,
   GitBranch,
   Crosshair,
+  Globe,
+  Zap,
 } from "lucide-react";
 
 // ─────────────────────────────────────────────
@@ -37,6 +39,8 @@ const ADD_WIDGET_OPTIONS = [
   { type: "focus", name: "Focus Panel", desc: "Tasks and brain dump", icon: <Crosshair className="w-4 h-4 text-primary" /> },
   { type: "machine", name: "Machine Control", desc: "Ports, launcher, workspace files", icon: <Terminal className="w-4 h-4 text-primary" /> },
   { type: "terminal", name: "Terminal", desc: "Embedded terminal with agent connection", icon: <Terminal className="w-4 h-4 text-primary" /> },
+  { type: "portfolio", name: "Portfolio Control", desc: "Manage coderkavyag.me directly", icon: <Globe className="w-4 h-4 text-primary" /> },
+  { type: "social", name: "Social Drafts", desc: "Draft X/Twitter & LinkedIn posts", icon: <Zap className="w-4 h-4 text-primary" /> },
 ];
 
 
@@ -265,7 +269,7 @@ export function CockpitCommand() {
   );
 
   // ── AI streaming call ─────────────────────────
-  const askCockpit = async (query: string) => {
+  const askCockpit = async (query: string, screenshot?: string) => {
     if (!query.trim()) return;
     setLastQuery(query);
     setStreamedAnswer("");
@@ -283,6 +287,7 @@ export function CockpitCommand() {
         signal: abortRef.current.signal,
         body: JSON.stringify({
           query,
+          screenshot,
           context: {
             projects: projects.map((p) => ({
               name: p.name,
@@ -389,7 +394,7 @@ export function CockpitCommand() {
 
     if (lower.startsWith("add ")) {
       const type = lower.replace("add ", "").trim();
-      if (["projects", "github", "focus", "machine"].includes(type)) {
+      if (["projects", "github", "focus", "machine", "terminal", "portfolio", "social"].includes(type)) {
         addWidget(type as any);
         setConfirmation(`✓ Added ${type} widget`);
         setInput("");
@@ -420,7 +425,7 @@ export function CockpitCommand() {
   };
 
   // ── Submit handler ────────────────────────────
-  const handleSubmit = (query?: string) => {
+  const handleSubmit = async (query?: string) => {
     const val = (query ?? input).trim();
     if (!val) return;
 
@@ -442,6 +447,30 @@ export function CockpitCommand() {
 
     // Ask AI
     setInput("");
+
+    const lower = val.toLowerCase();
+    if (lower.startsWith("review design")) {
+      if ((window as any).electronAPI?.captureScreenshot) {
+        setLastQuery(val);
+        setStreamedAnswer("Capturing workspace screenshot for AI design review...");
+        setAnswerDone(false);
+        setIsStreaming(true);
+        try {
+          const screenshot = await (window as any).electronAPI.captureScreenshot();
+          askCockpit(val, screenshot);
+        } catch (err: any) {
+          setStreamedAnswer("Failed to capture screenshot: " + (err.message || String(err)));
+          setAnswerDone(true);
+          setIsStreaming(false);
+        }
+      } else {
+        setLastQuery(val);
+        setStreamedAnswer("Design review is only available in the DevOS desktop app because it requires screen capture capabilities. Please run DevOS via Electron to use this feature.");
+        setAnswerDone(true);
+      }
+      return;
+    }
+
     askCockpit(val);
   };
 
@@ -708,6 +737,8 @@ export function CockpitCommand() {
                     <div className="pt-3 px-2 border-t border-border/20 mt-2 grid grid-cols-1 gap-2">
                       {[
                         { prefix: "add <widget>", desc: "E.g., add projects, add focus" },
+                        { prefix: "review code <file>", desc: "Get AI code review for matching file(s)" },
+                        { prefix: "review design", desc: "AI design critique of DevOS layout (Electron)" },
                         { prefix: "quicklinks", desc: "Toggle quick links panel" },
                         { prefix: "task:", desc: "Create a task instantly" },
                         { prefix: "note:", desc: "Save a quick note" },

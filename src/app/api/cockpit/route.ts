@@ -17,6 +17,7 @@ export const dynamic = "force-dynamic";
 
 interface CockpitRequest {
   query: string;
+  screenshot?: string;
 }
 
 export async function POST(request: Request) {
@@ -29,10 +30,131 @@ export async function POST(request: Request) {
     const userName = session.user.name || "Kavya";
 
     const body: CockpitRequest = await request.json();
-    const { query } = body;
+    const { query, screenshot } = body;
 
     if (!query?.trim()) {
       return Response.json({ error: "Query is required" }, { status: 400 });
+    }
+
+    const q = query.toLowerCase();
+
+    // -- INTENT: DESIGN REVIEW --
+    if (q.startsWith("review design")) {
+      if (!screenshot) {
+        return Response.json({
+          response: "Design review requires an Electron screen capture. Please run DevOS as a desktop app."
+        });
+      }
+
+      let visionModel = null;
+      if (process.env.GROQ_API_KEY) {
+        visionModel = groq("llama-3.2-11b-vision-preview");
+      } else if (process.env.OPENROUTER_API_KEY) {
+        visionModel = openrouter("google/gemini-2.0-flash");
+      }
+
+      if (!visionModel) {
+        return Response.json({ error: "Please configure your GROQ_API_KEY or OPENROUTER_API_KEY for vision support." }, { status: 500 });
+      }
+
+      const imgUrl = screenshot.startsWith("data:") ? screenshot : `data:image/jpeg;base64,${screenshot}`;
+
+      const result = streamText({
+        model: visionModel,
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: "You are the DevOS Design Review Assistant. Critique this design layout carefully. Analyze margins, color harmony, typography sizes, alignments, and visual hierarchy. List up to 3 dense, concrete, actionable visual styling recommendations for Kavya. Keep the response concise, constructive, and under 400 tokens." },
+              { type: "image", image: imgUrl }
+            ]
+          }
+        ],
+        maxOutputTokens: 400,
+      });
+
+      return createTextStreamResponse({ textStream: result.textStream });
+    }
+
+    // -- INTENT: CODE REVIEW --
+    if (q.startsWith("review code")) {
+      const topic = query.replace(/^review code\s*/i, "").trim();
+      if (!topic) {
+        return Response.json({
+          response: "Please specify a file name or search topic to review. Example: 'review code FocusPanelWidget'"
+        });
+      }
+
+      // Fetch file content from the local agent
+      let files = [];
+      let agentError = "";
+      try {
+        const agentRes = await fetch(`http://localhost:3131/read-files?topic=${encodeURIComponent(topic)}`);
+        if (agentRes.ok) {
+          const data = await agentRes.json();
+          files = data.files || [];
+          agentError = data.error || "";
+        } else {
+          agentError = `Agent returned status ${agentRes.status}`;
+        }
+      } catch (err: any) {
+        agentError = `Could not connect to local Express agent: ${err.message}`;
+      }
+
+      if (files.length === 0) {
+        return Response.json({
+          response: `Code review failed:\n${agentError || "No matching files found."}`
+        });
+      }
+
+      // Read Claude.md/Agents.md guidelines from project root
+      let codingRules = "";
+      try {
+        const fs = require("fs");
+        const path = require("path");
+        const rulesPath = path.join(process.cwd(), "Claude.md");
+        if (fs.existsSync(rulesPath)) {
+          codingRules = fs.readFileSync(rulesPath, "utf8").substring(0, 3000); // grab first 3kb
+        }
+      } catch (e) {}
+
+      let modelInstance = null;
+      if (process.env.GROQ_API_KEY) {
+        modelInstance = groq("llama-3.3-70b-versatile");
+      } else if (process.env.OPENROUTER_API_KEY) {
+        modelInstance = openrouter("google/gemma-4-26b-a4b-it:free");
+      }
+
+      if (!modelInstance) {
+        return Response.json({ error: "Please configure your GROQ_API_KEY or OPENROUTER_API_KEY in .env." }, { status: 500 });
+      }
+
+      const filesContent = files.map((f: any) => `### FILE: ${f.path}\n\`\`\`typescript\n${f.content}\n\`\`\`${f.truncated ? "\n[... truncated ...]" : ""}`).join("\n\n");
+
+      const prompt = `You are a Senior React/Next.js/TypeScript Engineer auditing code for DevOS.
+Auditee: Kavya (student developer building her personal OS).
+Task: Critique the code below based on the coding standards in Claude.md (if provided). Focus on bug risks, React state anti-patterns, style guide violations, and tailwind/styling issues.
+Guidelines:
+- Be dense, direct, and actionable. No polite intros/outros ("Overall looks good", etc.). Start directly with findings.
+- Recommend concrete lines/fixes.
+- Limit review to 400 tokens.
+
+CODENAME ARCHITECTURE RULES (CLAUDE.MD snippet):
+${codingRules || "None provided. Use standard Next.js, React 19, and TailwindCSS rules."}
+
+CODE FOR AUDIT:
+${filesContent}
+
+Provide the audit review:`;
+
+      const result = streamText({
+        model: modelInstance,
+        system: "You are a direct, concise AI code auditor. You do not praise or offer empty compliments. You only identify issues and specify concrete fixes.",
+        prompt,
+        maxOutputTokens: 400,
+      });
+
+      return createTextStreamResponse({ textStream: result.textStream });
     }
 
     // 1. FRESH DB PULL FOR EACH REQUEST
@@ -71,8 +193,6 @@ export async function POST(request: Request) {
     });
 
     // 3. SMART INTENT ROUTING (Direct DB bypass before AI)
-    const q = query.toLowerCase();
-
     if (q.includes('stale')) {
       const list = stale.map(p => `${p.name} — ${Math.floor((now - new Date(p.updatedAt).getTime())/86400000)}d ago`).join('\n');
       const responseMsg = stale.length === 0 ? 'All projects are active.' : `${stale.length} stale projects:\n${list}`;
