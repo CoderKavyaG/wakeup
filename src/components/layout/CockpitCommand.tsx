@@ -7,6 +7,7 @@ import { useTaskStore } from "@/store/useTaskStore";
 import { useNoteStore } from "@/store/useNoteStore";
 import { useUrlStore } from "@/store/useUrlStore";
 import { useLayoutStore } from "@/store/useLayoutStore";
+import { useProjectOSStore } from "@/store/useProjectOSStore";
 import {
   Terminal,
   Search,
@@ -149,6 +150,7 @@ export function CockpitCommand() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        if (useProjectOSStore.getState().isOpen) return;
         e.preventDefault();
         setIsOpen((prev) => !prev);
         if (!isOpen) resetState();

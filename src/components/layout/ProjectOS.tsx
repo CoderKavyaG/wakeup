@@ -30,9 +30,22 @@ import {
   Copy,
   PlusCircle,
   RefreshCw,
-  FolderOpen
+  FolderOpen,
+  Code2,
+  Lightbulb,
+  FlaskConical,
+  BookOpen,
+  Search,
+  Sparkles,
+  ChevronRight,
+  Pencil,
+  Activity,
+  X,
+  Terminal
 } from "lucide-react";
 import ProjectTasksTab from "./ProjectTasksTab";
+import ProjectOSCommandPalette from "./ProjectOSCommandPalette";
+import ProjectPhysicsBox from "./ProjectPhysicsBox";
 
 const PHASES = [
   { id: 'launched', label: 'Launched', dotColor: 'bg-green-400' },
@@ -45,7 +58,6 @@ const TABS = [
   { id: 'overview', label: 'Overview' },
   { id: 'ideas', label: 'Ideas' },
   { id: 'media', label: 'Media' },
-  { id: 'braindump', label: 'Brain Dump' },
   { id: 'tasks', label: 'Tasks' },
   { id: 'controlroom', label: 'Control Room' },
 ];
@@ -124,47 +136,62 @@ function PhaseBadge({ project }: { project: Project }) {
 // ── 1. Overview Tab ──
 function OverviewTab({ project }: { project: Project }) {
   return (
-    <div className="p-6 space-y-6 max-w-4xl">
-      <div className="grid grid-cols-3 gap-4">
-        <div className="bg-[#121217] border border-white/[0.04] p-4 rounded-xl space-y-1">
-          <span className="text-[9px] uppercase tracking-wider text-white/30 font-mono">Completion</span>
-          <p className="text-2xl font-bold font-mono text-white">{project.completionPercentage ?? 0}%</p>
-          <div className="w-full bg-white/[0.04] h-1.5 rounded-full overflow-hidden mt-2">
-            <div className="bg-purple-500 h-full rounded-full" style={{ width: `${project.completionPercentage ?? 0}%` }} />
+    <div className="p-6 space-y-6 max-w-4xl animate-in fade-in duration-300">
+      {/* Overview Cards Grid */}
+      <div className="grid grid-cols-3 gap-5">
+        <div className="bg-white/[0.02] border border-white/[0.05] p-5 rounded-2xl space-y-2 hover:border-white/10 transition-colors">
+          <span className="text-[10px] uppercase tracking-wider text-white/30 font-mono font-semibold">Completion</span>
+          <p className="text-3xl font-extrabold font-mono text-white leading-none">
+            {project.completionPercentage ?? 0}%
+          </p>
+          <div className="w-full bg-white/[0.04] h-1.5 rounded-full overflow-hidden mt-3">
+            <div
+              className="bg-gradient-to-r from-purple-500 to-indigo-500 h-full rounded-full"
+              style={{ width: `${project.completionPercentage ?? 0}%` }}
+            />
           </div>
         </div>
-        <div className="bg-[#121217] border border-white/[0.04] p-4 rounded-xl space-y-1">
-          <span className="text-[9px] uppercase tracking-wider text-white/30 font-mono">Status Indicator</span>
+
+        <div className="bg-white/[0.02] border border-white/[0.05] p-5 rounded-2xl space-y-2 hover:border-white/10 transition-colors">
+          <span className="text-[10px] uppercase tracking-wider text-white/30 font-mono font-semibold">Status</span>
           <div className="flex items-center gap-2 mt-1">
-            <span className={`w-2.5 h-2.5 rounded-full ${
-              project.status === "active" ? "bg-green-400" :
-              project.status === "planning" ? "bg-blue-400" :
-              project.status === "completed" ? "bg-purple-400" : "bg-amber-400"
-            }`} />
+            <span className={`w-2 h-2 rounded-full ${project.status === "active" ? "bg-green-400" :
+                project.status === "planning" ? "bg-blue-400" :
+                  project.status === "completed" ? "bg-purple-400" : "bg-amber-400"
+              }`} />
             <span className="text-sm font-semibold capitalize text-white/80">{project.status}</span>
           </div>
         </div>
-        <div className="bg-[#121217] border border-white/[0.04] p-4 rounded-xl space-y-1">
-          <span className="text-[9px] uppercase tracking-wider text-white/30 font-mono">Linked Path</span>
+
+        <div className="bg-white/[0.02] border border-white/[0.05] p-5 rounded-2xl space-y-2 hover:border-white/10 transition-colors">
+          <span className="text-[10px] uppercase tracking-wider text-white/30 font-mono font-semibold">Linked Workspace</span>
           <p className="text-xs font-mono text-white/60 truncate mt-1.5" title={project.folderPath || "Local-only unlinked"}>
-            {project.folderPath || "Not connected to local workspace"}
+            {project.folderPath || "No local path connected"}
           </p>
         </div>
       </div>
 
-      <div className="bg-[#121217] border border-white/[0.04] p-5 rounded-xl space-y-4">
-        <h3 className="text-xs uppercase tracking-wider text-white/40 font-mono">Resume / Milestones Context</h3>
-        <div className="space-y-4">
-          <div>
-            <span className="text-[10px] text-white/30">Architecture overview & highlights</span>
-            <p className="text-xs text-white/70 leading-relaxed mt-1 whitespace-pre-wrap">{project.architectureNotes || "None documented yet."}</p>
-          </div>
-          <div className="h-px bg-white/[0.04]" />
-          <div>
-            <span className="text-[10px] text-white/30">Auto-generated resume bullet points</span>
-            <p className="text-xs text-white/70 leading-relaxed mt-1 font-mono italic">
-              {project.resumeBullet ? `• ${project.resumeBullet}` : "Create task list milestones and push code to generate portfolio bullet points."}
+      {/* Architecture & Resume section */}
+      <div className="bg-white/[0.02] border border-white/[0.05] p-6 rounded-2xl space-y-5">
+        <h3 className="text-xs uppercase tracking-wider text-white/40 font-mono font-semibold">Project Intelligence</h3>
+
+        <div className="space-y-5">
+          <div className="space-y-1.5">
+            <span className="text-[10px] text-white/35 font-mono uppercase tracking-wider block">Architecture Overview</span>
+            <p className="text-xs text-white/70 leading-relaxed whitespace-pre-wrap font-sans">
+              {project.architectureNotes || "No architecture notes documented yet."}
             </p>
+          </div>
+
+          <div className="h-px bg-white/[0.05]" />
+
+          <div className="space-y-1.5">
+            <span className="text-[10px] text-white/35 font-mono uppercase tracking-wider block">Auto-Generated Resume Context</span>
+            <div className="p-3 bg-white/[0.01] border border-white/[0.03] rounded-xl">
+              <p className="text-xs text-white/60 leading-relaxed font-mono italic">
+                {project.resumeBullet ? project.resumeBullet : "Create task list milestones and push code to generate portfolio bullet points."}
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -174,10 +201,10 @@ function OverviewTab({ project }: { project: Project }) {
 
 // ── 2. Ideas Tab ──
 const STATUS_COLS = [
-  { id: 'raw',       label: 'Raw Ideas',  color: 'text-white/40',    borderColor: 'border-white/[0.06]',   dotColor: 'bg-white/30'    },
-  { id: 'validated', label: 'Validated',  color: 'text-blue-400/80', borderColor: 'border-blue-500/20',    dotColor: 'bg-blue-400'    },
-  { id: 'building',  label: 'Building',   color: 'text-green-400/80',borderColor: 'border-green-500/20',   dotColor: 'bg-green-400'   },
-  { id: 'shelved',   label: 'Shelved',    color: 'text-white/20',    borderColor: 'border-white/[0.04]',   dotColor: 'bg-white/20'    },
+  { id: 'raw', label: 'Raw Ideas', color: 'text-white/40', borderColor: 'border-white/[0.06]', dotColor: 'bg-white/30' },
+  { id: 'validated', label: 'Validated', color: 'text-blue-400/80', borderColor: 'border-blue-500/20', dotColor: 'bg-blue-400' },
+  { id: 'building', label: 'Building', color: 'text-green-400/80', borderColor: 'border-green-500/20', dotColor: 'bg-green-400' },
+  { id: 'shelved', label: 'Shelved', color: 'text-white/20', borderColor: 'border-white/[0.04]', dotColor: 'bg-white/20' },
 ];
 
 function timeAgoShort(date: string) {
@@ -185,7 +212,7 @@ function timeAgoShort(date: string) {
   const now = Date.now();
   const diff = now - d.getTime();
   const m = Math.floor(diff / 60000);
-  if (m < 1)  return 'now';
+  if (m < 1) return 'now';
   if (m < 60) return `${m}m`;
   const h = Math.floor(m / 60);
   if (h < 24) return `${h}h`;
@@ -233,7 +260,7 @@ function IdeaCard({ idea, projectId, onUpdate, onDelete }: IdeaCardProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: trimmed }),
       });
-    } catch {}
+    } catch { }
   };
 
   const handleStarClick = (e: React.MouseEvent) => {
@@ -243,7 +270,7 @@ function IdeaCard({ idea, projectId, onUpdate, onDelete }: IdeaCardProps) {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ starred: !idea.starred }),
-    }).catch(() => {});
+    }).catch(() => { });
   };
 
   return (
@@ -331,7 +358,7 @@ function IdeasTab({ project }: { project: Project }) {
     try {
       const res = await fetch(`/api/projects/${project.id}/ideas`);
       if (res.ok) setIdeas(await res.json());
-    } catch {}
+    } catch { }
     finally { setLoading(false); }
   };
 
@@ -365,7 +392,7 @@ function IdeasTab({ project }: { project: Project }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus }),
       });
-    } catch {}
+    } catch { }
   };
 
   const handleDelete = async (id: string) => {
@@ -373,7 +400,7 @@ function IdeasTab({ project }: { project: Project }) {
     setIdeas(prev => prev.filter(i => i.id !== id));
     try {
       await fetch(`/api/projects/${project.id}/ideas?ideaId=${id}`, { method: 'DELETE' });
-    } catch {}
+    } catch { }
   };
 
   const submitNewIdea = async (status: string) => {
@@ -636,7 +663,7 @@ function MediaVaultTab({ project }: { project: Project }) {
     try {
       const res = await fetch(`/api/projects/${project.id}/media`);
       if (res.ok) setMedia(await res.json());
-    } catch {}
+    } catch { }
     finally { setLoading(false); }
   };
 
@@ -674,7 +701,7 @@ function MediaVaultTab({ project }: { project: Project }) {
         const items = Array.isArray(data) ? data : [data];
         setMedia(prev => [...items, ...prev]);
       }
-    } catch {}
+    } catch { }
     finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -722,7 +749,7 @@ function MediaVaultTab({ project }: { project: Project }) {
     if (lightboxItem?.id === mediaId) setLightboxItem(null);
     try {
       await fetch(`/api/projects/${project.id}/media?mediaId=${mediaId}`, { method: 'DELETE' });
-    } catch {}
+    } catch { }
   };
 
   // ── Filter logic ──
@@ -753,7 +780,7 @@ function MediaVaultTab({ project }: { project: Project }) {
             <><RefreshCw className="w-3 h-3 animate-spin" /> Uploading...</>
           ) : (
             <>
-              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-3.5 h-3.5"><path d="M8 12V3M4 7l4-4 4 4"/><path d="M2 14h12"/></svg>
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-3.5 h-3.5"><path d="M8 12V3M4 7l4-4 4 4" /><path d="M2 14h12" /></svg>
               Upload images
             </>
           )}
@@ -788,11 +815,10 @@ function MediaVaultTab({ project }: { project: Project }) {
           <button
             key={t}
             onClick={() => setFilter(t)}
-            className={`text-[10px] px-2.5 py-1 rounded-full transition-all cursor-pointer font-medium ${
-              filter === t
+            className={`text-[10px] px-2.5 py-1 rounded-full transition-all cursor-pointer font-medium ${filter === t
                 ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
                 : 'text-white/30 hover:text-white/50 border border-transparent hover:border-white/10'
-            }`}
+              }`}
           >
             {t === 'all' ? 'All' : t === 'link_preview' ? 'Link Preview' : t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
@@ -943,7 +969,7 @@ function BrainDumpTab({ project }: { project: Project }) {
     try {
       const res = await fetch(`/api/notes?projectId=${project.id}`);
       if (res.ok) setNotes(await res.json());
-    } catch (e) {}
+    } catch (e) { }
     finally { setLoading(false); }
   };
 
@@ -966,7 +992,7 @@ function BrainDumpTab({ project }: { project: Project }) {
         setNotes(prev => [created, ...prev]);
         setNewNote("");
       }
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const deleteNote = async (noteId: string) => {
@@ -976,7 +1002,7 @@ function BrainDumpTab({ project }: { project: Project }) {
       if (res.ok) {
         setNotes(prev => prev.filter(n => n.id !== noteId));
       }
-    } catch (e) {}
+    } catch (e) { }
   };
 
   return (
@@ -1061,7 +1087,7 @@ function ControlRoomTab({ project }: { project: Project }) {
         setMaxVisits(Math.max(...visits, 1));
       })
       .catch(() => {
-        setWeeklyVisits([0,0,0,0,0,0,0]);
+        setWeeklyVisits([0, 0, 0, 0, 0, 0, 0]);
         setTotalVisits(0);
         setMaxVisits(1);
       });
@@ -1073,7 +1099,7 @@ function ControlRoomTab({ project }: { project: Project }) {
       const res = await fetch(`/api/projects/${project.id}/links`);
       const data = await res.json();
       setProjectLinks(Array.isArray(data) ? data : []);
-    } catch (e) {}
+    } catch (e) { }
     finally { setLinksLoading(false); }
   };
 
@@ -1097,10 +1123,10 @@ function ControlRoomTab({ project }: { project: Project }) {
                 setProjectLinks(prev => prev.map(l => l.id === updatedLink.id ? updatedLink : l));
               }
             }
-          } catch (e) {}
+          } catch (e) { }
         })
       );
-    } catch (e) {}
+    } catch (e) { }
     finally { setPingingLinks(false); }
   };
 
@@ -1125,7 +1151,7 @@ function ControlRoomTab({ project }: { project: Project }) {
         setJustAdded(true);
         setTimeout(() => setJustAdded(false), 2000);
       }
-    } catch (e) {}
+    } catch (e) { }
     finally { setCreatingLink(false); }
   };
 
@@ -1137,75 +1163,90 @@ function ControlRoomTab({ project }: { project: Project }) {
       if (res.ok) {
         setProjectLinks(prev => prev.filter(l => l.id !== linkId));
       }
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const mapVercelProject = async (vercelProjId: string) => {
     try {
       const vp = vercel?.projects?.find((p: any) => p.id === vercelProjId);
-      let alias = "";
       if (vp) {
-        const rawAlias = vp.targets?.production?.alias?.[0] || vp.alias?.[0];
-        if (rawAlias) alias = `https://${rawAlias}`;
+        await updateProject(project.id, { vercelProjectId: vercelProjId });
       }
-      await updateProject(project.id, { vercelProjectId: vercelProjId, liveUrl: alias || undefined });
-      alert("Successfully linked to Vercel project!");
-      fetchDeploymentsAndVisits();
-    } catch (e) {}
+    } catch (e) { }
   };
 
   return (
-    <div className="p-6 space-y-6 max-w-4xl">
-      <div className="grid grid-cols-2 gap-4">
-        {/* Vercel details */}
-        <div className="bg-[#121217] border border-white/[0.04] p-5 rounded-xl space-y-4">
-          <h4 className="text-xs uppercase font-mono tracking-wider text-white/40">Vercel Deployment</h4>
+    <div className="p-6 space-y-6 max-w-4xl animate-in fade-in duration-300">
+
+      {/* Vercel and Add Environment Link row */}
+      <div className="grid grid-cols-2 gap-6">
+
+        {/* Vercel Deployment Control */}
+        <div className="bg-white/[0.02] border border-white/[0.05] p-6 rounded-2xl flex flex-col space-y-5">
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs uppercase font-mono tracking-widest text-white/40 font-bold">Vercel Deployment</h4>
+            {project.vercelProjectId && (
+              <span className="text-[9px] px-2 py-0.5 rounded-full bg-green-500/10 text-green-400 border border-green-500/20 font-mono font-bold uppercase tracking-wider">
+                connected
+              </span>
+            )}
+          </div>
+
           {!project.vercelProjectId ? (
-            <div className="space-y-3">
-              <p className="text-xs text-white/40">Link a Vercel project to load traffic metrics & deployments.</p>
+            <div className="flex-1 flex flex-col justify-center space-y-4 py-4">
+              <p className="text-xs text-white/55 leading-relaxed">
+                Connect a Vercel project to load visitor traffic metrics and trigger production deployments.
+              </p>
               <select
                 onChange={e => mapVercelProject(e.target.value)}
-                className="w-full h-8 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-2 focus:outline-none focus:ring-1 focus:ring-primary/20"
+                className="w-full h-9 bg-white/[0.02] border border-white/[0.08] rounded-xl text-xs text-white px-3 focus:outline-none focus:border-purple-500/40 cursor-pointer font-semibold transition-all"
               >
-                <option value="">Select Vercel Project...</option>
+                <option value="" className="bg-[#0f0f11]">Select Vercel Project...</option>
                 {vercel?.projects?.map((vp: any) => (
-                  <option key={vp.id} value={vp.id}>{vp.name}</option>
+                  <option key={vp.id} value={vp.id} className="bg-[#0f0f11]">{vp.name}</option>
                 ))}
               </select>
             </div>
           ) : (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-3 rounded-lg bg-black/40 border border-white/5">
+            <div className="space-y-5 flex-1 flex flex-col justify-between">
+              <div className="flex items-center justify-between p-4 rounded-xl bg-white/[0.01] border border-white/[0.03]">
                 <div>
-                  <span className="text-[9px] font-bold uppercase text-white/20 tracking-wider">Weekly Visits</span>
-                  <p className="text-xl font-bold font-mono text-white mt-0.5">{totalVisits}</p>
+                  <span className="text-[9px] font-bold uppercase text-white/30 tracking-wider">Weekly Visits</span>
+                  <p className="text-2xl font-bold font-mono text-white mt-1">{totalVisits}</p>
                 </div>
-                <div className="h-6 flex items-end gap-1.5 select-none pr-1">
+                <div className="h-10 flex items-end gap-2 pr-1 select-none">
                   {weeklyVisits.map((v, idx) => (
                     <div
                       key={idx}
                       style={{ height: `${Math.max(15, Math.round((v / maxVisits) * 100))}%` }}
-                      className="w-1.5 bg-blue-500/60 hover:bg-blue-400 rounded-t transition-all duration-300"
+                      className="w-2.5 bg-gradient-to-t from-purple-500 to-indigo-400 hover:from-purple-400 hover:to-indigo-300 rounded-t transition-all duration-300 cursor-help"
                       title={`${v} visits`}
                     />
                   ))}
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <span className="text-[9px] font-bold uppercase text-white/20 tracking-wider">Deployments</span>
+              <div className="space-y-2.5">
+                <span className="text-[9px] font-bold uppercase text-white/30 tracking-wider block">Production Deployments</span>
                 {deploymentsLoading ? (
-                  <p className="text-[10px] text-white/30 animate-pulse">Loading deployments...</p>
+                  <p className="text-[10px] text-white/30 animate-pulse font-mono">Fetching deployment history...</p>
                 ) : (
-                  <div className="space-y-2">
-                    {deployments.slice(0, 3).map((dep: any) => (
-                      <div key={dep.uid} className="flex items-center justify-between p-2 rounded-lg bg-black/35 border border-white/5 text-xs text-white/60">
-                        <span className="truncate flex-1 pr-2">{dep.meta?.githubCommitMessage || dep.name || "Deploy"}</span>
-                        <Badge variant="outline" className="text-[8px] uppercase tracking-wide text-white/40 shrink-0 font-mono">
-                          {dep.state}
-                        </Badge>
-                      </div>
-                    ))}
+                  <div className="space-y-2 max-h-[140px] overflow-y-auto pr-1">
+                    {deployments.slice(0, 3).map((dep: any) => {
+                      const isReady = dep.state === "READY";
+                      const isError = dep.state === "ERROR" || dep.state === "FAILED";
+                      return (
+                        <div key={dep.uid} className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.01] border border-white/[0.03] text-xs text-white/60 hover:bg-white/[0.03] transition-colors">
+                          <span className="truncate flex-1 pr-3 text-[11px] font-medium text-white/80">{dep.meta?.githubCommitMessage || dep.name || "Production Deploy"}</span>
+                          <span className={`text-[8px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded ${isReady ? "bg-green-500/10 text-green-400 border border-green-500/20" :
+                              isError ? "bg-red-500/10 text-red-400 border border-red-500/20" :
+                                "bg-purple-500/10 text-purple-400 border border-purple-500/20"
+                            }`}>
+                            {dep.state.toLowerCase()}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -1213,88 +1254,137 @@ function ControlRoomTab({ project }: { project: Project }) {
           )}
         </div>
 
-        {/* Link creation */}
-        <div className="bg-[#121217] border border-white/[0.04] p-5 rounded-xl space-y-4">
-          <h4 className="text-xs uppercase font-mono tracking-wider text-white/40">Add Environment Link</h4>
-          <div className="space-y-3">
-            <Input
-              value={newLinkLabel}
-              onChange={e => setNewLinkLabel(e.target.value)}
-              placeholder="Database Connection"
-              className="h-8 bg-black/40 border-white/10 text-xs text-white rounded-lg focus-visible:ring-primary/20"
-            />
-            <div className="flex gap-2">
-              <select
-                value={newLinkType}
-                onChange={e => setNewLinkType(e.target.value)}
-                className="h-8 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-2 focus:outline-none focus:ring-1 focus:ring-primary/20 flex-1"
-              >
-                <option value="frontend">Frontend</option>
-                <option value="backend">Backend</option>
-                <option value="database">Database</option>
-                <option value="storage">Storage</option>
-                <option value="monitoring">Monitoring</option>
-                <option value="logs">Logs</option>
-                <option value="other">Other</option>
-              </select>
+        {/* Add Environment Link Card */}
+        <div className="bg-white/[0.02] border border-white/[0.05] p-6 rounded-2xl space-y-5">
+          <h4 className="text-xs uppercase font-mono tracking-widest text-white/40 font-bold">Add Environment Link</h4>
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <span className="text-[9px] text-white/30 font-bold uppercase tracking-wider font-mono">Link Label</span>
               <Input
-                value={newLinkUrl}
-                onChange={e => setNewLinkUrl(e.target.value)}
-                placeholder="https://console.neon.tech"
-                className="h-8 bg-black/40 border-white/10 text-xs text-white rounded-lg focus-visible:ring-primary/20 flex-[2]"
+                value={newLinkLabel}
+                onChange={e => setNewLinkLabel(e.target.value)}
+                placeholder="Database Connection Console"
+                className="h-9 bg-white/[0.02] border border-white/[0.08] focus:border-purple-500/40 text-xs text-white rounded-xl focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none transition-all placeholder:text-white/20"
               />
             </div>
-            <Button
-              onClick={submitNewLink}
-              disabled={creatingLink || !newLinkUrl || !newLinkLabel}
-              className={`w-full h-8 text-xs font-semibold rounded-lg transition-all ${
-                justAdded ? 'bg-green-500 hover:bg-green-600 text-white' : 'bg-white text-black hover:bg-white/90'
-              }`}
-            >
-              {creatingLink ? "..." : justAdded ? "Added!" : "Save Link"}
-            </Button>
+
+            <div className="grid grid-cols-3 gap-3">
+              <div className="col-span-1 space-y-1">
+                <span className="text-[9px] text-white/30 font-bold uppercase tracking-wider font-mono">Type</span>
+                <select
+                  value={newLinkType}
+                  onChange={e => setNewLinkType(e.target.value)}
+                  className="w-full h-9 bg-white/[0.02] border border-white/[0.08] focus:border-purple-500/40 rounded-xl text-xs text-white px-2.5 focus:outline-none cursor-pointer font-medium transition-all"
+                >
+                  <option value="frontend" className="bg-[#0f0f11]">Frontend</option>
+                  <option value="backend" className="bg-[#0f0f11]">Backend</option>
+                  <option value="database" className="bg-[#0f0f11]">Database</option>
+                  <option value="storage" className="bg-[#0f0f11]">Storage</option>
+                  <option value="monitoring" className="bg-[#0f0f11]">Monitoring</option>
+                  <option value="logs" className="bg-[#0f0f11]">Logs</option>
+                  <option value="other" className="bg-[#0f0f11]">Other</option>
+                </select>
+              </div>
+              <div className="col-span-2 space-y-1">
+                <span className="text-[9px] text-white/30 font-bold uppercase tracking-wider font-mono">Target URL</span>
+                <Input
+                  value={newLinkUrl}
+                  onChange={e => setNewLinkUrl(e.target.value)}
+                  placeholder="https://console.neon.tech/..."
+                  className="h-9 bg-white/[0.02] border border-white/[0.08] focus:border-purple-500/40 text-xs text-white rounded-xl focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none transition-all placeholder:text-white/20"
+                />
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <Button
+                onClick={submitNewLink}
+                disabled={creatingLink || !newLinkUrl || !newLinkLabel}
+                className={`w-full h-9 text-xs font-bold rounded-xl transition-all cursor-pointer border-0 ${justAdded
+                    ? 'bg-green-500 hover:bg-green-600 text-white'
+                    : 'bg-white text-black hover:bg-white/90'
+                  }`}
+              >
+                {creatingLink ? "Saving link..." : justAdded ? "Saved Link!" : "Save Link"}
+              </Button>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Infrastructure list */}
-      <div className="bg-[#121217] border border-white/[0.04] p-5 rounded-xl space-y-4">
-        <div className="flex items-center justify-between">
-          <h4 className="text-xs uppercase font-mono tracking-wider text-white/40">Infrastructure Links</h4>
-          <Button size="sm" variant="outline" className="h-7 text-[10px] bg-transparent border-white/10 text-white/70 hover:bg-white/5 cursor-pointer" onClick={pingLinks} disabled={pingingLinks}>
-            {pingingLinks ? "Pinging..." : "Ping All"}
+      <div className="bg-white/[0.02] border border-white/[0.05] p-6 rounded-2xl space-y-5">
+        <div className="flex items-center justify-between border-b border-white/[0.04] pb-3">
+          <div className="flex items-center gap-2">
+            <Activity className="w-4 h-4 text-purple-400" />
+            <h4 className="text-xs uppercase font-mono tracking-widest text-white/40 font-bold">Infrastructure Links</h4>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-[10px] bg-transparent border-white/10 text-white/60 hover:bg-white/5 cursor-pointer font-bold px-3 rounded-lg flex items-center gap-1"
+            onClick={pingLinks}
+            disabled={pingingLinks}
+          >
+            {pingingLinks ? "Pinging..." : "Ping All Links"}
           </Button>
         </div>
 
         {linksLoading ? (
-          <p className="text-xs text-white/30 text-center py-4">Loading infrastructure links...</p>
+          <p className="text-xs text-white/30 text-center py-6 font-mono">Loading links registry...</p>
         ) : projectLinks.length === 0 ? (
-          <p className="text-xs text-white/20 text-center py-4">No external dashboard links added yet.</p>
+          <p className="text-xs text-white/20 text-center py-8 italic">No environment or infrastructure links added yet.</p>
         ) : (
-          <div className="grid grid-cols-2 gap-3">
-            {projectLinks.map((link) => (
-              <div key={link.id} className="p-2.5 rounded-lg bg-black/40 border border-white/5 flex items-center justify-between gap-3 group">
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                    !link.lastPinged || link.lastStatus === null ? 'bg-gray-500' :
-                    (link.lastStatus >= 200 && link.lastStatus < 300) ? 'bg-green-400' : 'bg-red-400'
-                  }`} />
-                  <div className="min-w-0">
-                    <p className="text-xs font-semibold text-white/80 truncate leading-tight">{link.label}</p>
-                    <span className="text-[9px] font-mono text-white/30 truncate block mt-0.5">{link.url.replace(/^https?:\/\//, '')}</span>
+          <div className="grid grid-cols-2 gap-4">
+            {projectLinks.map((link) => {
+              return (
+                <div key={link.id} className="p-3.5 rounded-xl bg-white/[0.01] border border-white/[0.04] flex items-center justify-between gap-3 group hover:border-white/10 hover:bg-white/[0.02] transition-all">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="relative flex h-2 w-2 shrink-0">
+                      {(!link.lastPinged || link.lastStatus === null) ? (
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white/20 opacity-75"></span>
+                      ) : (link.lastStatus >= 200 && link.lastStatus < 300) ? (
+                        <span className="animate-pulse absolute inline-flex h-full w-full rounded-full bg-green-400/40 opacity-75"></span>
+                      ) : (
+                        <span className="animate-pulse absolute inline-flex h-full w-full rounded-full bg-red-400/40 opacity-75"></span>
+                      )}
+                      <span className={`relative inline-flex rounded-full h-2 w-2 ${!link.lastPinged || link.lastStatus === null ? 'bg-white/30' :
+                          (link.lastStatus >= 200 && link.lastStatus < 300) ? 'bg-green-400' : 'bg-red-400'
+                        }`}></span>
+                    </span>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-xs font-semibold text-white/85 truncate leading-none">{link.label}</p>
+                        <span className="text-[8px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-white/[0.04] text-white/30 border border-white/5 font-mono">
+                          {link.type}
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-mono text-white/35 truncate block mt-1">{link.url.replace(/^https?:\/\//, '')}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                    <a
+                      href={link.url}
+                      target="_blank"
+                      className="w-7 h-7 text-white/40 hover:text-white hover:bg-white/5 inline-flex items-center justify-center rounded-lg border border-white/5"
+                      title="Navigate to console"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="w-7 h-7 text-white/40 hover:text-red-400 hover:bg-red-500/10 rounded-lg border border-transparent"
+                      onClick={() => deleteLink(link.id)}
+                      title="Remove link"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
                   </div>
                 </div>
-
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                  <a href={link.url} target="_blank" className="w-6 h-6 text-white/35 hover:text-white hover:bg-white/5 inline-flex items-center justify-center rounded-md" title="Open Link">
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                  <Button size="icon" variant="ghost" className="w-6 h-6 text-white/35 hover:text-red-400" onClick={() => deleteLink(link.id)} title="Delete Link">
-                    <Trash2 className="w-3 h-3" />
-                  </Button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -1306,22 +1396,888 @@ function ControlRoomTab({ project }: { project: Project }) {
 // Main Overlay Component
 // ─────────────────────────────────────────────
 
+const PRIORITY_BADGES = {
+  critical: { label: "Critical", color: "text-red-400 bg-red-400/10 border-red-500/20" },
+  high: { label: "High", color: "text-orange-400 bg-orange-400/10 border-orange-500/20" },
+  medium: { label: "Medium", color: "text-yellow-400 bg-yellow-400/10 border-yellow-500/20" },
+  low: { label: "Low", color: "text-zinc-400 bg-zinc-400/10 border-zinc-500/20" },
+};
+
+const TYPE_BADGES = {
+  code: { label: "Code", color: "text-blue-400 bg-blue-400/10 border-blue-500/20", icon: Code2 },
+  idea: { label: "Idea", color: "text-purple-400 bg-purple-400/10 border-purple-500/20", icon: Lightbulb },
+  research: { label: "Research", color: "text-indigo-400 bg-indigo-400/10 border-indigo-500/20", icon: BookOpen },
+  experiment: { label: "Experiment", color: "text-amber-400 bg-amber-400/10 border-amber-500/20", icon: FlaskConical },
+};
+
+const getPriorityBadge = (priority: string) => {
+  const cfg = PRIORITY_BADGES[priority as keyof typeof PRIORITY_BADGES] || PRIORITY_BADGES.medium;
+  return (
+    <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium border ${cfg.color}`}>
+      {cfg.label}
+    </span>
+  );
+};
+
+const getTypeBadge = (type: string) => {
+  const cfg = TYPE_BADGES[type as keyof typeof TYPE_BADGES] || TYPE_BADGES.code;
+  const Icon = cfg.icon;
+  return (
+    <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium border flex items-center gap-1 ${cfg.color}`}>
+      <Icon className="w-2.5 h-2.5" />
+      {cfg.label}
+    </span>
+  );
+};
+
+// ─────────────────────────────────────────────
+// Project Form Modal (Create / Edit)
+// ─────────────────────────────────────────────
+interface ProjectFormModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  projectToEdit?: Project | null;
+  defaultPhase?: "launched" | "in_development" | "sketching" | "idea";
+}
+
+function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase }: ProjectFormModalProps) {
+  const { addProject, updateProject } = useProjectStore();
+  const [activeTab, setActiveTab] = useState<"manual" | "github" | "local">("manual");
+
+  // Form state
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [phase, setPhaseState] = useState<"launched" | "in_development" | "sketching" | "idea">("idea");
+  const [type, setType] = useState<"code" | "idea" | "research" | "experiment">("code");
+  const [priority, setPriority] = useState<"critical" | "high" | "medium" | "low">("medium");
+  const [pinned, setPinned] = useState(false);
+  const [githubUrl, setGithubUrl] = useState("");
+  const [liveUrl, setLiveUrl] = useState("");
+  const [folderPath, setFolderPath] = useState("");
+
+  // Idea fields
+  const [confidenceLevel, setConfidenceLevel] = useState<number>(3);
+  const [effortEstimate, setEffortEstimate] = useState<string>("m");
+  const [potentialImpact, setPotentialImpact] = useState<string>("medium");
+  const [stage, setStage] = useState<string>("concept");
+
+  // GitHub import state
+  const [githubUsername, setGithubUsername] = useState("");
+  const [githubSearch, setGithubSearch] = useState("");
+  const [githubRepos, setGithubRepos] = useState<any[]>([]);
+  const [githubLoading, setGithubLoading] = useState(false);
+
+  // Local scan state
+  const [localScanning, setLocalScanning] = useState(false);
+
+  // Initialize form when opening/editing
+  useEffect(() => {
+    if (isOpen) {
+      if (projectToEdit) {
+        setName(projectToEdit.name || "");
+        setDescription(projectToEdit.description || "");
+        setPhaseState((projectToEdit.phase as any) || "idea");
+        setType(projectToEdit.type || "code");
+        setPriority(projectToEdit.priority || "medium");
+        setPinned(projectToEdit.pinned || false);
+        setGithubUrl(projectToEdit.githubUrl || "");
+        setLiveUrl(projectToEdit.liveUrl || "");
+        setFolderPath(projectToEdit.folderPath || "");
+        setConfidenceLevel(projectToEdit.confidenceLevel || 3);
+        setEffortEstimate(projectToEdit.effortEstimate || "m");
+        setPotentialImpact(projectToEdit.potentialImpact || "medium");
+        setStage(projectToEdit.stage || "concept");
+        setActiveTab("manual");
+      } else {
+        setName("");
+        setDescription("");
+        setPhaseState(defaultPhase || (useProjectOSStore.getState().activePhase as any) || "idea");
+        setType("code");
+        setPriority("medium");
+        setPinned(false);
+        setGithubUrl("");
+        setLiveUrl("");
+        setFolderPath("");
+        setConfidenceLevel(3);
+        setEffortEstimate("m");
+        setPotentialImpact("medium");
+        setStage("concept");
+        setActiveTab("manual");
+      }
+      setGithubUsername(localStorage.getItem("GITHUB_USERNAME") || "coderkavyag");
+    }
+  }, [isOpen, projectToEdit, defaultPhase]);
+
+  // Load GitHub repos when GitHub tab selected
+  useEffect(() => {
+    if (activeTab === "github" && githubUsername) {
+      fetchRepos();
+    }
+  }, [activeTab, githubUsername]);
+
+  const fetchRepos = async () => {
+    setGithubLoading(true);
+    try {
+      const token = localStorage.getItem("GITHUB_TOKEN") || "";
+      const res = await fetch(`/api/github?username=${encodeURIComponent(githubUsername)}`, {
+        headers: token ? { "Authorization": `token ${token}` } : {}
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setGithubRepos(data.repos || []);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setGithubLoading(false);
+    }
+  };
+
+  const handleSelectRepo = (repo: any) => {
+    setName(repo.name || "");
+    setDescription(repo.description || "");
+    setGithubUrl(repo.html_url || "");
+    setType("code");
+    setActiveTab("manual");
+  };
+
+  const handleScanLocal = async () => {
+    setLocalScanning(true);
+    try {
+      const res = await fetch("/api/machine/pick-and-scan-folder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (data.error === "No folder selected") return;
+        throw new Error(data.error);
+      }
+      setName(data.name || "");
+      setDescription(data.description || "");
+      setFolderPath(data.folderPath || "");
+      if (data.githubUrl) {
+        setGithubUrl(data.githubUrl);
+      }
+      setType("code");
+
+      // Auto-register workspace
+      try {
+        await fetch("/api/machine/register-workspace", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path: data.folderPath })
+        });
+      } catch { }
+
+      setActiveTab("manual");
+    } catch (e: any) {
+      alert(`Local scan failed: ${e.message}`);
+    } finally {
+      setLocalScanning(false);
+    }
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) {
+      alert("Project name is required.");
+      return;
+    }
+
+    if (projectToEdit) {
+      const payload: Partial<Project> = {
+        name: name.trim(),
+        description: description.trim(),
+        phase,
+        workspace: phase === "launched" || phase === "in_development" ? "main" : "incubation",
+        type,
+        priority,
+        pinned,
+        githubUrl: githubUrl.trim() || undefined,
+        liveUrl: liveUrl.trim() || undefined,
+        folderPath: folderPath.trim() || undefined,
+        confidenceLevel: type === "idea" ? confidenceLevel : undefined,
+        effortEstimate: type === "idea" ? effortEstimate : undefined,
+        potentialImpact: type === "idea" ? potentialImpact : undefined,
+        stage: type === "idea" ? stage : undefined,
+      };
+
+      try {
+        await updateProject(projectToEdit.id, payload);
+        onClose();
+      } catch (err: any) {
+        alert(`Failed to save project: ${err.message}`);
+      }
+    } else {
+      const payload = {
+        name: name.trim(),
+        description: description.trim(),
+        phase,
+        workspace: (phase === "launched" || phase === "in_development" ? "main" : "incubation") as any,
+        type,
+        priority,
+        pinned,
+        status: "active" as const,
+        tags: [] as string[],
+        githubUrl: githubUrl.trim() || undefined,
+        liveUrl: liveUrl.trim() || undefined,
+        folderPath: folderPath.trim() || undefined,
+        confidenceLevel: type === "idea" ? confidenceLevel : undefined,
+        effortEstimate: type === "idea" ? effortEstimate : undefined,
+        potentialImpact: type === "idea" ? potentialImpact : undefined,
+        stage: type === "idea" ? stage : undefined,
+      };
+
+      try {
+        await addProject(payload);
+        onClose();
+      } catch (err: any) {
+        alert(`Failed to save project: ${err.message}`);
+      }
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="w-full max-w-lg bg-surface-1 border border-white/[0.08] rounded-xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh]"
+      >
+        <div className="px-5 py-4 border-b border-white/[0.06] flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-white">
+            {projectToEdit ? `Configure ${projectToEdit.name}` : "Create New Project"}
+          </h2>
+          <button onClick={onClose} className="text-white/40 hover:text-white/70 transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Source Tabs */}
+        {!projectToEdit && (
+          <div className="px-5 pt-3 border-b border-white/[0.04] flex gap-4 text-xs select-none">
+            <button
+              onClick={() => setActiveTab("manual")}
+              className={`pb-2 font-medium border-b-2 transition-colors ${activeTab === "manual" ? "text-purple-400 border-purple-500" : "text-white/40 hover:text-white/60 border-transparent"
+                }`}
+            >
+              Manual Details
+            </button>
+            <button
+              onClick={() => setActiveTab("github")}
+              className={`pb-2 font-medium border-b-2 transition-colors ${activeTab === "github" ? "text-purple-400 border-purple-500" : "text-white/40 hover:text-white/60 border-transparent"
+                }`}
+            >
+              Import from GitHub
+            </button>
+            <button
+              onClick={() => setActiveTab("local")}
+              className={`pb-2 font-medium border-b-2 transition-colors ${activeTab === "local" ? "text-purple-400 border-purple-500" : "text-white/40 hover:text-white/60 border-transparent"
+                }`}
+            >
+              Import Local Folder
+            </button>
+          </div>
+        )}
+
+        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          {activeTab === "manual" && (
+            <form onSubmit={handleSave} className="space-y-4">
+              {/* Name & Workspace */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] uppercase tracking-wider text-white/30 font-bold block mb-1">Project Name</label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    placeholder="My SaaS App"
+                    className="w-full h-8 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-3 focus:outline-none focus:ring-1 focus:ring-purple-500/30 placeholder:text-white/20"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-wider text-white/30 font-bold block mb-1">Project Phase</label>
+                  <select
+                    value={phase}
+                    onChange={e => setPhaseState(e.target.value as any)}
+                    className="w-full h-8 bg-black/40 border border-white/10 rounded-lg text-[11px] text-white px-3 focus:outline-none focus:ring-1 focus:ring-purple-500/30 font-semibold"
+                  >
+                    <option value="idea">Idea Phase</option>
+                    <option value="sketching">Sketching</option>
+                    <option value="in_development">In Development</option>
+                    <option value="launched">Launched</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Type Selection */}
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-white/30 font-bold block mb-1.5">Project Type</label>
+                <div className="grid grid-cols-4 gap-2">
+                  {(["code", "idea", "research", "experiment"] as const).map(t => {
+                    const badge = TYPE_BADGES[t];
+                    const Icon = badge.icon;
+                    const isSelected = type === t;
+                    return (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setType(t)}
+                        className={`h-9 border rounded-lg flex flex-col items-center justify-center gap-1 transition-all ${isSelected
+                            ? "bg-purple-500/10 border-purple-500/40 text-purple-300"
+                            : "bg-black/20 border-white/10 text-white/40 hover:text-white/60"
+                          }`}
+                      >
+                        <Icon className="w-3.5 h-3.5" />
+                        <span className="text-[9px] font-semibold uppercase">{badge.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-white/30 font-bold block mb-1">Description</label>
+                <textarea
+                  value={description}
+                  onChange={e => setDescription(e.target.value)}
+                  placeholder="Tell DevOS what this project is about..."
+                  className="w-full bg-black/40 border border-white/10 rounded-lg text-xs text-white p-3 focus:outline-none focus:ring-1 focus:ring-purple-500/30 placeholder:text-white/20 h-16 resize-none"
+                />
+              </div>
+
+              {/* Priority & Pinned */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] uppercase tracking-wider text-white/30 font-bold block mb-1">Priority</label>
+                  <div className="flex bg-black/40 rounded-lg p-0.5 border border-white/5 h-8">
+                    {(["low", "medium", "high", "critical"] as const).map(p => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setPriority(p)}
+                        className={`flex-1 text-[10px] font-semibold rounded capitalize transition-all ${priority === p ? "bg-white/10 text-white" : "text-white/40 hover:text-white/60"
+                          }`}
+                      >
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex items-center justify-between h-8 mt-5 px-3 bg-black/20 border border-white/5 rounded-lg">
+                  <span className="text-xs text-white/50">Pin to sidebar</span>
+                  <button
+                    type="button"
+                    onClick={() => setPinned(!pinned)}
+                    className={`w-8 h-4 rounded-full p-0.5 transition-colors duration-200 focus:outline-none ${pinned ? "bg-purple-500" : "bg-white/10"
+                      }`}
+                  >
+                    <div className={`bg-white w-3 h-3 rounded-full shadow-md transform transition-transform duration-200 ${pinned ? "translate-x-4" : "translate-x-0"
+                      }`} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Idea-specific fields */}
+              {type === "idea" && (
+                <div className="p-4 bg-purple-500/[0.02] border border-purple-500/10 rounded-xl space-y-4">
+                  <h3 className="text-[10px] uppercase tracking-widest text-purple-400 font-bold font-mono">Idea Validation Parameters</h3>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[10px] text-white/45 block mb-1">Confidence Score (1–5)</label>
+                      <div className="flex gap-2">
+                        {[1, 2, 3, 4, 5].map(val => (
+                          <button
+                            key={val}
+                            type="button"
+                            onClick={() => setConfidenceLevel(val)}
+                            className={`flex-1 py-1 rounded border text-xs font-mono transition-all ${confidenceLevel === val
+                                ? "bg-purple-500/20 border-purple-500/50 text-purple-300 font-bold"
+                                : "bg-black/25 border-white/10 text-white/40"
+                              }`}
+                          >
+                            {val}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-white/45 block mb-1">Effort Estimate</label>
+                      <div className="flex gap-1 bg-black/40 rounded-lg p-0.5 border border-white/5">
+                        {(["xs", "s", "m", "l", "xl"] as const).map(ef => (
+                          <button
+                            key={ef}
+                            type="button"
+                            onClick={() => setEffortEstimate(ef)}
+                            className={`flex-1 text-[9px] uppercase font-bold rounded transition-all ${effortEstimate === ef ? "bg-white/15 text-white" : "text-white/40 hover:text-white/60"
+                              }`}
+                          >
+                            {ef}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[10px] text-white/45 block mb-1">Potential Impact</label>
+                      <select
+                        value={potentialImpact}
+                        onChange={e => setPotentialImpact(e.target.value)}
+                        className="w-full h-8 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-2 focus:outline-none"
+                      >
+                        <option value="low">Low Impact</option>
+                        <option value="medium">Medium Impact</option>
+                        <option value="high">High Impact</option>
+                        <option value="massive">Massive Impact</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-white/45 block mb-1">Idea Stage</label>
+                      <select
+                        value={stage}
+                        onChange={e => setStage(e.target.value)}
+                        className="w-full h-8 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-2 focus:outline-none"
+                      >
+                        <option value="concept">Concept Only</option>
+                        <option value="research">Active Research</option>
+                        <option value="validated">Market Validated</option>
+                        <option value="prototyping">Prototyping</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Integrations URLs */}
+              {type !== "idea" && (
+                <div className="space-y-3 pt-2">
+                  <div>
+                    <label className="text-[10px] uppercase tracking-wider text-white/30 block mb-1">GitHub Repo URL (Optional)</label>
+                    <input
+                      type="text"
+                      value={githubUrl}
+                      onChange={e => setGithubUrl(e.target.value)}
+                      placeholder="https://github.com/username/project"
+                      className="w-full h-8 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-3 focus:outline-none focus:ring-1 focus:ring-purple-500/30 placeholder:text-white/25 font-mono"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[10px] uppercase tracking-wider text-white/30 block mb-1">Production URL (Optional)</label>
+                      <input
+                        type="text"
+                        value={liveUrl}
+                        onChange={e => setLiveUrl(e.target.value)}
+                        placeholder="https://project.vercel.app"
+                        className="w-full h-8 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-3 focus:outline-none focus:ring-1 focus:ring-purple-500/30 placeholder:text-white/25 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] uppercase tracking-wider text-white/30 block mb-1">Local Directory Path (Optional)</label>
+                      <input
+                        type="text"
+                        value={folderPath}
+                        onChange={e => setFolderPath(e.target.value)}
+                        placeholder="C:/Users/name/Projects/app"
+                        className="w-full h-8 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-3 focus:outline-none focus:ring-1 focus:ring-purple-500/30 placeholder:text-white/25 font-mono"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex justify-end gap-3 pt-3 border-t border-white/[0.04]">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-4 py-1.5 text-xs font-semibold rounded-lg bg-white/10 text-white hover:bg-white/15 transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 text-xs font-semibold rounded-lg bg-purple-500 hover:bg-purple-600 text-white transition-all cursor-pointer"
+                >
+                  {projectToEdit ? "Update Project" : "Create Project"}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {activeTab === "github" && (
+            <div className="space-y-4">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="GitHub Username"
+                  value={githubUsername}
+                  onChange={e => setGithubUsername(e.target.value)}
+                  className="w-36 h-8 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-3 focus:outline-none"
+                />
+                <div className="flex-1 flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Search repositories..."
+                    value={githubSearch}
+                    onChange={e => setGithubSearch(e.target.value)}
+                    className="flex-1 h-8 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-3 focus:outline-none"
+                  />
+                  <button
+                    onClick={fetchRepos}
+                    className="px-3 h-8 text-xs font-semibold rounded-lg bg-white/10 text-white hover:bg-white/15 cursor-pointer"
+                  >
+                    Refresh
+                  </button>
+                </div>
+              </div>
+
+              <div className="h-56 overflow-y-auto border border-white/5 rounded-lg bg-black/20 p-1 space-y-1">
+                {githubLoading ? (
+                  <div className="h-full flex items-center justify-center text-xs text-white/30 animate-pulse">
+                    Fetching user repositories...
+                  </div>
+                ) : githubRepos.length === 0 ? (
+                  <div className="h-full flex items-center justify-center text-xs text-white/20">
+                    No repositories found. Ensure your GitHub configs are valid.
+                  </div>
+                ) : (
+                  githubRepos
+                    .filter(repo => repo.name.toLowerCase().includes(githubSearch.toLowerCase()))
+                    .map(repo => (
+                      <button
+                        key={repo.id}
+                        onClick={() => handleSelectRepo(repo)}
+                        className="w-full text-left p-2.5 rounded hover:bg-white/[0.04] transition-colors flex items-center justify-between group cursor-pointer"
+                      >
+                        <div className="min-w-0">
+                          <span className="text-xs font-semibold text-white/80 block truncate">{repo.name}</span>
+                          <span className="text-[10px] text-white/30 truncate block mt-0.5">
+                            {repo.description || "No description"}
+                          </span>
+                        </div>
+                        <span className="text-[9px] font-mono text-purple-400/70 opacity-0 group-hover:opacity-100 transition-opacity">
+                          Select Repo
+                        </span>
+                      </button>
+                    ))
+                )}
+              </div>
+            </div>
+          )}
+
+          {activeTab === "local" && (
+            <div className="py-12 text-center flex flex-col items-center justify-center space-y-4 bg-black/10 border border-dashed border-white/10 rounded-xl">
+              <Folder className="w-10 h-10 text-white/15" />
+              <div className="max-w-xs">
+                <h3 className="text-xs font-semibold text-white/80">Scan a local development workspace</h3>
+                <p className="text-[10px] text-white/30 mt-1">
+                  We will let you pick a folder, scan its configuration, language distribution, README files, and pre-fill details.
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={localScanning}
+                onClick={handleScanLocal}
+                className="px-4 py-2 text-xs font-semibold rounded-lg bg-white text-black hover:bg-white/90 transition-all disabled:opacity-50 cursor-pointer"
+              >
+                {localScanning ? "Scanning system..." : "Select Local Folder"}
+              </button>
+            </div>
+          )}
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// Main Overlay Component
+// ─────────────────────────────────────────────
 export function ProjectOS() {
-  const { isOpen, selectedProjectId, activeTab, close, selectProject, setTab } = useProjectOSStore();
+  const {
+    isOpen,
+    selectedProjectId,
+    activeTab,
+    close,
+    selectProject,
+    setTab,
+    activePhase,
+    setPhase,
+    openCommandPalette
+  } = useProjectOSStore();
   const { projects } = useProjectStore();
+
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [selectModalOpen, setSelectModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [curatedIds, setCuratedIds] = useState<string[]>([]);
+  const [selectedDefaultPhase, setSelectedDefaultPhase] = useState<"launched" | "in_development" | "sketching" | "idea" | undefined>(undefined);
 
   const selectedProject = projects.find(p => p.id === selectedProjectId) || null;
 
-  // ESC key to close overlay
+  const handleHideProject = (projectId: string, phase: string) => {
+    const key = `devos_curated_${phase}`;
+    const stored = localStorage.getItem(key);
+    if (stored) {
+      try {
+        let list = JSON.parse(stored) as string[];
+        list = list.filter(id => id !== projectId);
+        localStorage.setItem(key, JSON.stringify(list));
+        loadCurationLists();
+      } catch { }
+    }
+  };
+
+  const handleMoveProjectPhase = async (projectId: string, newPhase: string) => {
+    const project = projects.find(p => p.id === projectId);
+    if (!project) return;
+    const oldPhase = project.phase;
+    if (oldPhase === newPhase) return;
+
+    try {
+      await fetch(`/api/projects/${project.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phase: newPhase })
+      });
+      useProjectStore.getState().updateProject(project.id, { phase: newPhase as any });
+
+      // Remove from old curation list
+      const oldKey = `devos_curated_${oldPhase}`;
+      const oldStored = localStorage.getItem(oldKey);
+      if (oldStored) {
+        try {
+          let list = JSON.parse(oldStored) as string[];
+          list = list.filter(id => id !== project.id);
+          localStorage.setItem(oldKey, JSON.stringify(list));
+        } catch { }
+      }
+
+      // Add to new curation list
+      const newKey = `devos_curated_${newPhase}`;
+      const newStored = localStorage.getItem(newKey);
+      let list: string[] = [];
+      if (newStored) {
+        try { list = JSON.parse(newStored); } catch { }
+      }
+      if (!list.includes(project.id)) {
+        list.push(project.id);
+        localStorage.setItem(newKey, JSON.stringify(list));
+      }
+
+      loadCurationLists();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Curation lists state for all 4 phases
+  const [curatedLaunched, setCuratedLaunched] = useState<string[]>([]);
+  const [curatedInDev, setCuratedInDev] = useState<string[]>([]);
+  const [curatedSketching, setCuratedSketching] = useState<string[]>([]);
+  const [curatedIdea, setCuratedIdea] = useState<string[]>([]);
+
+  const loadCurationLists = () => {
+    if (typeof window !== "undefined") {
+      const loadList = (phase: string) => {
+        const stored = localStorage.getItem(`devos_curated_${phase}`);
+        if (stored) {
+          try {
+            return JSON.parse(stored) as string[];
+          } catch {
+            return [];
+          }
+        } else {
+          // If no stored curation list exists yet, default to showing ALL projects in this phase!
+          const ids = projects.filter(p => p.phase === phase).map(p => p.id);
+          localStorage.setItem(`devos_curated_${phase}`, JSON.stringify(ids));
+          return ids;
+        }
+      };
+      setCuratedLaunched(loadList("launched"));
+      setCuratedInDev(loadList("in_development"));
+      setCuratedSketching(loadList("sketching"));
+      setCuratedIdea(loadList("idea"));
+    }
+  };
+
+  // Synchronize curation lists when projects or overlay open state changes
+  useEffect(() => {
+    loadCurationLists();
+  }, [projects, isOpen]);
+
+  // Automatically move project IDs in curated lists when their DB phase shifts!
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let modified = false;
+    projects.forEach(p => {
+      // Find if this project is currently curated in a phase that doesn't match its DB phase
+      PHASES.forEach(phaseObj => {
+        if (p.phase !== phaseObj.id) {
+          const key = `devos_curated_${phaseObj.id}`;
+          const stored = localStorage.getItem(key);
+          if (stored) {
+            try {
+              let list = JSON.parse(stored) as string[];
+              if (list.includes(p.id)) {
+                // Remove from incorrect phase list
+                list = list.filter(id => id !== p.id);
+                localStorage.setItem(key, JSON.stringify(list));
+                modified = true;
+
+                // Add to correct phase list
+                const correctKey = `devos_curated_${p.phase}`;
+                const correctStored = localStorage.getItem(correctKey);
+                let correctList = correctStored ? JSON.parse(correctStored) : [];
+                if (!correctList.includes(p.id)) {
+                  correctList.push(p.id);
+                  localStorage.setItem(correctKey, JSON.stringify(correctList));
+                }
+              }
+            } catch { }
+          }
+        }
+      });
+    });
+    if (modified) {
+      loadCurationLists();
+    }
+  }, [projects]);
+
+  // Keyboard shortcut hook
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
+      if (!isOpen) return;
+      if (e.key === "Escape") {
+        // useProjectOSStore handles ESC or manual trigger handles it here
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        openCommandPalette();
+      }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [close]);
+  }, [isOpen, openCommandPalette]);
 
   if (!isOpen) return null;
+
+  // Curated lists
+  const launchedProjects = projects.filter(p => p.phase === "launched" && curatedLaunched.includes(p.id));
+  const inDevProjects = projects.filter(p => p.phase === "in_development" && curatedInDev.includes(p.id));
+  const sketchingProjects = projects.filter(p => p.phase === "sketching" && curatedSketching.includes(p.id));
+  const ideaProjects = projects.filter(p => p.phase === "idea" && curatedIdea.includes(p.id));
+
+  // Curated list for the currently active phase tab (for left rail sidebar list)
+  const activeCuratedList =
+    activePhase === "launched" ? launchedProjects :
+      activePhase === "in_development" ? inDevProjects :
+        activePhase === "sketching" ? sketchingProjects : ideaProjects;
+
+  // Filter sidebar projects by active tab & search query
+  const filteredProjects = activeCuratedList.filter(p => {
+    if (searchQuery) {
+      const match = `${p.name} ${p.description} ${p.tags.join(" ")}`.toLowerCase();
+      return match.includes(searchQuery.toLowerCase());
+    }
+    return true;
+  });
+
+  // Group into pinned and regular for the sidebar
+  const pinnedProjects = filteredProjects.filter(p => p.pinned);
+  const otherProjects = filteredProjects.filter(p => !p.pinned);
+
+  // Stats calculation by phase (all DB projects, not curated only, to match totals)
+  const stats = {
+    launched: projects.filter(p => p.phase === "launched").length,
+    in_development: projects.filter(p => p.phase === "in_development").length,
+    sketching: projects.filter(p => p.phase === "sketching").length,
+    idea: projects.filter(p => p.phase === "idea").length,
+  };
+
+  // Dashboard general stats based on all curated projects across all columns
+  const allCuratedProjects = [...launchedProjects, ...inDevProjects, ...sketchingProjects, ...ideaProjects];
+  const totalCuratedCount = allCuratedProjects.length;
+  const codeProjectsCount = allCuratedProjects.filter(p => p.type === "code").length;
+  const ideaProjectsCount = allCuratedProjects.filter(p => p.type === "idea").length;
+  const avgProgress = allCuratedProjects.length > 0
+    ? Math.round(allCuratedProjects.reduce((sum, p) => sum + (p.completionPercentage ?? 0), 0) / allCuratedProjects.length)
+    : 0;
+
+  // Quick phase shifter handler for visual board columns
+  const shiftPhase = async (project: Project, direction: "left" | "right") => {
+    const currentIndex = PHASES.findIndex(ph => ph.id === project.phase);
+    let newIndex = currentIndex;
+    if (direction === "left") {
+      newIndex = Math.max(0, currentIndex - 1);
+    } else {
+      newIndex = Math.min(PHASES.length - 1, currentIndex + 1);
+    }
+    if (newIndex === currentIndex) return;
+
+    const oldPhase = project.phase;
+    const newPhase = PHASES[newIndex].id;
+
+    try {
+      await fetch(`/api/projects/${project.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phase: newPhase })
+      });
+      useProjectStore.getState().updateProject(project.id, { phase: newPhase as any });
+
+      // Remove from old curation list
+      const oldKey = `devos_curated_${oldPhase}`;
+      const oldStored = localStorage.getItem(oldKey);
+      if (oldStored) {
+        try {
+          let list = JSON.parse(oldStored) as string[];
+          list = list.filter(id => id !== project.id);
+          localStorage.setItem(oldKey, JSON.stringify(list));
+        } catch { }
+      }
+
+      // Add to new curation list
+      const newKey = `devos_curated_${newPhase}`;
+      const newStored = localStorage.getItem(newKey);
+      let list: string[] = [];
+      if (newStored) {
+        try { list = JSON.parse(newStored); } catch { }
+      }
+      if (!list.includes(project.id)) {
+        list.push(project.id);
+        localStorage.setItem(newKey, JSON.stringify(list));
+      }
+
+      loadCurationLists();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const renderStars = (rating: number) => {
+    return (
+      <div className="flex gap-0.5 select-none">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <span
+            key={star}
+            className={`w-1.5 h-1.5 rounded-full ${star <= rating ? "bg-purple-400" : "bg-white/15"
+              }`}
+          />
+        ))}
+      </div>
+    );
+  };
 
   return (
     <div className="fixed inset-0 z-50 bg-[#0a0a0f] flex flex-col pointer-events-auto select-text text-foreground">
@@ -1330,131 +2286,274 @@ export function ProjectOS() {
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.98 }}
         transition={{ duration: 0.15 }}
-        className="w-full h-full flex flex-col"
+        className="w-full h-full flex flex-col bg-surface-0"
       >
-        {/* Header bar — matches the AmbientBar height (40px) */}
-        <div className="h-10 flex items-center px-4 border-b border-white/[0.04] flex-shrink-0 bg-[#07070a] select-none">
-          <button onClick={close} className="flex items-center gap-1 text-white/40 hover:text-white/70 transition-colors mr-3 cursor-pointer text-xs">
-            <ArrowLeft className="w-3 h-3" />
-            <span>DevOS</span>
-          </button>
-          <span className="text-xs text-white/20 mx-2">/</span>
-          <span className="text-xs text-white/60 font-medium">Projects</span>
-          {selectedProject && (
-            <>
-              <span className="text-xs text-white/20 mx-2">/</span>
-              <span className="text-xs text-white font-medium">{selectedProject.name}</span>
-            </>
-          )}
-          <div className="flex-1" />
-          {selectedProject && <PhaseBadge project={selectedProject} />}
-        </div>
+        {/* TopBar Header (52px height) */}
+        <div className="h-12 flex items-center px-4 border-b border-surface-border flex-shrink-0 bg-surface-1 select-none justify-between">
+          <div className="flex items-center gap-1.5">
+            <button onClick={close} className="flex items-center gap-1.5 text-white/40 hover:text-white/70 transition-colors mr-2 cursor-pointer text-xs font-semibold">
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>DevOS</span>
+            </button>
+            <span className="text-white/20 text-xs">/</span>
+            <button onClick={() => selectProject(null)} className="text-xs text-white/50 hover:text-white font-medium cursor-pointer">
+              Projects
+            </button>
+            {selectedProject && (
+              <>
+                <span className="text-white/20 text-xs">/</span>
+                <span className="text-xs text-white font-semibold flex items-center gap-1.5">
+                  {selectedProject.pinned && <Star className="w-3 h-3 text-amber-400 fill-amber-400" />}
+                  {selectedProject.name}
+                </span>
+              </>
+            )}
+          </div>
 
-        {/* Main content — sidebar + content area */}
-        <div className="flex flex-1 min-h-0">
-
-          {/* LEFT SIDEBAR — project list organized by phase */}
-          <div className="w-52 border-r border-white/[0.04] bg-[#07070a] flex flex-col flex-shrink-0 overflow-y-auto select-none custom-scrollbar">
-            {/* Phase groups */}
-            {PHASES.map(phase => {
-              const phaseProjects = projects.filter(p => p.phase === phase.id);
-              if (phaseProjects.length === 0) return null;
-              return (
-                <div key={phase.id} className="mb-1">
-                  <div className="px-3 pt-3 pb-1 flex items-center gap-2">
-                    <span className="text-[10px] text-white/25 font-medium uppercase tracking-wider">
-                      {phase.label}
-                    </span>
-                    <span className="text-[10px] text-white/15">{phaseProjects.length}</span>
-                  </div>
-                  {phaseProjects.map(p => (
-                    <button
-                      key={p.id}
-                      onClick={() => selectProject(p.id)}
-                      className={`w-full text-left px-3 py-2 flex items-center gap-2 transition-colors cursor-pointer
-                        ${selectedProjectId === p.id
-                          ? 'bg-white/[0.06] text-white'
-                          : 'text-white/50 hover:text-white/80 hover:bg-white/[0.03]'}`}
-                    >
-                      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${phase.dotColor}`} />
-                      <span className="text-xs truncate flex-1">{p.name}</span>
-                      {p.health && p.health < 50 && (
-                        <span className="text-[9px] text-red-400/60 font-semibold font-mono shrink-0">{p.health}%</span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              );
-            })}
-
-            {/* Add new project button */}
+          {/* Center search element to open Command Palette */}
+          <div className="flex-1 max-w-sm mx-4 relative">
             <button
-              onClick={() => {
-                close();
-                // Dispatch event to open Add Project Dialog on Dashboard
-                setTimeout(() => {
-                  window.dispatchEvent(new CustomEvent("open_projects_add_dialog"));
-                }, 100);
-              }}
-              className="mx-3 mt-4 mb-3 py-1.5 text-xs text-white/25 hover:text-white/50 border border-white/[0.06] hover:border-white/10 rounded-md transition-colors cursor-pointer text-center font-medium bg-transparent"
+              onClick={openCommandPalette}
+              className="w-full h-7 rounded-lg bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.06] hover:border-white/15 px-3 flex items-center justify-between text-left transition-all cursor-pointer text-white/35"
             >
-              + new project
+              <span className="text-[11px] flex items-center gap-2">
+                <Search className="w-3.5 h-3.5" /> Search command panel...
+              </span>
+              <kbd className="text-[9px] font-mono bg-white/5 border border-white/10 px-1 py-0.5 rounded text-white/40">
+                ⌘K
+              </kbd>
             </button>
           </div>
 
-          {/* RIGHT CONTENT AREA */}
-          {selectedProject ? (
-            <div className="flex-1 flex flex-col min-w-0 min-h-0 bg-[#0a0a0f]">
+          <div className="flex items-center gap-3">
+            {selectedProject && (
+              <>
+                <button
+                  onClick={() => setEditModalOpen(true)}
+                  className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.08] hover:text-white text-white/60 transition-colors cursor-pointer"
+                  title="Configure project"
+                >
+                  <Settings className="w-3.5 h-3.5" />
+                </button>
+                <PhaseBadge project={selectedProject} />
+              </>
+            )}
+            <button
+              onClick={close}
+              className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-white/[0.06] text-white/45 hover:text-white transition-colors cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
 
-              {/* Project header */}
-              <div className="px-6 py-4 border-b border-white/[0.04] flex items-start gap-4 flex-shrink-0">
-                <div className="w-12 h-12 rounded-lg bg-white/[0.04] border border-white/[0.06] overflow-hidden flex-shrink-0 flex items-center justify-center">
+        {/* Workspace Body Layout */}
+        <div className="flex flex-1 min-h-0">
+
+          {/* Left Rail Sidebar */}
+          {selectedProjectId && (
+            <div className="w-60 border-r border-surface-border bg-surface-1 flex flex-col flex-shrink-0 select-none">
+              {/* Phase Selector */}
+              <div className="p-3 border-b border-surface-border space-y-1">
+                <span className="text-[9px] font-bold uppercase tracking-widest text-white/20 px-1.5 font-mono">Project Phase</span>
+                <div className="grid grid-cols-2 gap-1 bg-black/40 rounded-lg p-0.5 border border-white/5 mt-1">
+                  {PHASES.map(phaseObj => {
+                    const isActive = activePhase === phaseObj.id;
+                    const count = stats[phaseObj.id as keyof typeof stats] || 0;
+                    return (
+                      <button
+                        key={phaseObj.id}
+                        onClick={() => {
+                          setPhase(phaseObj.id as any);
+                          selectProject(null); // Return to dashboard
+                        }}
+                        className={`py-1.5 px-0.5 rounded flex flex-col items-center justify-center transition-all cursor-pointer text-center ${isActive
+                            ? "bg-white/10 text-purple-300 font-bold"
+                            : "text-white/40 hover:text-white/60"
+                          }`}
+                      >
+                        <span className="text-[8px] uppercase tracking-wider font-semibold truncate w-full px-1">{phaseObj.label}</span>
+                        <span className="text-[9px] font-mono mt-0.5 opacity-60 leading-none">{count}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Sidebar projects list search filter */}
+              <div className="p-2 border-b border-surface-border bg-[#07070a] flex items-center gap-1.5">
+                <Search className="w-3.5 h-3.5 text-white/20 shrink-0 ml-1.5" />
+                <input
+                  type="text"
+                  placeholder="Filter phase projects..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="w-full bg-transparent text-[11px] text-white placeholder-white/20 focus:outline-none"
+                />
+                {searchQuery && (
+                  <button onClick={() => setSearchQuery("")} className="text-white/25 hover:text-white/50 cursor-pointer pr-1">
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              {/* Scrollable Projects lists */}
+              <div className="flex-1 overflow-y-auto py-2 custom-scrollbar">
+                {/* Pinned Projects Section */}
+                {pinnedProjects.length > 0 && (
+                  <div className="mb-4">
+                    <span className="px-3 py-1 flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest text-white/25 font-mono">
+                      <Star className="w-2.5 h-2.5 text-amber-400 fill-amber-400 shrink-0" /> Pinned
+                    </span>
+                    <div className="space-y-0.5 mt-1">
+                      {pinnedProjects.map(p => {
+                        const badge = TYPE_BADGES[p.type] || TYPE_BADGES.code;
+                        const Icon = badge.icon;
+                        const isSelected = selectedProjectId === p.id;
+                        return (
+                          <button
+                            key={p.id}
+                            onClick={() => selectProject(p.id)}
+                            className={`w-full text-left px-3 py-1.5 flex items-center gap-2 border-l-2 transition-all cursor-pointer group/item
+                              ${isSelected
+                                ? 'bg-white/[0.06] text-white border-purple-500 font-semibold'
+                                : 'text-white/50 hover:text-white/80 hover:bg-white/[0.02] border-transparent'}`}
+                          >
+                            <Icon className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                            <span className="text-[12px] truncate flex-1">{p.name}</span>
+                            {p.folderPath && (
+                              <span
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  window.open(`vscode://file/${p.folderPath}`);
+                                }}
+                                className="text-white/35 hover:text-blue-400 p-0.5 hover:bg-white/5 rounded transition-all cursor-pointer opacity-0 group-hover/item:opacity-100 shrink-0"
+                                title="Open in VS Code"
+                              >
+                                <Code2 className="w-3.5 h-3.5 text-blue-400" />
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Regular Projects Section */}
+                {otherProjects.length > 0 && (
+                  <div className="mb-4">
+                    <span className="px-3 py-1 text-[9px] font-bold uppercase tracking-widest text-white/20 block font-mono">
+                      {pinnedProjects.length > 0 ? "Other projects" : "Projects"}
+                    </span>
+                    <div className="space-y-0.5 mt-1">
+                      {otherProjects.map(p => {
+                        const badge = TYPE_BADGES[p.type] || TYPE_BADGES.code;
+                        const Icon = badge.icon;
+                        const isSelected = selectedProjectId === p.id;
+                        return (
+                          <button
+                            key={p.id}
+                            onClick={() => selectProject(p.id)}
+                            className={`w-full text-left px-3 py-1.5 flex items-center gap-2 border-l-2 transition-all cursor-pointer group/item
+                              ${isSelected
+                                ? 'bg-white/[0.06] text-white border-purple-500 font-semibold'
+                                : 'text-white/50 hover:text-white/80 hover:bg-white/[0.02] border-transparent'}`}
+                          >
+                            <Icon className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                            <span className="text-[12px] truncate flex-1">{p.name}</span>
+                            {p.folderPath && (
+                              <span
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  window.open(`vscode://file/${p.folderPath}`);
+                                }}
+                                className="text-white/35 hover:text-blue-400 p-0.5 hover:bg-white/5 rounded transition-all cursor-pointer opacity-0 group-hover/item:opacity-100 shrink-0"
+                                title="Open in VS Code"
+                              >
+                                <Code2 className="w-3.5 h-3.5 text-blue-400" />
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Bottom New button */}
+              <div className="p-3 border-t border-surface-border">
+                <button
+                  onClick={() => setCreateModalOpen(true)}
+                  className="w-full py-1.5 text-xs text-purple-400 hover:text-purple-300 border border-purple-500/20 hover:border-purple-500/40 rounded-lg transition-all cursor-pointer text-center font-medium bg-purple-500/5 flex items-center justify-center gap-1.5"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>New Project</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Right Main Panel */}
+          {selectedProject ? (
+            <div className="flex-1 flex flex-col min-w-0 min-h-0 bg-surface-0">
+
+              {/* Detailed Project Header */}
+              <div className="px-6 py-4 border-b border-surface-border flex items-start gap-4 flex-shrink-0 bg-surface-1">
+                <div className="w-10 h-10 rounded-lg bg-white/[0.03] border border-white/[0.06] shrink-0 flex items-center justify-center select-none">
                   {selectedProject.ogImageUrl ? (
-                    <img src={selectedProject.ogImageUrl} className="w-full h-full object-cover" />
+                    <img src={selectedProject.ogImageUrl} className="w-full h-full object-cover rounded-lg" />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-purple-400/70 text-lg font-bold font-mono bg-purple-500/10 border border-purple-500/20 rounded-lg">
+                    <div className="w-full h-full flex items-center justify-center text-purple-400/80 text-[15px] font-bold font-mono bg-purple-500/10 border border-purple-500/20 rounded-lg">
                       {selectedProject.name[0].toUpperCase()}
                     </div>
                   )}
                 </div>
+
                 <div className="flex-1 min-w-0">
-                  <h1 className="text-base font-semibold text-white">{selectedProject.name}</h1>
-                  <p className="text-xs text-white/40 mt-0.5 truncate">{selectedProject.description || 'No description'}</p>
-                  <div className="flex items-center gap-3 mt-2 select-none">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h1 className="text-sm font-semibold text-white truncate max-w-sm leading-none">{selectedProject.name}</h1>
+                    {getTypeBadge(selectedProject.type)}
+                    {selectedProject.folderPath && (
+                      <button
+                        onClick={() => window.open(`vscode://file/${selectedProject.folderPath}`)}
+                        className="w-6 h-6 rounded-md hover:bg-[#007acc]/10 text-blue-400 flex items-center justify-center shrink-0 border border-blue-500/20 ml-1 transition-all cursor-pointer bg-transparent"
+                        title="Open in VS Code"
+                      >
+                        <Code2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+
+                  <p className="text-[11px] text-white/40 mt-1 truncate max-w-xl">{selectedProject.description || 'No description provided.'}</p>
+
+                  <div className="flex items-center gap-3 mt-2 select-none text-[10px] text-white/30">
                     {selectedProject.githubUrl && (
-                      <a href={selectedProject.githubUrl} target="_blank" className="text-[11px] text-white/30 hover:text-white/60 flex items-center gap-1 font-medium">
+                      <a href={selectedProject.githubUrl} target="_blank" className="hover:text-purple-400 flex items-center gap-0.5 font-medium transition-colors">
                         GitHub ↗
                       </a>
                     )}
                     {selectedProject.liveUrl && (
-                      <a href={selectedProject.liveUrl} target="_blank" className="text-[11px] text-white/30 hover:text-white/60 flex items-center gap-1 font-medium">
+                      <a href={selectedProject.liveUrl} target="_blank" className="hover:text-purple-400 flex items-center gap-0.5 font-medium transition-colors">
                         Live ↗
                       </a>
                     )}
-                    <span className="text-[11px] text-white/20">
-                      Updated {timeAgo(selectedProject.updatedAt)}
-                    </span>
+                    <span>·</span>
+                    <span>Updated {timeAgo(selectedProject.updatedAt)}</span>
                   </div>
-                </div>
-                {/* Health score */}
-                <div className="flex-shrink-0 text-right select-none">
-                  <div className={`text-2xl font-bold font-mono leading-none ${
-                    (selectedProject.health ?? 100) >= 70 ? 'text-green-400' :
-                    (selectedProject.health ?? 100) >= 40 ? 'text-amber-400' : 'text-red-400'
-                  }`}>{selectedProject.health ?? '—'}%</div>
-                  <div className="text-[10px] text-white/25 font-semibold uppercase tracking-wider font-mono mt-1">health</div>
                 </div>
               </div>
 
-              {/* Tab navigation */}
-              <div className="px-6 flex items-center gap-1 border-b border-white/[0.04] flex-shrink-0 bg-[#09090d] select-none">
+              {/* Tab Navigation Menu */}
+              <div className="px-6 flex items-center gap-1 border-b border-surface-border flex-shrink-0 bg-surface-1 select-none">
                 {TABS.map(tab => (
                   <button
                     key={tab.id}
                     onClick={() => setTab(tab.id as any)}
-                    className={`px-3 py-2.5 text-xs font-semibold transition-colors border-b-2 -mb-px cursor-pointer
+                    className={`px-3.5 py-2.5 text-[11px] font-semibold transition-colors border-b-2 -mb-px cursor-pointer
                       ${activeTab === tab.id
-                        ? 'text-white border-purple-500'
+                        ? 'text-purple-300 border-purple-500'
                         : 'text-white/35 border-transparent hover:text-white/60'}`}
                   >
                     {tab.label}
@@ -1467,23 +2566,230 @@ export function ProjectOS() {
                 {activeTab === 'overview' && <OverviewTab project={selectedProject} />}
                 {activeTab === 'ideas' && <IdeasTab project={selectedProject} />}
                 {activeTab === 'media' && <MediaVaultTab project={selectedProject} />}
-                {activeTab === 'braindump' && <BrainDumpTab project={selectedProject} />}
                 {activeTab === 'tasks' && <ProjectTasksTab project={selectedProject} />}
                 {activeTab === 'controlroom' && <ControlRoomTab project={selectedProject} />}
               </div>
-
             </div>
           ) : (
-            // Empty state when no project selected
-            <div className="flex-1 flex items-center justify-center bg-[#0a0a0f] select-none">
-              <div className="text-center">
-                <FolderOpen className="w-10 h-10 text-white/10 mx-auto mb-2" />
-                <div className="text-white/30 text-xs font-medium">Select a project from the sidebar</div>
-                <div className="text-white/15 text-[10px] font-mono mt-1">or register a new local workspace folder</div>
+            // Curved Intentional Command Center Dashboard (Visual Gravity Physics Box layout)
+            <div className="flex-1 flex flex-col overflow-hidden bg-surface-0 p-6 space-y-6 min-h-0 h-full">
+
+              {/* Dashboard Banner */}
+              <div className="flex items-center justify-between border-b border-surface-border pb-4 flex-shrink-0 select-none">
+                <div>
+                  <h1 className="text-sm font-bold text-white tracking-wide">Command Center Dashboard</h1>
+                  <p className="text-[11px] text-white/45 mt-0.5">Global projects registry board mapped by active build phases</p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={openCommandPalette}
+                    className="px-3 py-1.5 rounded-lg border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.06] text-xs font-semibold text-white/70 hover:text-white transition-all cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Terminal className="w-3.5 h-3.5 text-purple-400" />
+                    <span>Run Actions (⌘K)</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSelectedDefaultPhase(undefined);
+                      setCreateModalOpen(true);
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-purple-500 hover:bg-purple-600 text-xs font-semibold text-white transition-all cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Create Project</span>
+                  </button>
+                </div>
               </div>
+
+              {/* Physics Board Wrapper */}
+              <div className="relative flex-1 min-h-0 w-full">
+
+                {/* HTML Columns Grid underneath (for background boxes and headers) */}
+                <div className="grid grid-cols-4 gap-4 h-full w-full absolute inset-0">
+                  {[
+                    { id: "launched", label: "Launched", color: "text-green-400/80", dotColor: "bg-green-400", list: launchedProjects },
+                    { id: "in_development", label: "In Development", color: "text-blue-400/80", dotColor: "bg-blue-400", list: inDevProjects },
+                    { id: "sketching", label: "Sketching", color: "text-amber-400/80", dotColor: "bg-amber-400", list: sketchingProjects },
+                    { id: "idea", label: "Idea Phase", color: "text-white/50", dotColor: "bg-white/20", list: ideaProjects },
+                  ].map((col) => {
+                    const filteredList = searchQuery
+                      ? col.list.filter(p => {
+                        const match = `${p.name} ${p.description} ${p.tags.join(" ")}`.toLowerCase();
+                        return match.includes(searchQuery.toLowerCase());
+                      })
+                      : col.list;
+
+                    return (
+                      <div key={col.id} className="bg-white/[0.01] border border-white/[0.03] rounded-2xl p-4 flex flex-col h-full overflow-hidden">
+                        {/* Column Header */}
+                        <div className="flex items-center justify-between pb-3 border-b border-white/[0.04] mb-3 select-none">
+                          <span className={`text-[10px] font-bold uppercase tracking-wider font-mono flex items-center gap-2 ${col.color}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${col.dotColor}`} />
+                            {col.label}
+                            <span className="opacity-40 font-mono">({filteredList.length})</span>
+                          </span>
+
+                          <button
+                            onClick={() => {
+                              setSelectedDefaultPhase(col.id as any);
+                              setCreateModalOpen(true);
+                            }}
+                            className="w-5 h-5 rounded hover:bg-white/10 flex items-center justify-center text-white/50 hover:text-white transition-colors cursor-pointer border-0 p-0"
+                            title={`Add project to ${col.label}`}
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        {/* Spacer for physics overlay */}
+                        <div className="flex-1 w-full relative" />
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Transparent Physics Canvas Overlay */}
+                <ProjectPhysicsBox
+                  projects={projects}
+                  searchQuery={searchQuery}
+                  onSelectProject={(id) => selectProject(id)}
+                  curatedLaunched={curatedLaunched}
+                  curatedInDev={curatedInDev}
+                  curatedSketching={curatedSketching}
+                  curatedIdea={curatedIdea}
+                  onMoveProjectPhase={handleMoveProjectPhase}
+                  onHideProject={handleHideProject}
+                />
+              </div>
+
             </div>
           )}
+
         </div>
+
+        {/* Project Board Curation Modal */}
+        {selectModalOpen && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm select-none">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="w-full max-w-md bg-[#121217] border border-white/[0.08] rounded-xl overflow-hidden shadow-2xl flex flex-col max-h-[70vh]"
+            >
+              <div className="px-5 py-4 border-b border-white/[0.06] flex items-center justify-between">
+                <div>
+                  <h2 className="text-sm font-semibold text-white">Manage Phase Board</h2>
+                  <p className="text-[10px] text-white/40 font-mono mt-0.5">
+                    Select projects to display in {PHASES.find(p => p.id === activePhase)?.label}
+                  </p>
+                </div>
+                <button onClick={() => setSelectModalOpen(false)} className="text-white/40 hover:text-white/70 transition-colors cursor-pointer">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
+                {projects.length === 0 ? (
+                  <p className="text-center text-xs text-white/30 py-8 italic">No projects registered. Create a project first.</p>
+                ) : (
+                  projects.map(p => {
+                    const activeCuratedIds =
+                      activePhase === "launched" ? curatedLaunched :
+                        activePhase === "in_development" ? curatedInDev :
+                          activePhase === "sketching" ? curatedSketching : curatedIdea;
+
+                    const isCuratedInThisPhase = activeCuratedIds.includes(p.id) && p.phase === activePhase;
+                    const belongsToOtherPhase = p.phase !== activePhase;
+
+                    return (
+                      <label
+                        key={p.id}
+                        className="flex items-center justify-between p-3 rounded-lg border border-white/[0.04] bg-white/[0.01] hover:bg-white/[0.03] cursor-pointer transition-colors"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <input
+                            type="checkbox"
+                            checked={isCuratedInThisPhase}
+                            onChange={async (e) => {
+                              const checked = e.target.checked;
+                              let updatedList = [...activeCuratedIds];
+
+                              if (checked) {
+                                if (!updatedList.includes(p.id)) {
+                                  updatedList.push(p.id);
+                                }
+                                if (p.phase !== activePhase) {
+                                  try {
+                                    await fetch(`/api/projects/${p.id}`, {
+                                      method: 'PATCH',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ phase: activePhase })
+                                    });
+                                    useProjectStore.getState().updateProject(p.id, { phase: activePhase as any });
+                                  } catch (err) {
+                                    console.error(err);
+                                  }
+                                }
+                              } else {
+                                updatedList = updatedList.filter(id => id !== p.id);
+                              }
+
+                              localStorage.setItem(`devos_curated_${activePhase}`, JSON.stringify(updatedList));
+                              loadCurationLists();
+                            }}
+                            className="w-4 h-4 rounded border-white/20 bg-black/40 text-purple-500 focus:ring-purple-500 focus:ring-offset-0 cursor-pointer"
+                          />
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold text-white truncate">{p.name}</p>
+                            <p className="text-[10px] text-white/30 truncate">
+                              {belongsToOtherPhase
+                                ? `Current Phase: ${PHASES.find(ph => ph.id === p.phase)?.label || p.phase}`
+                                : p.description || "No description"
+                              }
+                            </p>
+                          </div>
+                        </div>
+                        <div className="shrink-0">
+                          {getTypeBadge(p.type)}
+                        </div>
+                      </label>
+                    );
+                  })
+                )}
+              </div>
+
+              <div className="px-5 py-3 border-t border-white/[0.06] bg-black/20 flex justify-end">
+                <button
+                  onClick={() => setSelectModalOpen(false)}
+                  className="px-4 py-1.5 text-xs font-semibold rounded-lg bg-white text-black hover:bg-white/90 transition-all cursor-pointer"
+                >
+                  Done
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {/* Create / Edit Project Modals */}
+        <ProjectFormModal
+          isOpen={createModalOpen}
+          onClose={() => {
+            setCreateModalOpen(false);
+            setSelectedDefaultPhase(undefined);
+          }}
+          defaultPhase={selectedDefaultPhase}
+        />
+
+        <ProjectFormModal
+          isOpen={editModalOpen}
+          onClose={() => setEditModalOpen(false)}
+          projectToEdit={selectedProject}
+        />
+
+        {/* Command Palette */}
+        <ProjectOSCommandPalette
+          onOpenCreateModal={() => setCreateModalOpen(true)}
+        />
+
       </motion.div>
     </div>
   );

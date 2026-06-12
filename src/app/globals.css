@@ -39,6 +39,11 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  --color-surface-0: var(--surface-0);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-surface-border: var(--surface-border);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -71,6 +76,12 @@
   --success: #22C55E;
   --warning: #F59E0B;
   
+  --surface-0: #09090b;
+  --surface-1: #0d0d10;
+  --surface-2: #111115;
+  --surface-3: #161619;
+  --surface-border: rgba(255, 255, 255, 0.06);
+
   --chart-1: #7C5CFF;
   --chart-2: #22C55E;
   --chart-3: #F59E0B;

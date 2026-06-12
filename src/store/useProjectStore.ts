@@ -12,7 +12,7 @@ export interface Project {
   liveUrl?: string;
   folderPath?: string;
   feedback?: { id: string; text: string; date: string }[];
-  
+
   // Project Intelligence & Developer Memory Fields
   summary?: string;
   architectureNotes?: string;
@@ -34,7 +34,20 @@ export interface Project {
   coverImageUrl?: string | null;
   ogImageUrl?: string | null;
 
+  // Project OS workspace model
+  workspace: "main" | "incubation" | "archive";
+  type: "code" | "idea" | "research" | "experiment";
+  priority: "critical" | "high" | "medium" | "low";
+  pinned: boolean;
+
+  // Idea / concept project metadata
+  confidenceLevel?: number | null;
+  effortEstimate?: string | null;
+  potentialImpact?: string | null;
+  stage?: string | null;
+
   updatedAt: string;
+  createdAt?: string;
 }
 
 interface ProjectState {
@@ -43,7 +56,17 @@ interface ProjectState {
   error: string | null;
   fetchProjects: () => Promise<void>;
   setProjects: (projects: Project[]) => void;
-  addProject: (project: Omit<Project, "id" | "updatedAt" | "phase"> & { phase?: string }) => Promise<void>;
+  addProject: (project: Omit<Project, "id" | "updatedAt" | "phase" | "workspace" | "type" | "priority" | "pinned"> & {
+    phase?: string;
+    workspace?: "main" | "incubation" | "archive";
+    type?: "code" | "idea" | "research" | "experiment";
+    priority?: "critical" | "high" | "medium" | "low";
+    pinned?: boolean;
+    confidenceLevel?: number | null;
+    effortEstimate?: string | null;
+    potentialImpact?: string | null;
+    stage?: string | null;
+  }) => Promise<void>;
   updateProject: (id: string, updates: Partial<Project>) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
 }
@@ -72,9 +95,14 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     const tempId = `temp-${Date.now()}`;
     const newProject: Project = {
       phase: "idea",
+      workspace: "main",
+      type: "code",
+      priority: "medium",
+      pinned: false,
       ...project,
       id: tempId,
       updatedAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
       projectHealth: 100.0,
       momentumScore: 0.0,
       completionPercentage: 0.0,

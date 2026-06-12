@@ -45,6 +45,18 @@ model Project {
   coverImageUrl        String?
   ogImageUrl           String?
 
+  // Project OS workspace model
+  workspace            String   @default("main")    // "main" | "incubation" | "archive"
+  type                 String   @default("code")    // "code" | "idea" | "research" | "experiment"
+  priority             String   @default("medium")  // "critical" | "high" | "medium" | "low"
+  pinned               Boolean  @default(false)
+
+  // Idea / concept project metadata
+  confidenceLevel      Int?     // 1–5
+  effortEstimate       String?  // "xs" | "s" | "m" | "l" | "xl"
+  potentialImpact      String?  // "low" | "medium" | "high" | "massive"
+  stage                String?  // "concept" | "research" | "validated" | "prototyping"
+
   // Relations (Phase 5)
   memories             Memory[]
   projectMemory        ProjectMemory?

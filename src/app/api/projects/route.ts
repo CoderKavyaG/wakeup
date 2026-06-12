@@ -4,7 +4,7 @@ import { auth } from "@/auth";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
@@ -12,8 +12,14 @@ export async function GET() {
     }
     const userId = session.user.id;
 
+    const { searchParams } = new URL(request.url);
+    const workspace = searchParams.get("workspace");
+
     const projects = await prisma.project.findMany({
-      where: { userId },
+      where: { 
+        userId,
+        ...(workspace ? { workspace } : {})
+      },
       orderBy: { createdAt: "desc" },
     });
 
@@ -33,7 +39,23 @@ export async function POST(request: Request) {
     const userId = session.user.id;
 
     const body = await request.json();
-    const { name, description, status, tags, githubUrl, liveUrl, folderPath } = body;
+    const { 
+      name, 
+      description, 
+      status, 
+      tags, 
+      githubUrl, 
+      liveUrl, 
+      folderPath,
+      workspace,
+      type,
+      priority,
+      pinned,
+      confidenceLevel,
+      effortEstimate,
+      potentialImpact,
+      stage
+    } = body;
 
     if (!name || name.trim() === "") {
       return NextResponse.json({ error: "Project name is required" }, { status: 400 });
@@ -81,6 +103,14 @@ export async function POST(request: Request) {
         momentumScore: 0.0,
         completionPercentage: 0.0,
         userId,
+        workspace: workspace || "main",
+        type: type || "code",
+        priority: priority || "medium",
+        pinned: pinned !== undefined ? pinned : false,
+        confidenceLevel: confidenceLevel !== undefined ? confidenceLevel : null,
+        effortEstimate: effortEstimate || null,
+        potentialImpact: potentialImpact || null,
+        stage: stage || null,
       },
     });
 
