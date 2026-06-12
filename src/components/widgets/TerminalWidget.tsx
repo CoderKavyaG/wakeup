@@ -23,7 +23,7 @@ export function TerminalWidget({ initialCwd, onClose }: TerminalWidgetProps) {
       const { WebLinksAddon } = await import('xterm-addon-web-links')
       
       // Load styles dynamically
-      await import('xterm/css/xterm.css')
+
 
       term = new Terminal({
         theme: {

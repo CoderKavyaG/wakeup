@@ -577,8 +577,26 @@ wss.on('connection', (ws, req) => {
     windowsHide: false
   });
 
+  if (ws.readyState === ws.OPEN) {
+    ws.send(`\r\n*** Connected to DevOS Terminal (CWD: ${cwd}) ***\r\n\r\n`);
+  }
+
   ws.on('message', data => {
-    try { pty.stdin.write(data.toString()) } catch(e) {}
+    const raw = data.toString();
+    // Echo back to client
+    if (ws.readyState === ws.OPEN) {
+      if (raw === '\r') {
+        ws.send('\r\n');
+      } else {
+        ws.send(raw);
+      }
+    }
+
+    let msg = raw;
+    if (process.platform === 'win32') {
+      msg = msg.replace(/\r(?!\n)/g, '\r\n');
+    }
+    try { pty.stdin.write(msg) } catch(e) {}
   });
 
   pty.stdout.on('data', data => {

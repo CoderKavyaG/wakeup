@@ -18,6 +18,10 @@ function waitForNext(callback, retries = 20) {
 }
 
 function startNextServer() {
+  if (!app.isPackaged) {
+    console.log('[Electron] Running in development mode. Skipping standalone server spawn.');
+    return;
+  }
   nextProcess = spawn('node', ['.next/standalone/server.js'], {
     cwd: path.join(__dirname, '..'),
     env: { ...process.env, PORT: NEXT_PORT },
@@ -28,6 +32,10 @@ function startNextServer() {
 }
 
 function startAgent() {
+  if (!app.isPackaged) {
+    console.log('[Electron] Running in development mode. Skipping Agent spawn.');
+    return;
+  }
   const agentProcess = spawn('node', ['devos-agent/index.js'], {
     cwd: path.join(__dirname, '..'),
     windowsHide: true

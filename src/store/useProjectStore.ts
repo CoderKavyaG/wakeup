@@ -66,7 +66,7 @@ interface ProjectState {
     effortEstimate?: string | null;
     potentialImpact?: string | null;
     stage?: string | null;
-  }) => Promise<void>;
+  }) => Promise<any>;
   updateProject: (id: string, updates: Partial<Project>) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
 }
@@ -134,10 +134,12 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
           projects: state.projects.map((p) => (p.id === tempId ? savedProject : p)),
         };
       });
+      return savedProject;
     } catch (err) {
       // Revert optimistic update
       const errorMessage = err instanceof Error ? err.message : 'An error occurred';
       set({ projects: previousProjects, error: errorMessage });
+      throw err;
     }
   },
 

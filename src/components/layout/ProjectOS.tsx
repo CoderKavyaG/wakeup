@@ -1438,11 +1438,11 @@ interface ProjectFormModalProps {
   onClose: () => void;
   projectToEdit?: Project | null;
   defaultPhase?: "launched" | "in_development" | "sketching" | "idea";
+  onSaveSuccess?: (project: Project) => void;
 }
 
-function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase }: ProjectFormModalProps) {
+function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSaveSuccess }: ProjectFormModalProps) {
   const { addProject, updateProject } = useProjectStore();
-  const [activeTab, setActiveTab] = useState<"manual" | "github" | "local">("manual");
 
   // Form state
   const [name, setName] = useState("");
@@ -1460,12 +1460,6 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase }: Proj
   const [effortEstimate, setEffortEstimate] = useState<string>("m");
   const [potentialImpact, setPotentialImpact] = useState<string>("medium");
   const [stage, setStage] = useState<string>("concept");
-
-  // GitHub import state
-  const [githubUsername, setGithubUsername] = useState("");
-  const [githubSearch, setGithubSearch] = useState("");
-  const [githubRepos, setGithubRepos] = useState<any[]>([]);
-  const [githubLoading, setGithubLoading] = useState(false);
 
   // Local scan state
   const [localScanning, setLocalScanning] = useState(false);
@@ -1487,7 +1481,6 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase }: Proj
         setEffortEstimate(projectToEdit.effortEstimate || "m");
         setPotentialImpact(projectToEdit.potentialImpact || "medium");
         setStage(projectToEdit.stage || "concept");
-        setActiveTab("manual");
       } else {
         setName("");
         setDescription("");
@@ -1502,44 +1495,9 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase }: Proj
         setEffortEstimate("m");
         setPotentialImpact("medium");
         setStage("concept");
-        setActiveTab("manual");
       }
-      setGithubUsername(localStorage.getItem("GITHUB_USERNAME") || "coderkavyag");
     }
   }, [isOpen, projectToEdit, defaultPhase]);
-
-  // Load GitHub repos when GitHub tab selected
-  useEffect(() => {
-    if (activeTab === "github" && githubUsername) {
-      fetchRepos();
-    }
-  }, [activeTab, githubUsername]);
-
-  const fetchRepos = async () => {
-    setGithubLoading(true);
-    try {
-      const token = localStorage.getItem("GITHUB_TOKEN") || "";
-      const res = await fetch(`/api/github?username=${encodeURIComponent(githubUsername)}`, {
-        headers: token ? { "Authorization": `token ${token}` } : {}
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setGithubRepos(data.repos || []);
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setGithubLoading(false);
-    }
-  };
-
-  const handleSelectRepo = (repo: any) => {
-    setName(repo.name || "");
-    setDescription(repo.description || "");
-    setGithubUrl(repo.html_url || "");
-    setType("code");
-    setActiveTab("manual");
-  };
 
   const handleScanLocal = async () => {
     setLocalScanning(true);
@@ -1553,8 +1511,10 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase }: Proj
         if (data.error === "No folder selected") return;
         throw new Error(data.error);
       }
-      setName(data.name || "");
-      setDescription(data.description || "");
+      
+      // Auto-detect fields
+      if (data.name) setName(data.name || "");
+      if (data.description) setDescription(data.description || "");
       setFolderPath(data.folderPath || "");
       if (data.githubUrl) {
         setGithubUrl(data.githubUrl);
@@ -1569,8 +1529,6 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase }: Proj
           body: JSON.stringify({ path: data.folderPath })
         });
       } catch { }
-
-      setActiveTab("manual");
     } catch (e: any) {
       alert(`Local scan failed: ${e.message}`);
     } finally {
@@ -1630,7 +1588,10 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase }: Proj
       };
 
       try {
-        await addProject(payload);
+        const saved = await addProject(payload);
+        if (saved && onSaveSuccess) {
+          onSaveSuccess(saved);
+        }
         onClose();
       } catch (err: any) {
         alert(`Failed to save project: ${err.message}`);
@@ -1656,343 +1617,243 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase }: Proj
           </button>
         </div>
 
-        {/* Source Tabs */}
-        {!projectToEdit && (
-          <div className="px-5 pt-3 border-b border-white/[0.04] flex gap-4 text-xs select-none">
-            <button
-              onClick={() => setActiveTab("manual")}
-              className={`pb-2 font-medium border-b-2 transition-colors ${activeTab === "manual" ? "text-purple-400 border-purple-500" : "text-white/40 hover:text-white/60 border-transparent"
-                }`}
-            >
-              Manual Details
-            </button>
-            <button
-              onClick={() => setActiveTab("github")}
-              className={`pb-2 font-medium border-b-2 transition-colors ${activeTab === "github" ? "text-purple-400 border-purple-500" : "text-white/40 hover:text-white/60 border-transparent"
-                }`}
-            >
-              Import from GitHub
-            </button>
-            <button
-              onClick={() => setActiveTab("local")}
-              className={`pb-2 font-medium border-b-2 transition-colors ${activeTab === "local" ? "text-purple-400 border-purple-500" : "text-white/40 hover:text-white/60 border-transparent"
-                }`}
-            >
-              Import Local Folder
-            </button>
-          </div>
-        )}
-
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
-          {activeTab === "manual" && (
-            <form onSubmit={handleSave} className="space-y-4">
-              {/* Name & Workspace */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-[10px] uppercase tracking-wider text-white/30 font-bold block mb-1">Project Name</label>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={e => setName(e.target.value)}
-                    placeholder="My SaaS App"
-                    className="w-full h-8 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-3 focus:outline-none focus:ring-1 focus:ring-purple-500/30 placeholder:text-white/20"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] uppercase tracking-wider text-white/30 font-bold block mb-1">Project Phase</label>
-                  <select
-                    value={phase}
-                    onChange={e => setPhaseState(e.target.value as any)}
-                    className="w-full h-8 bg-black/40 border border-white/10 rounded-lg text-[11px] text-white px-3 focus:outline-none focus:ring-1 focus:ring-purple-500/30 font-semibold"
-                  >
-                    <option value="idea">Idea Phase</option>
-                    <option value="sketching">Sketching</option>
-                    <option value="in_development">In Development</option>
-                    <option value="launched">Launched</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Type Selection */}
+          <form onSubmit={handleSave} className="space-y-4">
+            {/* Name & Workspace */}
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-[10px] uppercase tracking-wider text-white/30 font-bold block mb-1.5">Project Type</label>
-                <div className="grid grid-cols-4 gap-2">
-                  {(["code", "idea", "research", "experiment"] as const).map(t => {
-                    const badge = TYPE_BADGES[t];
-                    const Icon = badge.icon;
-                    const isSelected = type === t;
-                    return (
-                      <button
-                        key={t}
-                        type="button"
-                        onClick={() => setType(t)}
-                        className={`h-9 border rounded-lg flex flex-col items-center justify-center gap-1 transition-all ${isSelected
-                            ? "bg-purple-500/10 border-purple-500/40 text-purple-300"
-                            : "bg-black/20 border-white/10 text-white/40 hover:text-white/60"
-                          }`}
-                      >
-                        <Icon className="w-3.5 h-3.5" />
-                        <span className="text-[9px] font-semibold uppercase">{badge.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Description */}
-              <div>
-                <label className="text-[10px] uppercase tracking-wider text-white/30 font-bold block mb-1">Description</label>
-                <textarea
-                  value={description}
-                  onChange={e => setDescription(e.target.value)}
-                  placeholder="Tell DevOS what this project is about..."
-                  className="w-full bg-black/40 border border-white/10 rounded-lg text-xs text-white p-3 focus:outline-none focus:ring-1 focus:ring-purple-500/30 placeholder:text-white/20 h-16 resize-none"
+                <label className="text-[10px] uppercase tracking-wider text-white/30 font-bold block mb-1">Project Name</label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  placeholder="My SaaS App"
+                  className="w-full h-8 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-3 focus:outline-none focus:ring-1 focus:ring-purple-500/30 placeholder:text-white/20"
+                  required
                 />
               </div>
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-white/30 font-bold block mb-1">Project Phase</label>
+                <select
+                  value={phase}
+                  onChange={e => setPhaseState(e.target.value as any)}
+                  className="w-full h-8 bg-black/40 border border-white/10 rounded-lg text-[11px] text-white px-3 focus:outline-none focus:ring-1 focus:ring-purple-500/30 font-semibold"
+                >
+                  <option value="idea">Idea Phase</option>
+                  <option value="sketching">Sketching</option>
+                  <option value="in_development">In Development</option>
+                  <option value="launched">Launched</option>
+                </select>
+              </div>
+            </div>
 
-              {/* Priority & Pinned */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-[10px] uppercase tracking-wider text-white/30 font-bold block mb-1">Priority</label>
-                  <div className="flex bg-black/40 rounded-lg p-0.5 border border-white/5 h-8">
-                    {(["low", "medium", "high", "critical"] as const).map(p => (
-                      <button
-                        key={p}
-                        type="button"
-                        onClick={() => setPriority(p)}
-                        className={`flex-1 text-[10px] font-semibold rounded capitalize transition-all ${priority === p ? "bg-white/10 text-white" : "text-white/40 hover:text-white/60"
-                          }`}
-                      >
-                        {p}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="flex items-center justify-between h-8 mt-5 px-3 bg-black/20 border border-white/5 rounded-lg">
-                  <span className="text-xs text-white/50">Pin to sidebar</span>
-                  <button
-                    type="button"
-                    onClick={() => setPinned(!pinned)}
-                    className={`w-8 h-4 rounded-full p-0.5 transition-colors duration-200 focus:outline-none ${pinned ? "bg-purple-500" : "bg-white/10"
-                      }`}
-                  >
-                    <div className={`bg-white w-3 h-3 rounded-full shadow-md transform transition-transform duration-200 ${pinned ? "translate-x-4" : "translate-x-0"
-                      }`} />
-                  </button>
+            {/* Type Selection */}
+            <div>
+              <label className="text-[10px] uppercase tracking-wider text-white/30 font-bold block mb-1.5">Project Type</label>
+              <div className="grid grid-cols-4 gap-2">
+                {(["code", "idea", "research", "experiment"] as const).map(t => {
+                  const badge = TYPE_BADGES[t];
+                  const Icon = badge.icon;
+                  const isSelected = type === t;
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setType(t)}
+                      className={`h-9 border rounded-lg flex flex-col items-center justify-center gap-1 transition-all ${isSelected
+                          ? "bg-purple-500/10 border-purple-500/40 text-purple-300"
+                          : "bg-black/20 border-white/10 text-white/40 hover:text-white/60"
+                        }`}
+                    >
+                      <Icon className="w-3.5 h-3.5" />
+                      <span className="text-[9px] font-semibold uppercase">{badge.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Description */}
+            <div>
+              <label className="text-[10px] uppercase tracking-wider text-white/30 font-bold block mb-1">Description</label>
+              <textarea
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                placeholder="Tell DevOS what this project is about..."
+                className="w-full bg-black/40 border border-white/10 rounded-lg text-xs text-white p-3 focus:outline-none focus:ring-1 focus:ring-purple-500/30 placeholder:text-white/20 h-16 resize-none"
+              />
+            </div>
+
+            {/* Priority & Pinned */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-white/30 font-bold block mb-1">Priority</label>
+                <div className="flex bg-black/40 rounded-lg p-0.5 border border-white/5 h-8">
+                  {(["low", "medium", "high", "critical"] as const).map(p => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setPriority(p)}
+                      className={`flex-1 text-[10px] font-semibold rounded capitalize transition-all ${priority === p ? "bg-white/10 text-white" : "text-white/40 hover:text-white/60"
+                        }`}
+                    >
+                      {p}
+                    </button>
+                  ))}
                 </div>
               </div>
+              <div className="flex items-center justify-between h-8 mt-5 px-3 bg-black/20 border border-white/5 rounded-lg">
+                <span className="text-xs text-white/50">Pin to sidebar</span>
+                <button
+                  type="button"
+                  onClick={() => setPinned(!pinned)}
+                  className={`w-8 h-4 rounded-full p-0.5 transition-colors duration-200 focus:outline-none ${pinned ? "bg-purple-500" : "bg-white/10"
+                    }`}
+                >
+                  <div className={`bg-white w-3 h-3 rounded-full shadow-md transform transition-transform duration-200 ${pinned ? "translate-x-4" : "translate-x-0"
+                    }`} />
+                </button>
+              </div>
+            </div>
 
-              {/* Idea-specific fields */}
-              {type === "idea" && (
-                <div className="p-4 bg-purple-500/[0.02] border border-purple-500/10 rounded-xl space-y-4">
-                  <h3 className="text-[10px] uppercase tracking-widest text-purple-400 font-bold font-mono">Idea Validation Parameters</h3>
+            {/* Idea-specific fields */}
+            {type === "idea" && (
+              <div className="p-4 bg-purple-500/[0.02] border border-purple-500/10 rounded-xl space-y-4">
+                <h3 className="text-[10px] uppercase tracking-widest text-purple-400 font-bold font-mono">Idea Validation Parameters</h3>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-[10px] text-white/45 block mb-1">Confidence Score (1–5)</label>
-                      <div className="flex gap-2">
-                        {[1, 2, 3, 4, 5].map(val => (
-                          <button
-                            key={val}
-                            type="button"
-                            onClick={() => setConfidenceLevel(val)}
-                            className={`flex-1 py-1 rounded border text-xs font-mono transition-all ${confidenceLevel === val
-                                ? "bg-purple-500/20 border-purple-500/50 text-purple-300 font-bold"
-                                : "bg-black/25 border-white/10 text-white/40"
-                              }`}
-                          >
-                            {val}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-white/45 block mb-1">Effort Estimate</label>
-                      <div className="flex gap-1 bg-black/40 rounded-lg p-0.5 border border-white/5">
-                        {(["xs", "s", "m", "l", "xl"] as const).map(ef => (
-                          <button
-                            key={ef}
-                            type="button"
-                            onClick={() => setEffortEstimate(ef)}
-                            className={`flex-1 text-[9px] uppercase font-bold rounded transition-all ${effortEstimate === ef ? "bg-white/15 text-white" : "text-white/40 hover:text-white/60"
-                              }`}
-                          >
-                            {ef}
-                          </button>
-                        ))}
-                      </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] text-white/45 block mb-1">Confidence Score (1–5)</label>
+                    <div className="flex gap-2">
+                      {[1, 2, 3, 4, 5].map(val => (
+                        <button
+                          key={val}
+                          type="button"
+                          onClick={() => setConfidenceLevel(val)}
+                          className={`flex-1 py-1 rounded border text-xs font-mono transition-all ${confidenceLevel === val
+                              ? "bg-purple-500/20 border-purple-500/50 text-purple-300 font-bold"
+                              : "bg-black/25 border-white/10 text-white/40"
+                            }`}
+                        >
+                          {val}
+                        </button>
+                      ))}
                     </div>
                   </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-[10px] text-white/45 block mb-1">Potential Impact</label>
-                      <select
-                        value={potentialImpact}
-                        onChange={e => setPotentialImpact(e.target.value)}
-                        className="w-full h-8 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-2 focus:outline-none"
-                      >
-                        <option value="low">Low Impact</option>
-                        <option value="medium">Medium Impact</option>
-                        <option value="high">High Impact</option>
-                        <option value="massive">Massive Impact</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-white/45 block mb-1">Idea Stage</label>
-                      <select
-                        value={stage}
-                        onChange={e => setStage(e.target.value)}
-                        className="w-full h-8 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-2 focus:outline-none"
-                      >
-                        <option value="concept">Concept Only</option>
-                        <option value="research">Active Research</option>
-                        <option value="validated">Market Validated</option>
-                        <option value="prototyping">Prototyping</option>
-                      </select>
+                  <div>
+                    <label className="text-[10px] text-white/45 block mb-1">Effort Estimate</label>
+                    <div className="flex gap-1 bg-black/40 rounded-lg p-0.5 border border-white/5">
+                      {(["xs", "s", "m", "l", "xl"] as const).map(ef => (
+                        <button
+                          key={ef}
+                          type="button"
+                          onClick={() => setEffortEstimate(ef)}
+                          className={`flex-1 text-[9px] uppercase font-bold rounded transition-all ${effortEstimate === ef ? "bg-white/15 text-white" : "text-white/40 hover:text-white/60"
+                            }`}
+                        >
+                          {ef}
+                        </button>
+                      ))}
                     </div>
                   </div>
                 </div>
-              )}
 
-              {/* Integrations URLs */}
-              {type !== "idea" && (
-                <div className="space-y-3 pt-2">
+                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-[10px] uppercase tracking-wider text-white/30 block mb-1">GitHub Repo URL (Optional)</label>
+                    <label className="text-[10px] text-white/45 block mb-1">Potential Impact</label>
+                    <select
+                      value={potentialImpact}
+                      onChange={e => setPotentialImpact(e.target.value)}
+                      className="w-full h-8 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-2 focus:outline-none"
+                    >
+                      <option value="low">Low Impact</option>
+                      <option value="medium">Medium Impact</option>
+                      <option value="high">High Impact</option>
+                      <option value="massive">Massive Impact</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-white/45 block mb-1">Idea Stage</label>
+                    <select
+                      value={stage}
+                      onChange={e => setStage(e.target.value)}
+                      className="w-full h-8 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-2 focus:outline-none"
+                    >
+                      <option value="concept">Concept Only</option>
+                      <option value="research">Active Research</option>
+                      <option value="validated">Market Validated</option>
+                      <option value="prototyping">Prototyping</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Integrations URLs */}
+            {type !== "idea" && (
+              <div className="space-y-3 pt-2">
+                <div>
+                  <label className="text-[10px] uppercase tracking-wider text-white/30 block mb-1">GitHub Repo URL (Optional)</label>
+                  <input
+                    type="text"
+                    value={githubUrl}
+                    onChange={e => setGithubUrl(e.target.value)}
+                    placeholder="https://github.com/username/project"
+                    className="w-full h-8 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-3 focus:outline-none focus:ring-1 focus:ring-purple-500/30 placeholder:text-white/25 font-mono"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] uppercase tracking-wider text-white/30 block mb-1">Production URL (Optional)</label>
                     <input
                       type="text"
-                      value={githubUrl}
-                      onChange={e => setGithubUrl(e.target.value)}
-                      placeholder="https://github.com/username/project"
+                      value={liveUrl}
+                      onChange={e => setLiveUrl(e.target.value)}
+                      placeholder="https://project.vercel.app"
                       className="w-full h-8 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-3 focus:outline-none focus:ring-1 focus:ring-purple-500/30 placeholder:text-white/25 font-mono"
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-[10px] uppercase tracking-wider text-white/30 block mb-1">Production URL (Optional)</label>
-                      <input
-                        type="text"
-                        value={liveUrl}
-                        onChange={e => setLiveUrl(e.target.value)}
-                        placeholder="https://project.vercel.app"
-                        className="w-full h-8 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-3 focus:outline-none focus:ring-1 focus:ring-purple-500/30 placeholder:text-white/25 font-mono"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] uppercase tracking-wider text-white/30 block mb-1">Local Directory Path (Optional)</label>
+                  <div>
+                    <label className="text-[10px] uppercase tracking-wider text-white/30 block mb-1">Local Directory Path (Optional)</label>
+                    <div className="flex gap-2">
                       <input
                         type="text"
                         value={folderPath}
                         onChange={e => setFolderPath(e.target.value)}
                         placeholder="C:/Users/name/Projects/app"
-                        className="w-full h-8 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-3 focus:outline-none focus:ring-1 focus:ring-purple-500/30 placeholder:text-white/25 font-mono"
+                        className="flex-1 h-8 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-3 focus:outline-none focus:ring-1 focus:ring-purple-500/30 placeholder:text-white/25 font-mono"
                       />
+                      <button
+                        type="button"
+                        onClick={handleScanLocal}
+                        disabled={localScanning}
+                        className="px-3 h-8 text-[11px] font-semibold rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-400 hover:bg-purple-500/20 hover:text-purple-300 disabled:opacity-50 disabled:pointer-events-none transition-colors cursor-pointer"
+                      >
+                        {localScanning ? "Choosing..." : "Choose Folder"}
+                      </button>
                     </div>
                   </div>
                 </div>
-              )}
-
-              {/* Actions */}
-              <div className="flex justify-end gap-3 pt-3 border-t border-white/[0.04]">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="px-4 py-1.5 text-xs font-semibold rounded-lg bg-white/10 text-white hover:bg-white/15 transition-all cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-1.5 text-xs font-semibold rounded-lg bg-purple-500 hover:bg-purple-600 text-white transition-all cursor-pointer"
-                >
-                  {projectToEdit ? "Update Project" : "Create Project"}
-                </button>
               </div>
-            </form>
-          )}
+            )}
 
-          {activeTab === "github" && (
-            <div className="space-y-4">
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="GitHub Username"
-                  value={githubUsername}
-                  onChange={e => setGithubUsername(e.target.value)}
-                  className="w-36 h-8 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-3 focus:outline-none"
-                />
-                <div className="flex-1 flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="Search repositories..."
-                    value={githubSearch}
-                    onChange={e => setGithubSearch(e.target.value)}
-                    className="flex-1 h-8 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-3 focus:outline-none"
-                  />
-                  <button
-                    onClick={fetchRepos}
-                    className="px-3 h-8 text-xs font-semibold rounded-lg bg-white/10 text-white hover:bg-white/15 cursor-pointer"
-                  >
-                    Refresh
-                  </button>
-                </div>
-              </div>
-
-              <div className="h-56 overflow-y-auto border border-white/5 rounded-lg bg-black/20 p-1 space-y-1">
-                {githubLoading ? (
-                  <div className="h-full flex items-center justify-center text-xs text-white/30 animate-pulse">
-                    Fetching user repositories...
-                  </div>
-                ) : githubRepos.length === 0 ? (
-                  <div className="h-full flex items-center justify-center text-xs text-white/20">
-                    No repositories found. Ensure your GitHub configs are valid.
-                  </div>
-                ) : (
-                  githubRepos
-                    .filter(repo => repo.name.toLowerCase().includes(githubSearch.toLowerCase()))
-                    .map(repo => (
-                      <button
-                        key={repo.id}
-                        onClick={() => handleSelectRepo(repo)}
-                        className="w-full text-left p-2.5 rounded hover:bg-white/[0.04] transition-colors flex items-center justify-between group cursor-pointer"
-                      >
-                        <div className="min-w-0">
-                          <span className="text-xs font-semibold text-white/80 block truncate">{repo.name}</span>
-                          <span className="text-[10px] text-white/30 truncate block mt-0.5">
-                            {repo.description || "No description"}
-                          </span>
-                        </div>
-                        <span className="text-[9px] font-mono text-purple-400/70 opacity-0 group-hover:opacity-100 transition-opacity">
-                          Select Repo
-                        </span>
-                      </button>
-                    ))
-                )}
-              </div>
-            </div>
-          )}
-
-          {activeTab === "local" && (
-            <div className="py-12 text-center flex flex-col items-center justify-center space-y-4 bg-black/10 border border-dashed border-white/10 rounded-xl">
-              <Folder className="w-10 h-10 text-white/15" />
-              <div className="max-w-xs">
-                <h3 className="text-xs font-semibold text-white/80">Scan a local development workspace</h3>
-                <p className="text-[10px] text-white/30 mt-1">
-                  We will let you pick a folder, scan its configuration, language distribution, README files, and pre-fill details.
-                </p>
-              </div>
+            {/* Actions */}
+            <div className="flex justify-end gap-3 pt-3 border-t border-white/[0.04]">
               <button
                 type="button"
-                disabled={localScanning}
-                onClick={handleScanLocal}
-                className="px-4 py-2 text-xs font-semibold rounded-lg bg-white text-black hover:bg-white/90 transition-all disabled:opacity-50 cursor-pointer"
+                onClick={onClose}
+                className="px-4 py-1.5 text-xs font-semibold rounded-lg bg-white/10 text-white hover:bg-white/15 transition-all cursor-pointer"
               >
-                {localScanning ? "Scanning system..." : "Select Local Folder"}
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-1.5 text-xs font-semibold rounded-lg bg-purple-500 hover:bg-purple-600 text-white transition-all cursor-pointer"
+              >
+                {projectToEdit ? "Update Project" : "Create Project"}
               </button>
             </div>
-          )}
+          </form>
         </div>
       </motion.div>
     </div>
@@ -2580,25 +2441,7 @@ export function ProjectOS() {
                   <h1 className="text-sm font-bold text-white tracking-wide">Command Center Dashboard</h1>
                   <p className="text-[11px] text-white/45 mt-0.5">Global projects registry board mapped by active build phases</p>
                 </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={openCommandPalette}
-                    className="px-3 py-1.5 rounded-lg border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.06] text-xs font-semibold text-white/70 hover:text-white transition-all cursor-pointer flex items-center gap-1.5"
-                  >
-                    <Terminal className="w-3.5 h-3.5 text-purple-400" />
-                    <span>Run Actions (⌘K)</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setSelectedDefaultPhase(undefined);
-                      setCreateModalOpen(true);
-                    }}
-                    className="px-3 py-1.5 rounded-lg bg-purple-500 hover:bg-purple-600 text-xs font-semibold text-white transition-all cursor-pointer flex items-center gap-1.5"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Create Project</span>
-                  </button>
-                </div>
+
               </div>
 
               {/* Physics Board Wrapper */}
@@ -2777,6 +2620,19 @@ export function ProjectOS() {
             setSelectedDefaultPhase(undefined);
           }}
           defaultPhase={selectedDefaultPhase}
+          onSaveSuccess={(newProj) => {
+            const key = `devos_curated_${newProj.phase}`;
+            const stored = localStorage.getItem(key);
+            let list: string[] = [];
+            if (stored) {
+              try { list = JSON.parse(stored); } catch { }
+            }
+            if (!list.includes(newProj.id)) {
+              list.push(newProj.id);
+              localStorage.setItem(key, JSON.stringify(list));
+            }
+            loadCurationLists();
+          }}
         />
 
         <ProjectFormModal
