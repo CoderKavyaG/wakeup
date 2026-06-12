@@ -34,6 +34,7 @@ interface ProjectTask {
 
 interface ProjectTasksTabProps {
   project: Project;
+  isNested?: boolean;
 }
 
 interface MappedTask {
@@ -47,7 +48,7 @@ interface MappedTask {
   order: number;
 }
 
-export default function ProjectTasksTab({ project }: ProjectTasksTabProps) {
+export default function ProjectTasksTab({ project, isNested }: ProjectTasksTabProps) {
   const [projectTasks, setProjectTasks] = useState<ProjectTask[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -312,7 +313,7 @@ export default function ProjectTasksTab({ project }: ProjectTasksTabProps) {
   );
 
   return (
-    <div className="p-6 overflow-y-auto h-full custom-scrollbar space-y-6">
+    <div className={isNested ? "space-y-6" : "p-6 overflow-y-auto h-full custom-scrollbar space-y-6"}>
       
       {/* Inline Task Creator Form */}
       <form onSubmit={handleCreateTask} className="bg-surface-1 border border-surface-border rounded-xl p-4 space-y-3">

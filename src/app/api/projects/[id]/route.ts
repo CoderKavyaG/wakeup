@@ -23,6 +23,20 @@ async function fetchOGImage(url: string): Promise<string | null> {
   }
 }
 
+function getFaviconUrl(urlString: string): string | null {
+  try {
+    let cleanUrl = urlString.trim();
+    if (!cleanUrl.startsWith("http://") && !cleanUrl.startsWith("https://")) {
+      cleanUrl = "https://" + cleanUrl;
+    }
+    const url = new URL(cleanUrl);
+    return `https://www.google.com/s2/favicons?domain=${url.hostname}&sz=128`;
+  } catch {
+    return null;
+  }
+}
+
+
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await auth();
@@ -33,7 +47,34 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const { id } = await params;
 
     const body = await request.json();
-    const { phase, name, description, status, coverImageUrl, ogImageUrl, liveUrl } = body;
+    const { 
+      phase, 
+      name, 
+      description, 
+      status, 
+      coverImageUrl, 
+      ogImageUrl, 
+      liveUrl,
+      workspace,
+      type,
+      priority,
+      pinned,
+      confidenceLevel,
+      effortEstimate,
+      potentialImpact,
+      stage,
+      githubUrl,
+      folderPath
+    } = body;
+
+    let finalOgImageUrl = ogImageUrl;
+    if (!finalOgImageUrl && (liveUrl || githubUrl)) {
+      const targetUrl = liveUrl || githubUrl;
+      const favicon = getFaviconUrl(targetUrl);
+      if (favicon) {
+        finalOgImageUrl = favicon;
+      }
+    }
 
     // Verify ownership
     const project = await prisma.project.findUnique({
@@ -51,8 +92,18 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         ...(description !== undefined && { description }),
         ...(status !== undefined && { status }),
         ...(coverImageUrl !== undefined && { coverImageUrl }),
-        ...(ogImageUrl !== undefined && { ogImageUrl }),
+        ...(finalOgImageUrl !== undefined && { ogImageUrl: finalOgImageUrl }),
         ...(liveUrl !== undefined && { liveUrl }),
+        ...(workspace !== undefined && { workspace }),
+        ...(type !== undefined && { type }),
+        ...(priority !== undefined && { priority }),
+        ...(pinned !== undefined && { pinned }),
+        ...(confidenceLevel !== undefined && { confidenceLevel }),
+        ...(effortEstimate !== undefined && { effortEstimate }),
+        ...(potentialImpact !== undefined && { potentialImpact }),
+        ...(stage !== undefined && { stage }),
+        ...(githubUrl !== undefined && { githubUrl }),
+        ...(folderPath !== undefined && { folderPath }),
       },
     });
 

@@ -3,7 +3,7 @@ import { create } from 'zustand'
 interface ProjectOSStore {
   isOpen: boolean
   selectedProjectId: string | null
-  activeTab: 'overview' | 'ideas' | 'media' | 'tasks' | 'controlroom'
+  activeTab: 'ideas' | 'media' | 'controlroom'
   activePhase: 'launched' | 'in_development' | 'sketching' | 'idea'
   commandPaletteOpen: boolean
   searchQuery: string
@@ -20,13 +20,13 @@ interface ProjectOSStore {
 export const useProjectOSStore = create<ProjectOSStore>((set) => ({
   isOpen: false,
   selectedProjectId: null,
-  activeTab: 'overview',
+  activeTab: 'controlroom',
   activePhase: 'idea',
   commandPaletteOpen: false,
   searchQuery: '',
   open: (projectId) => set({ isOpen: true, selectedProjectId: projectId || null }),
   close: () => set({ isOpen: false }),
-  selectProject: (id) => set({ selectedProjectId: id, activeTab: 'overview' }),
+  selectProject: (id) => set({ selectedProjectId: id, activeTab: 'controlroom' }),
   setTab: (tab) => set({ activeTab: tab }),
   setPhase: (p) => set({ activePhase: p }),
   openCommandPalette: () => set({ commandPaletteOpen: true }),

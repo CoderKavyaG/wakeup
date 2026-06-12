@@ -51,6 +51,11 @@ export default function ProjectOSCommandPalette({
     }
   }, [commandPaletteOpen]);
 
+  // Reset index when query changes to prevent index out of bounds
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [query]);
+
   // Click outside to close
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {

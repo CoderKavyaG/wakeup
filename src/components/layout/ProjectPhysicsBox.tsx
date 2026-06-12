@@ -7,7 +7,6 @@ const PHASES = [
   { id: 'launched', label: 'Launched' },
   { id: 'in_development', label: 'In Development' },
   { id: 'sketching', label: 'Sketching' },
-  { id: 'idea', label: 'Idea Phase' },
 ];
 
 interface PhysicsBubble {
@@ -86,8 +85,7 @@ export default function ProjectPhysicsBox({
       const isCurated =
         (p.phase === "launched" && curatedLaunched.includes(p.id)) ||
         (p.phase === "in_development" && curatedInDev.includes(p.id)) ||
-        (p.phase === "sketching" && curatedSketching.includes(p.id)) ||
-        (p.phase === "idea" && curatedIdea.includes(p.id));
+        (p.phase === "sketching" && curatedSketching.includes(p.id));
 
       if (!isCurated) return false;
 
@@ -99,7 +97,7 @@ export default function ProjectPhysicsBox({
     });
 
     const gap = 16;
-    const colWidth = Math.max(100, (state.dimensions.width - 3 * gap) / 4);
+    const colWidth = Math.max(100, (state.dimensions.width - 2 * gap) / 3);
 
     // Sync state.bubbles with activeCuratedList
     const newBubbles: PhysicsBubble[] = [];
@@ -212,7 +210,7 @@ export default function ProjectPhysicsBox({
 
       const width = state.dimensions.width;
       const height = state.dimensions.height;
-      const colWidth = Math.max(100, (width - 3 * gap) / 4);
+      const colWidth = Math.max(100, (width - 2 * gap) / 3);
 
       ctx.clearRect(0, 0, width, height);
 
@@ -567,11 +565,11 @@ export default function ProjectPhysicsBox({
       // Calculate dropped column zone
       const width = state.dimensions.width;
       const gap = 16;
-      const colWidth = Math.max(100, (width - 3 * gap) / 4);
+      const colWidth = Math.max(100, (width - 2 * gap) / 3);
       
       // Find closest column index
       let targetColIdx = Math.floor(bubble.x / (colWidth + gap));
-      targetColIdx = Math.max(0, Math.min(3, targetColIdx));
+      targetColIdx = Math.max(0, Math.min(2, targetColIdx));
 
       const currentColIdx = PHASES.findIndex((ph) => ph.id === bubble.phase);
       const targetPhaseId = PHASES[targetColIdx].id;
@@ -613,7 +611,7 @@ export default function ProjectPhysicsBox({
   };
 
   return (
-    <div ref={containerRef} className="absolute inset-0 top-[50px] bottom-0 left-0 right-0 z-10 select-none">
+    <div ref={containerRef} className="absolute inset-0 top-[50px] bottom-0 left-0 w-[calc(75%-4px)] z-10 select-none">
       <canvas
         ref={canvasRef}
         onMouseMove={handleMouseMove}

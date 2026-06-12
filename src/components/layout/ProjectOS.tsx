@@ -41,7 +41,11 @@ import {
   Pencil,
   Activity,
   X,
-  Terminal
+  Terminal,
+  Mic,
+  Play,
+  Pause,
+  GripHorizontal
 } from "lucide-react";
 import ProjectTasksTab from "./ProjectTasksTab";
 import ProjectOSCommandPalette from "./ProjectOSCommandPalette";
@@ -55,11 +59,9 @@ const PHASES = [
 ];
 
 const TABS = [
-  { id: 'overview', label: 'Overview' },
+  { id: 'controlroom', label: 'Control Room' },
   { id: 'ideas', label: 'Ideas' },
   { id: 'media', label: 'Media' },
-  { id: 'tasks', label: 'Tasks' },
-  { id: 'controlroom', label: 'Control Room' },
 ];
 
 const timeAgo = (dateInput: any) => {
@@ -202,9 +204,7 @@ function OverviewTab({ project }: { project: Project }) {
 // ── 2. Ideas Tab ──
 const STATUS_COLS = [
   { id: 'raw', label: 'Raw Ideas', color: 'text-white/40', borderColor: 'border-white/[0.06]', dotColor: 'bg-white/30' },
-  { id: 'validated', label: 'Validated', color: 'text-blue-400/80', borderColor: 'border-blue-500/20', dotColor: 'bg-blue-400' },
-  { id: 'building', label: 'Building', color: 'text-green-400/80', borderColor: 'border-green-500/20', dotColor: 'bg-green-400' },
-  { id: 'shelved', label: 'Shelved', color: 'text-white/20', borderColor: 'border-white/[0.04]', dotColor: 'bg-white/20' },
+  { id: 'validated', label: 'Validated', color: 'text-purple-400/80', borderColor: 'border-purple-500/20', dotColor: 'bg-purple-400' },
 ];
 
 function timeAgoShort(date: string) {
@@ -274,7 +274,13 @@ function IdeaCard({ idea, projectId, onUpdate, onDelete }: IdeaCardProps) {
   };
 
   return (
-    <div className="bg-white/[0.03] border border-white/[0.06] rounded-lg p-3 group relative hover:border-white/10 transition-colors">
+    <div 
+      draggable={!editing}
+      onDragStart={(e) => {
+        e.dataTransfer.setData("text/plain", idea.id);
+      }}
+      className="bg-white/[0.03] border border-white/[0.06] rounded-lg p-3 group relative hover:border-white/10 hover:border-purple-500/20 transition-all cursor-grab active:cursor-grabbing select-none"
+    >
       {/* Source badge */}
       {idea.source !== 'manual' && (
         <div className="flex items-center gap-1 mb-1.5">
@@ -344,6 +350,719 @@ function IdeaCard({ idea, projectId, onUpdate, onDelete }: IdeaCardProps) {
   );
 }
 
+interface CanvasItem {
+  id: string;
+  type: "text" | "image" | "voice";
+  x: number;
+  y: number;
+  text: string;
+  url: string;
+  w?: number;
+  h?: number;
+  name?: string;
+}
+
+function IdeaCanvasView({ project }: { project: Project }) {
+  const { selectProject } = useProjectOSStore();
+  const [items, setItems] = useState<CanvasItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  
+  // Recording states
+  const [recording, setRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordingIntervalRef = useRef<any>(null);
+
+  // Drag states
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const dragStartOffset = useRef({ x: 0, y: 0 });
+  const mousePos = useRef({ x: 200, y: 200 });
+
+  // Resize states
+  const [resizingId, setResizingId] = useState<string | null>(null);
+  const resizeStartSize = useRef({ w: 0, h: 0 });
+  const resizeStartMouse = useRef({ x: 0, y: 0 });
+
+  // AI brainstorm states
+  const [aiLoading, setAiLoading] = useState(false);
+
+  const fetchItems = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/projects/${project.id}/ideas`);
+      if (res.ok) {
+        const data = await res.json();
+        const parsed = data
+          .filter((idea: any) => idea.content && idea.content.startsWith('{"type":'))
+          .map((idea: any) => {
+            try {
+              const p = JSON.parse(idea.content);
+              return {
+                id: idea.id,
+                type: p.type,
+                x: p.x ?? 150,
+                y: p.y ?? 150,
+                text: p.text || "",
+                url: p.url || "",
+                w: p.w,
+                h: p.h,
+                name: p.name || "",
+              };
+            } catch {
+              return null;
+            }
+          })
+          .filter(Boolean) as CanvasItem[];
+        setItems(parsed);
+      }
+    } catch {}
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => {
+    fetchItems();
+  }, [project.id]);
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    const canvasRect = canvasRef.current?.getBoundingClientRect();
+    if (canvasRect) {
+      mousePos.current = {
+        x: e.clientX - canvasRect.left,
+        y: e.clientY - canvasRect.top
+      };
+    }
+    
+    if (draggingId) {
+      const x = e.clientX - dragStartOffset.current.x;
+      const y = e.clientY - dragStartOffset.current.y;
+      setItems(prev => prev.map(item =>
+        item.id === draggingId ? { ...item, x, y } : item
+      ));
+    } else if (resizingId) {
+      const deltaX = e.clientX - resizeStartMouse.current.x;
+      const deltaY = e.clientY - resizeStartMouse.current.y;
+      
+      const newWidth = Math.max(120, resizeStartSize.current.w + deltaX);
+      const newHeight = Math.max(100, resizeStartSize.current.h + deltaY);
+      
+      setItems(prev => prev.map(item =>
+        item.id === resizingId ? { ...item, w: newWidth, h: newHeight } : item
+      ));
+    }
+  };
+
+  const handleMouseDown = (id: string, e: React.MouseEvent) => {
+    if (e.button !== 0) return; // Left click only
+    setDraggingId(id);
+    const item = items.find(i => i.id === id);
+    if (item) {
+      dragStartOffset.current = {
+        x: e.clientX - item.x,
+        y: e.clientY - item.y
+      };
+    }
+    e.stopPropagation();
+  };
+
+  const handleResizeMouseDown = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setResizingId(id);
+    const item = items.find(i => i.id === id);
+    if (item) {
+      resizeStartSize.current = {
+        w: item.w || 240,
+        h: item.h || 180,
+      };
+      resizeStartMouse.current = {
+        x: e.clientX,
+        y: e.clientY,
+      };
+    }
+  };
+
+  const handleMouseUp = async () => {
+    if (draggingId) {
+      const draggedItem = items.find(i => i.id === draggingId);
+      if (draggedItem) {
+        try {
+          await fetch(`/api/projects/${project.id}/ideas?ideaId=${draggedItem.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              content: JSON.stringify({
+                type: draggedItem.type,
+                x: draggedItem.x,
+                y: draggedItem.y,
+                text: draggedItem.text,
+                url: draggedItem.url,
+                w: draggedItem.w,
+                h: draggedItem.h,
+                name: draggedItem.name,
+              })
+            })
+          });
+        } catch (err) {
+          console.error(err);
+        }
+      }
+      setDraggingId(null);
+    } else if (resizingId) {
+      const resizedItem = items.find(i => i.id === resizingId);
+      if (resizedItem) {
+        try {
+          await fetch(`/api/projects/${project.id}/ideas?ideaId=${resizedItem.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              content: JSON.stringify({
+                type: resizedItem.type,
+                x: resizedItem.x,
+                y: resizedItem.y,
+                text: resizedItem.text,
+                url: resizedItem.url,
+                w: resizedItem.w,
+                h: resizedItem.h,
+                name: resizedItem.name,
+              })
+            })
+          });
+        } catch (err) {
+          console.error(err);
+        }
+      }
+      setResizingId(null);
+    }
+  };
+
+  const spawnNote = async (text: string, x: number, y: number) => {
+    const payloadContent = JSON.stringify({ type: "text", x, y, text, url: "", w: 208, h: 140, name: "" });
+    try {
+      const res = await fetch(`/api/projects/${project.id}/ideas`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: payloadContent, status: 'raw' }),
+      });
+      if (res.ok) {
+        const saved = await res.json();
+        setItems(prev => [...prev, { id: saved.id, type: "text", x, y, text, url: "", w: 208, h: 140, name: "" }]);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleTextChange = async (id: string, newText: string) => {
+    setItems(prev => prev.map(item => item.id === id ? { ...item, text: newText } : item));
+    const item = items.find(i => i.id === id);
+    if (!item) return;
+
+    try {
+      await fetch(`/api/projects/${project.id}/ideas?ideaId=${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: JSON.stringify({
+            type: item.type,
+            x: item.x,
+            y: item.y,
+            text: newText,
+            url: item.url,
+            w: item.w,
+            h: item.h,
+            name: item.name,
+          })
+        })
+      });
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleNameChange = async (id: string, newName: string) => {
+    setItems(prev => prev.map(item => item.id === id ? { ...item, name: newName } : item));
+    const item = items.find(i => i.id === id);
+    if (!item) return;
+
+    try {
+      await fetch(`/api/projects/${project.id}/ideas?ideaId=${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: JSON.stringify({
+            type: item.type,
+            x: item.x,
+            y: item.y,
+            text: item.text,
+            url: item.url,
+            w: item.w,
+            h: item.h,
+            name: newName,
+          })
+        })
+      });
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    const handlePaste = async (e: ClipboardEvent) => {
+      const itemsList = e.clipboardData?.items;
+      if (!itemsList) return;
+
+      for (let i = 0; i < itemsList.length; i++) {
+        const fileItem = itemsList[i];
+        if (fileItem.type.indexOf("image") !== -1) {
+          const file = fileItem.getAsFile();
+          if (file) {
+            const base64 = await convertFileToBase64(file);
+            spawnImage(base64, mousePos.current.x, mousePos.current.y);
+          }
+        }
+      }
+    };
+
+    window.addEventListener("paste", handlePaste);
+    return () => window.removeEventListener("paste", handlePaste);
+  }, []);
+
+  const convertFileToBase64 = (file: Blob): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = error => reject(error);
+    });
+  };
+
+  const spawnImage = async (base64: string, x: number, y: number) => {
+    const payloadContent = JSON.stringify({ type: "image", x, y, text: "", url: base64, w: 240, h: 180, name: "" });
+    try {
+      const res = await fetch(`/api/projects/${project.id}/ideas`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: payloadContent, status: 'raw' }),
+      });
+      if (res.ok) {
+        const saved = await res.json();
+        setItems(prev => [...prev, { id: saved.id, type: "image", x, y, text: "", url: base64, w: 240, h: 180, name: "" }]);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      const chunks: Blob[] = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunks.push(e.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(chunks, { type: 'audio/webm' });
+        const base64Audio = await convertFileToBase64(audioBlob);
+        spawnVoiceNote(base64Audio, mousePos.current.x || 300, mousePos.current.y || 300);
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorder.start();
+      setRecording(true);
+      setRecordingTime(0);
+      recordingIntervalRef.current = setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+    } catch (err) {
+      console.error(err);
+      alert("Microphone access is required to capture voice notes.");
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && recording) {
+      mediaRecorderRef.current.stop();
+      setRecording(false);
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current);
+      }
+    }
+  };
+
+  const spawnVoiceNote = async (base64Audio: string, x: number, y: number) => {
+    const payloadContent = JSON.stringify({ type: "voice", x, y, text: "", url: base64Audio, w: 240, h: 80, name: "" });
+    try {
+      const res = await fetch(`/api/projects/${project.id}/ideas`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: payloadContent, status: 'raw' }),
+      });
+      if (res.ok) {
+        const saved = await res.json();
+        setItems(prev => [...prev, { id: saved.id, type: "voice", x, y, text: "", url: base64Audio, w: 240, h: 80, name: "" }]);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const deleteItem = async (id: string) => {
+    setItems(prev => prev.filter(i => i.id !== id));
+    try {
+      await fetch(`/api/projects/${project.id}/ideas?ideaId=${id}`, { method: 'DELETE' });
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleCanvasDoubleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget) return;
+    const canvasRect = canvasRef.current?.getBoundingClientRect();
+    if (canvasRect) {
+      const x = e.clientX - canvasRect.left;
+      const y = e.clientY - canvasRect.top;
+      spawnNote("Brainstorm idea...", x, y);
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const base64 = await convertFileToBase64(file);
+      spawnImage(base64, 250, 250);
+    }
+  };
+
+  const askAIWhiteboard = async () => {
+    const textNotes = items.filter(i => i.type === 'text' && i.text.trim() !== "" && i.text !== "Brainstorm note...").map(i => i.text);
+    if (textNotes.length === 0) {
+      spawnNote("Add some notes here first, then click AI to brainstorm with them!", 250, 250);
+      return;
+    }
+
+    setAiLoading(true);
+    try {
+      const res = await fetch('/api/cockpit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: `I am brainstorming ideas on a canvas for the project "${project.name}". Here are my current notes: ${textNotes.map((n, i) => `[Note ${i+1}]: ${n}`).join(" | ")}. Suggest 1 highly creative next feature, design choice, or improvement for this project. Keep it under 2 short sentences.`
+        }),
+      });
+
+      if (!res.ok || !res.body) {
+        spawnNote("AI unavailable. Please check API configuration.", 250, 250);
+        setAiLoading(false);
+        return;
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let fullText = "";
+
+      const tempId = `ai-temp-${Date.now()}`;
+      const spawnX = 350;
+      const spawnY = 250;
+      
+      setItems(prev => [...prev, {
+        id: tempId,
+        type: "text",
+        x: spawnX,
+        y: spawnY,
+        text: "Thinking...",
+        url: "",
+        w: 240,
+        h: 140,
+        name: "AI Suggestion"
+      }]);
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n');
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6);
+            if (data === '[DONE]') continue;
+            try {
+              const parsed = JSON.parse(data);
+              const token = parsed.choices?.[0]?.delta?.content || '';
+              fullText += token;
+            } catch {
+              fullText += data;
+            }
+          } else if (line.trim() && !line.startsWith(':') && !line.startsWith('event:')) {
+            fullText += line;
+          }
+        }
+        setItems(prev => prev.map(item => item.id === tempId ? { ...item, text: fullText } : item));
+      }
+
+      const payloadContent = JSON.stringify({ type: "text", x: spawnX, y: spawnY, text: fullText, url: "", w: 240, h: 140, name: "AI Suggestion" });
+      const dbRes = await fetch(`/api/projects/${project.id}/ideas`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: payloadContent, status: 'raw' }),
+      });
+      if (dbRes.ok) {
+        const saved = await dbRes.json();
+        setItems(prev => prev.map(item => item.id === tempId ? { ...item, id: saved.id } : item));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    setAiLoading(false);
+  };
+
+  return (
+    <div 
+      ref={canvasRef}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onDoubleClick={handleCanvasDoubleClick}
+      className="flex-1 h-full relative select-none overflow-hidden cursor-crosshair bg-black"
+      style={{
+        backgroundColor: '#070709',
+        backgroundImage: 'radial-gradient(rgba(124, 92, 255, 0.1) 1px, transparent 1px)',
+        backgroundSize: '24px 24px',
+      }}
+    >
+      {/* Floating Canvas Header (Back & Phase Switch) */}
+      <div className="absolute top-4 left-4 right-4 z-50 flex items-center justify-between pointer-events-none select-none">
+        <button
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={() => selectProject(null)}
+          className="pointer-events-auto flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#121217]/90 hover:bg-[#181822] border border-white/[0.08] text-[11px] font-semibold text-white/70 hover:text-white transition-all cursor-pointer shadow-lg backdrop-blur-sm"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          <span>Dashboard Shell</span>
+        </button>
+
+        <div className="pointer-events-auto flex items-center gap-3 bg-[#121217]/90 border border-white/[0.08] px-3 py-1.5 rounded-lg shadow-lg backdrop-blur-sm">
+          <span className="text-[11px] font-bold text-white/90">{project.name}</span>
+          <div className="h-3 w-px bg-white/10" />
+          <PhaseBadge project={project} />
+        </div>
+      </div>
+
+      {/* Element cards */}
+      {items.map(item => {
+        const width = item.w || (item.type === 'image' ? 240 : item.type === 'voice' ? 240 : 208);
+        const height = item.h || (item.type === 'image' ? 180 : 'auto');
+
+        if (item.type === "image") {
+          return (
+            <div
+              key={item.id}
+              className="absolute group select-none hover:shadow-[0_0_25px_rgba(124,92,255,0.15)] transition-shadow duration-200 z-10 cursor-grab active:cursor-grabbing"
+              style={{
+                left: item.x,
+                top: item.y,
+                width: width,
+                height: height === 'auto' ? undefined : height,
+                zIndex: draggingId === item.id ? 100 : 10,
+                touchAction: 'none'
+              }}
+              onMouseDown={(e) => handleMouseDown(item.id, e)}
+            >
+              <img 
+                src={item.url} 
+                alt="Canvas image" 
+                className="w-full h-full object-cover rounded-lg pointer-events-none select-none" 
+              />
+              
+              {/* Delete button (X) top-right */}
+              <button
+                onClick={(e) => { e.stopPropagation(); deleteItem(item.id); }}
+                className="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 flex items-center justify-center w-5 h-5 bg-red-950/90 hover:bg-red-900 border border-red-500/40 hover:border-red-500 rounded-full text-red-400 transition-all cursor-pointer shadow-md z-30"
+                title="Delete image"
+              >
+                <X className="w-3 h-3" />
+              </button>
+
+              {/* Resize Handle (bottom-right corner) */}
+              <div
+                onMouseDown={(e) => handleResizeMouseDown(item.id, e)}
+                className="absolute bottom-1 right-1 cursor-se-resize text-white/40 hover:text-purple-400 opacity-0 group-hover:opacity-100 transition-colors p-0.5 z-25"
+                title="Drag to resize"
+              >
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8">
+                  <line x1="10" y1="0" x2="0" y2="10" />
+                  <line x1="10" y1="4" x2="4" y2="10" />
+                </svg>
+              </div>
+            </div>
+          );
+        }
+
+        return (
+          <div
+            key={item.id}
+            className="absolute group rounded-xl shadow-2xl border bg-[#121217]/95 border-white/[0.08] p-3 transition-shadow duration-200 select-none hover:shadow-[0_0_25px_rgba(124,92,255,0.15)] hover:border-purple-500/20 flex flex-col"
+            style={{
+              left: item.x,
+              top: item.y,
+              width: width,
+              height: height === 'auto' ? undefined : height,
+              zIndex: draggingId === item.id ? 100 : 10,
+              touchAction: 'none'
+            }}
+          >
+            {/* Top Handle / Drag Bar */}
+            <div 
+              onMouseDown={(e) => handleMouseDown(item.id, e)}
+              className="flex items-center justify-between cursor-grab active:cursor-grabbing pb-2 mb-2 border-b border-white/[0.04] select-none"
+            >
+              <div className="flex items-center gap-1 text-white/40 group-hover:text-purple-400/80 transition-colors">
+                <GripHorizontal className="w-3.5 h-3.5" />
+                <span className="text-[9px] font-mono uppercase tracking-widest font-semibold select-none">
+                  {item.type === 'text' ? 'Note' : 'Voice'}
+                </span>
+              </div>
+              
+              <button
+                onClick={(e) => { e.stopPropagation(); deleteItem(item.id); }}
+                className="opacity-0 group-hover:opacity-100 flex items-center justify-center w-4.5 h-4.5 bg-red-950/40 hover:bg-red-900 border border-red-500/20 hover:border-red-500/50 rounded text-red-400 transition-all cursor-pointer shadow-md"
+                title="Delete item"
+              >
+                <X className="w-2.5 h-2.5" />
+              </button>
+            </div>
+
+            {item.type === "text" && (
+              <div className="flex-1 flex flex-col min-h-0" onMouseDown={(e) => e.stopPropagation()}>
+                <textarea
+                  value={item.text}
+                  onChange={(e) => handleTextChange(item.id, e.target.value)}
+                  className="w-full flex-1 bg-transparent border-none outline-none text-xs text-white placeholder:text-white/20 resize-none focus:ring-0 custom-scrollbar font-medium"
+                  placeholder="Type notes..."
+                />
+              </div>
+            )}
+
+            {item.type === "voice" && (
+              <div className="flex flex-col gap-2 flex-1" onMouseDown={(e) => e.stopPropagation()}>
+                <div className="flex items-center gap-3">
+                  <VoicePlayButton base64Audio={item.url} />
+                  <div className="flex-1 min-w-0">
+                    <input
+                      type="text"
+                      value={item.name || ""}
+                      onChange={(e) => handleNameChange(item.id, e.target.value)}
+                      placeholder="Voice note name..."
+                      className="w-full bg-transparent border-b border-transparent hover:border-white/10 focus:border-purple-500/50 outline-none text-[11px] font-bold text-white/95 placeholder:text-white/40 focus:ring-0 p-0"
+                    />
+                    <div className="text-[9px] text-white/40 font-mono mt-0.5">Press to replay</div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {/* Floating Canvas Instructions */}
+      {items.length === 0 && (
+        <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center text-center p-8 select-none">
+          <Lightbulb className="w-12 h-12 text-purple-400/40 mb-3 stroke-[1.2] animate-pulse" />
+          <h2 className="text-sm font-semibold text-white/50">Idea Sandbox Canvas</h2>
+          <p className="text-[11px] text-white/30 mt-1 max-w-sm leading-relaxed">
+            Double-click anywhere to spawn a sticky note.<br />
+            Paste an image (`Ctrl + V`) to import. Use the toolbar to record voice or upload assets.
+          </p>
+        </div>
+      )}
+
+      {/* Bottom Floating Canvas Toolbar */}
+      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 bg-zinc-950/85 border border-white/10 px-4 py-2.5 rounded-2xl shadow-[0_10px_30px_rgba(0,0,0,0.5)] backdrop-blur-md">
+        <button
+          onClick={() => spawnNote("Brainstorm note...", 200, 200)}
+          className="flex items-center justify-center p-2 rounded-xl bg-white/5 hover:bg-white/10 hover:text-white text-white/70 transition-all cursor-pointer border border-white/5"
+          title="Add note"
+        >
+          <FileText className="w-4 h-4" />
+        </button>
+
+        <label
+          className="flex items-center justify-center p-2 rounded-xl bg-white/5 hover:bg-white/10 hover:text-white text-white/70 transition-all cursor-pointer border border-white/5"
+          title="Upload image asset"
+        >
+          <input 
+            type="file" 
+            accept="image/*" 
+            onChange={handleFileUpload} 
+            className="hidden" 
+          />
+          <Image className="w-4 h-4" />
+        </label>
+
+        {recording ? (
+          <button
+            onClick={stopRecording}
+            className="flex items-center gap-2 px-3 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs transition-all cursor-pointer border border-red-500 animate-pulse animate-duration-1000"
+            title="Stop recording"
+          >
+            <Mic className="w-3.5 h-3.5" />
+            <span>Recording {recordingTime}s</span>
+          </button>
+        ) : (
+          <button
+            onClick={startRecording}
+            className="flex items-center justify-center p-2 rounded-xl bg-white/5 hover:bg-white/10 hover:text-white text-white/70 transition-all cursor-pointer border border-white/5"
+            title="Record voice note"
+          >
+            <Mic className="w-4 h-4" />
+          </button>
+        )}
+
+      </div>
+    </div>
+  );
+}
+
+function VoicePlayButton({ base64Audio }: { base64Audio: string }) {
+  const [playing, setPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const togglePlay = () => {
+    if (!audioRef.current) {
+      audioRef.current = new Audio(base64Audio);
+      audioRef.current.onended = () => setPlaying(false);
+    }
+    
+    if (playing) {
+      audioRef.current.pause();
+      setPlaying(false);
+    } else {
+      audioRef.current.play();
+      setPlaying(true);
+    }
+  };
+
+  return (
+    <button
+      onClick={togglePlay}
+      className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 border transition-all ${
+        playing 
+          ? "bg-purple-500 border-purple-400 text-white" 
+          : "bg-purple-500/10 border-purple-500/30 text-purple-400 hover:bg-purple-500/20"
+      }`}
+    >
+      {playing ? (
+        <Pause className="w-3.5 h-3.5" />
+      ) : (
+        <Play className="w-3.5 h-3.5 ml-0.5" />
+      )}
+    </button>
+  );
+}
+
 function IdeasTab({ project }: { project: Project }) {
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [loading, setLoading] = useState(false);
@@ -351,6 +1070,7 @@ function IdeasTab({ project }: { project: Project }) {
   const [newIdeaText, setNewIdeaText] = useState('');
   const [aiResponse, setAiResponse] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
+  const [dragOverCol, setDragOverCol] = useState<string | null>(null);
   const addInputRef = useRef<HTMLTextAreaElement>(null);
 
   const fetchIdeas = async () => {
@@ -546,14 +1266,33 @@ function IdeasTab({ project }: { project: Project }) {
         </div>
       )}
 
-      {/* 4-column Kanban board */}
-      <div className="grid grid-cols-4 gap-3 flex-1 min-h-0">
+      {/* 2-column Kanban board */}
+      <div className="grid grid-cols-2 gap-4 flex-1 min-h-0">
         {STATUS_COLS.map(col => {
           const colIdeas = ideasByStatus[col.id] || [];
+          const isOver = dragOverCol === col.id;
           return (
             <div
               key={col.id}
-              className={`flex flex-col border ${col.borderColor} rounded-xl bg-white/[0.01] overflow-hidden`}
+              onDragOver={(e) => {
+                e.preventDefault();
+              }}
+              onDragEnter={() => setDragOverCol(col.id)}
+              onDragLeave={() => {
+                if (dragOverCol === col.id) setDragOverCol(null);
+              }}
+              onDrop={(e) => {
+                const ideaId = e.dataTransfer.getData("text/plain");
+                if (ideaId) {
+                  handleStatusChange(ideaId, col.id);
+                }
+                setDragOverCol(null);
+              }}
+              className={`flex flex-col border transition-all duration-200 rounded-xl overflow-hidden ${
+                isOver 
+                  ? 'border-purple-500/50 bg-purple-500/[0.02] shadow-[0_0_15px_rgba(124,92,255,0.05)]' 
+                  : `${col.borderColor} bg-white/[0.01]`
+              }`}
             >
               {/* Column header */}
               <div className="px-3 pt-3 pb-2 flex-shrink-0">
@@ -1066,6 +1805,8 @@ function ControlRoomTab({ project }: { project: Project }) {
   const [creatingLink, setCreatingLink] = useState(false);
   const [justAdded, setJustAdded] = useState(false);
 
+  const [showAddLinkForm, setShowAddLinkForm] = useState(false);
+
   const fetchDeploymentsAndVisits = () => {
     if (!project.vercelProjectId) return;
     setDeploymentsLoading(true);
@@ -1106,7 +1847,7 @@ function ControlRoomTab({ project }: { project: Project }) {
   useEffect(() => {
     fetchDeploymentsAndVisits();
     fetchLinks();
-  }, [project.id]);
+  }, [project.id, project.vercelProjectId]);
 
   const pingLinks = async () => {
     if (projectLinks.length === 0) return;
@@ -1150,6 +1891,7 @@ function ControlRoomTab({ project }: { project: Project }) {
         setNewLinkType("other");
         setJustAdded(true);
         setTimeout(() => setJustAdded(false), 2000);
+        setShowAddLinkForm(false);
       }
     } catch (e) { }
     finally { setCreatingLink(false); }
@@ -1176,24 +1918,24 @@ function ControlRoomTab({ project }: { project: Project }) {
   };
 
   return (
-    <div className="p-6 space-y-6 max-w-4xl animate-in fade-in duration-300">
-
-      {/* Vercel and Add Environment Link row */}
-      <div className="grid grid-cols-2 gap-6">
-
-        {/* Vercel Deployment Control */}
-        <div className="bg-white/[0.02] border border-white/[0.05] p-6 rounded-2xl flex flex-col space-y-5">
+    <div className="p-4 grid grid-cols-1 md:grid-cols-12 gap-5 max-w-6xl mx-auto animate-in fade-in duration-300 min-h-0 select-none">
+      
+      {/* LEFT COLUMN: deployments, analytics and environments links registry */}
+      <div className="md:col-span-7 space-y-5 flex flex-col min-h-0">
+        
+        {/* Vercel Deployment & Analytics Card */}
+        <div className="bg-white/[0.02] border border-white/[0.05] p-5 rounded-2xl flex flex-col space-y-4">
           <div className="flex items-center justify-between">
-            <h4 className="text-xs uppercase font-mono tracking-widest text-white/40 font-bold">Vercel Deployment</h4>
+            <h4 className="text-[11px] uppercase font-mono tracking-widest text-white/40 font-bold">Vercel Integration</h4>
             {project.vercelProjectId && (
-              <span className="text-[9px] px-2 py-0.5 rounded-full bg-green-500/10 text-green-400 border border-green-500/20 font-mono font-bold uppercase tracking-wider">
+              <span className="text-[8px] px-2 py-0.5 rounded-full bg-green-500/10 text-green-400 border border-green-500/20 font-mono font-bold uppercase tracking-wider">
                 connected
               </span>
             )}
           </div>
 
           {!project.vercelProjectId ? (
-            <div className="flex-1 flex flex-col justify-center space-y-4 py-4">
+            <div className="flex-1 flex flex-col justify-center space-y-4 py-6">
               <p className="text-xs text-white/55 leading-relaxed">
                 Connect a Vercel project to load visitor traffic metrics and trigger production deployments.
               </p>
@@ -1208,13 +1950,13 @@ function ControlRoomTab({ project }: { project: Project }) {
               </select>
             </div>
           ) : (
-            <div className="space-y-5 flex-1 flex flex-col justify-between">
-              <div className="flex items-center justify-between p-4 rounded-xl bg-white/[0.01] border border-white/[0.03]">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-3.5 rounded-xl bg-white/[0.01] border border-white/[0.03]">
                 <div>
                   <span className="text-[9px] font-bold uppercase text-white/30 tracking-wider">Weekly Visits</span>
-                  <p className="text-2xl font-bold font-mono text-white mt-1">{totalVisits}</p>
+                  <p className="text-xl font-bold font-mono text-white mt-0.5">{totalVisits}</p>
                 </div>
-                <div className="h-10 flex items-end gap-2 pr-1 select-none">
+                <div className="h-9 flex items-end gap-1.5 pr-1 select-none">
                   {weeklyVisits.map((v, idx) => (
                     <div
                       key={idx}
@@ -1226,19 +1968,21 @@ function ControlRoomTab({ project }: { project: Project }) {
                 </div>
               </div>
 
-              <div className="space-y-2.5">
+              <div className="space-y-2">
                 <span className="text-[9px] font-bold uppercase text-white/30 tracking-wider block">Production Deployments</span>
                 {deploymentsLoading ? (
                   <p className="text-[10px] text-white/30 animate-pulse font-mono">Fetching deployment history...</p>
+                ) : deployments.length === 0 ? (
+                  <p className="text-[10px] text-white/20 italic">No deployments found for this Vercel project.</p>
                 ) : (
-                  <div className="space-y-2 max-h-[140px] overflow-y-auto pr-1">
+                  <div className="space-y-2 max-h-[140px] overflow-y-auto pr-1 custom-scrollbar">
                     {deployments.slice(0, 3).map((dep: any) => {
                       const isReady = dep.state === "READY";
                       const isError = dep.state === "ERROR" || dep.state === "FAILED";
                       return (
-                        <div key={dep.uid} className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.01] border border-white/[0.03] text-xs text-white/60 hover:bg-white/[0.03] transition-colors">
-                          <span className="truncate flex-1 pr-3 text-[11px] font-medium text-white/80">{dep.meta?.githubCommitMessage || dep.name || "Production Deploy"}</span>
-                          <span className={`text-[8px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded ${isReady ? "bg-green-500/10 text-green-400 border border-green-500/20" :
+                        <div key={dep.uid} className="flex items-center justify-between p-2 rounded-xl bg-white/[0.01] border border-white/[0.03] text-xs text-white/60 hover:bg-white/[0.03] transition-colors">
+                          <span className="truncate flex-1 pr-3 text-[11px] font-medium text-white/85">{dep.meta?.githubCommitMessage || dep.name || "Production Deploy"}</span>
+                          <span className={`text-[8px] font-mono font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${isReady ? "bg-green-500/10 text-green-400 border border-green-500/20" :
                               isError ? "bg-red-500/10 text-red-400 border border-red-500/20" :
                                 "bg-purple-500/10 text-purple-400 border border-purple-500/20"
                             }`}>
@@ -1254,93 +1998,98 @@ function ControlRoomTab({ project }: { project: Project }) {
           )}
         </div>
 
-        {/* Add Environment Link Card */}
-        <div className="bg-white/[0.02] border border-white/[0.05] p-6 rounded-2xl space-y-5">
-          <h4 className="text-xs uppercase font-mono tracking-widest text-white/40 font-bold">Add Environment Link</h4>
-          <div className="space-y-4">
-            <div className="space-y-1">
-              <span className="text-[9px] text-white/30 font-bold uppercase tracking-wider font-mono">Link Label</span>
-              <Input
-                value={newLinkLabel}
-                onChange={e => setNewLinkLabel(e.target.value)}
-                placeholder="Database Connection Console"
-                className="h-9 bg-white/[0.02] border border-white/[0.08] focus:border-purple-500/40 text-xs text-white rounded-xl focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none transition-all placeholder:text-white/20"
-              />
+        {/* Combined Infrastructure Links & Add Form Card */}
+        <div className="bg-white/[0.02] border border-white/[0.05] p-5 rounded-2xl flex flex-col space-y-3">
+          <div className="flex items-center justify-between border-b border-white/[0.04] pb-2">
+            <div className="flex items-center gap-1.5">
+              <Activity className="w-3.5 h-3.5 text-purple-400" />
+              <h4 className="text-[11px] uppercase font-mono tracking-wider text-white/40 font-bold">Infrastructure Registry</h4>
             </div>
-
-            <div className="grid grid-cols-3 gap-3">
-              <div className="col-span-1 space-y-1">
-                <span className="text-[9px] text-white/30 font-bold uppercase tracking-wider font-mono">Type</span>
-                <select
-                  value={newLinkType}
-                  onChange={e => setNewLinkType(e.target.value)}
-                  className="w-full h-9 bg-white/[0.02] border border-white/[0.08] focus:border-purple-500/40 rounded-xl text-xs text-white px-2.5 focus:outline-none cursor-pointer font-medium transition-all"
-                >
-                  <option value="frontend" className="bg-[#0f0f11]">Frontend</option>
-                  <option value="backend" className="bg-[#0f0f11]">Backend</option>
-                  <option value="database" className="bg-[#0f0f11]">Database</option>
-                  <option value="storage" className="bg-[#0f0f11]">Storage</option>
-                  <option value="monitoring" className="bg-[#0f0f11]">Monitoring</option>
-                  <option value="logs" className="bg-[#0f0f11]">Logs</option>
-                  <option value="other" className="bg-[#0f0f11]">Other</option>
-                </select>
-              </div>
-              <div className="col-span-2 space-y-1">
-                <span className="text-[9px] text-white/30 font-bold uppercase tracking-wider font-mono">Target URL</span>
-                <Input
-                  value={newLinkUrl}
-                  onChange={e => setNewLinkUrl(e.target.value)}
-                  placeholder="https://console.neon.tech/..."
-                  className="h-9 bg-white/[0.02] border border-white/[0.08] focus:border-purple-500/40 text-xs text-white rounded-xl focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none transition-all placeholder:text-white/20"
-                />
-              </div>
-            </div>
-
-            <div className="pt-2">
+            <div className="flex items-center gap-2">
               <Button
-                onClick={submitNewLink}
-                disabled={creatingLink || !newLinkUrl || !newLinkLabel}
-                className={`w-full h-9 text-xs font-bold rounded-xl transition-all cursor-pointer border-0 ${justAdded
-                    ? 'bg-green-500 hover:bg-green-600 text-white'
-                    : 'bg-white text-black hover:bg-white/90'
-                  }`}
+                size="sm"
+                variant="outline"
+                className="h-6 text-[9px] bg-transparent border-white/10 text-white/50 hover:bg-white/5 cursor-pointer px-2 rounded-md"
+                onClick={pingLinks}
+                disabled={pingingLinks}
               >
-                {creatingLink ? "Saving link..." : justAdded ? "Saved Link!" : "Save Link"}
+                {pingingLinks ? "Pinging..." : "Ping All"}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className={`h-6 text-[9px] cursor-pointer px-2 rounded-md ${showAddLinkForm ? 'bg-purple-500/10 border-purple-500/20 text-purple-400' : 'bg-transparent border-white/10 text-white/50 hover:bg-white/5'}`}
+                onClick={() => setShowAddLinkForm(!showAddLinkForm)}
+              >
+                {showAddLinkForm ? "Cancel" : "+ Add Link"}
               </Button>
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* Infrastructure list */}
-      <div className="bg-white/[0.02] border border-white/[0.05] p-6 rounded-2xl space-y-5">
-        <div className="flex items-center justify-between border-b border-white/[0.04] pb-3">
-          <div className="flex items-center gap-2">
-            <Activity className="w-4 h-4 text-purple-400" />
-            <h4 className="text-xs uppercase font-mono tracking-widest text-white/40 font-bold">Infrastructure Links</h4>
-          </div>
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-7 text-[10px] bg-transparent border-white/10 text-white/60 hover:bg-white/5 cursor-pointer font-bold px-3 rounded-lg flex items-center gap-1"
-            onClick={pingLinks}
-            disabled={pingingLinks}
-          >
-            {pingingLinks ? "Pinging..." : "Ping All Links"}
-          </Button>
-        </div>
+          {/* Collapsible Add Form */}
+          {showAddLinkForm && (
+            <div className="p-3.5 bg-white/[0.01] border border-white/[0.04] rounded-xl space-y-3 text-xs animate-in slide-in-from-top-2 duration-200">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <span className="text-[9px] text-white/30 font-bold uppercase tracking-wider font-mono">Link Label</span>
+                  <Input
+                    value={newLinkLabel}
+                    onChange={e => setNewLinkLabel(e.target.value)}
+                    placeholder="Neon DB Console"
+                    className="h-8 bg-[#07070a] border border-white/[0.08] focus:border-purple-500/40 text-xs text-white rounded-lg px-2.5 focus:ring-0 placeholder:text-white/20"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <span className="text-[9px] text-white/30 font-bold uppercase tracking-wider font-mono">Type</span>
+                  <select
+                    value={newLinkType}
+                    onChange={e => setNewLinkType(e.target.value)}
+                    className="w-full h-8 bg-[#07070a] border border-white/[0.08] focus:border-purple-500/40 rounded-lg text-xs text-white px-2.5 cursor-pointer outline-none font-medium"
+                  >
+                    <option value="frontend" className="bg-[#0f0f11]">Frontend</option>
+                    <option value="backend" className="bg-[#0f0f11]">Backend</option>
+                    <option value="database" className="bg-[#0f0f11]">Database</option>
+                    <option value="storage" className="bg-[#0f0f11]">Storage</option>
+                    <option value="monitoring" className="bg-[#0f0f11]">Monitoring</option>
+                    <option value="logs" className="bg-[#0f0f11]">Logs</option>
+                    <option value="other" className="bg-[#0f0f11]">Other</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div className="space-y-1">
+                <span className="text-[9px] text-white/30 font-bold uppercase tracking-wider font-mono">Target URL</span>
+                <div className="flex gap-2">
+                  <Input
+                    value={newLinkUrl}
+                    onChange={e => setNewLinkUrl(e.target.value)}
+                    placeholder="https://console.neon.tech/..."
+                    className="h-8 bg-[#07070a] border border-white/[0.08] focus:border-purple-500/40 text-xs text-white rounded-lg flex-1 px-2.5 focus:ring-0 placeholder:text-white/20"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={submitNewLink}
+                    disabled={creatingLink || !newLinkUrl || !newLinkLabel}
+                    className={`h-8 text-xs font-bold rounded-lg px-3.5 border-0 ${justAdded ? 'bg-green-500 hover:bg-green-600 text-white' : 'bg-white text-black hover:bg-white/90'}`}
+                  >
+                    {creatingLink ? "Saving..." : justAdded ? "Saved!" : "Save"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
 
-        {linksLoading ? (
-          <p className="text-xs text-white/30 text-center py-6 font-mono">Loading links registry...</p>
-        ) : projectLinks.length === 0 ? (
-          <p className="text-xs text-white/20 text-center py-8 italic">No environment or infrastructure links added yet.</p>
-        ) : (
-          <div className="grid grid-cols-2 gap-4">
-            {projectLinks.map((link) => {
-              return (
-                <div key={link.id} className="p-3.5 rounded-xl bg-white/[0.01] border border-white/[0.04] flex items-center justify-between gap-3 group hover:border-white/10 hover:bg-white/[0.02] transition-all">
+          {/* Link Registry Items */}
+          {linksLoading ? (
+            <p className="text-[10px] text-white/30 text-center py-4 font-mono">Loading links registry...</p>
+          ) : projectLinks.length === 0 ? (
+            <p className="text-[10px] text-white/20 text-center py-4 italic">No environment or infrastructure links added yet.</p>
+          ) : (
+            <div className="grid grid-cols-1 gap-2 max-h-[190px] overflow-y-auto pr-1 custom-scrollbar">
+              {projectLinks.map((link) => (
+                <div key={link.id} className="p-2.5 rounded-xl bg-white/[0.01] border border-white/[0.04] flex items-center justify-between gap-3 group hover:border-white/10 hover:bg-white/[0.02] transition-all">
                   <div className="flex items-center gap-3 min-w-0">
-                    <span className="relative flex h-2 w-2 shrink-0">
+                    <span className="relative flex h-1.5 w-1.5 shrink-0">
                       {(!link.lastPinged || link.lastStatus === null) ? (
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white/20 opacity-75"></span>
                       ) : (link.lastStatus >= 200 && link.lastStatus < 300) ? (
@@ -1348,7 +2097,7 @@ function ControlRoomTab({ project }: { project: Project }) {
                       ) : (
                         <span className="animate-pulse absolute inline-flex h-full w-full rounded-full bg-red-400/40 opacity-75"></span>
                       )}
-                      <span className={`relative inline-flex rounded-full h-2 w-2 ${!link.lastPinged || link.lastStatus === null ? 'bg-white/30' :
+                      <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${!link.lastPinged || link.lastStatus === null ? 'bg-white/30' :
                           (link.lastStatus >= 200 && link.lastStatus < 300) ? 'bg-green-400' : 'bg-red-400'
                         }`}></span>
                     </span>
@@ -1359,35 +2108,45 @@ function ControlRoomTab({ project }: { project: Project }) {
                           {link.type}
                         </span>
                       </div>
-                      <span className="text-[10px] font-mono text-white/35 truncate block mt-1">{link.url.replace(/^https?:\/\//, '')}</span>
+                      <span className="text-[10px] font-mono text-white/35 truncate block mt-0.5">{link.url.replace(/^https?:\/\//, '')}</span>
                     </div>
                   </div>
-
+                  
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                     <a
                       href={link.url}
                       target="_blank"
-                      className="w-7 h-7 text-white/40 hover:text-white hover:bg-white/5 inline-flex items-center justify-center rounded-lg border border-white/5"
-                      title="Navigate to console"
+                      className="w-6 h-6 text-white/40 hover:text-white hover:bg-white/5 inline-flex items-center justify-center rounded border border-white/5"
                     >
-                      <ExternalLink className="w-3.5 h-3.5" />
+                      <ExternalLink className="w-3 h-3" />
                     </a>
                     <Button
                       size="icon"
                       variant="ghost"
-                      className="w-7 h-7 text-white/40 hover:text-red-400 hover:bg-red-500/10 rounded-lg border border-transparent"
+                      className="w-6 h-6 text-white/40 hover:text-red-400 hover:bg-red-500/10 rounded border border-transparent"
                       onClick={() => deleteLink(link.id)}
-                      title="Remove link"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </Button>
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* RIGHT COLUMN: Tasks full height */}
+      <div className="md:col-span-5 bg-[#121217]/60 border border-white/[0.05] p-5 rounded-2xl flex flex-col space-y-4 min-h-[380px] overflow-hidden">
+        <div className="flex items-center gap-1.5 border-b border-white/[0.04] pb-2 flex-shrink-0 select-none">
+          <CheckSquare className="w-4 h-4 text-purple-400" />
+          <h4 className="text-xs uppercase font-mono tracking-widest text-white/40 font-bold">Project Tasks</h4>
+        </div>
+        <div className="flex-1 overflow-y-auto custom-scrollbar pr-0.5">
+          <ProjectTasksTab project={project} isNested={true} />
+        </div>
+      </div>
+
     </div>
   );
 }
@@ -1461,8 +2220,13 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
   const [potentialImpact, setPotentialImpact] = useState<string>("medium");
   const [stage, setStage] = useState<string>("concept");
 
-  // Local scan state
+  // Local scan and Tab state
   const [localScanning, setLocalScanning] = useState(false);
+  const [activeFormTab, setActiveFormTab] = useState<"manual" | "github" | "local">("manual");
+  const [githubRepos, setGithubRepos] = useState<any[]>([]);
+  const [reposLoading, setReposLoading] = useState(false);
+  const [repoSearch, setRepoSearch] = useState("");
+  const [selectedRepo, setSelectedRepo] = useState<any | null>(null);
 
   // Initialize form when opening/editing
   useEffect(() => {
@@ -1481,11 +2245,13 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
         setEffortEstimate(projectToEdit.effortEstimate || "m");
         setPotentialImpact(projectToEdit.potentialImpact || "medium");
         setStage(projectToEdit.stage || "concept");
+        setActiveFormTab("manual");
       } else {
         setName("");
         setDescription("");
-        setPhaseState(defaultPhase || (useProjectOSStore.getState().activePhase as any) || "idea");
-        setType("code");
+        const startPhase = defaultPhase || (useProjectOSStore.getState().activePhase as any) || "idea";
+        setPhaseState(startPhase);
+        setType(startPhase === "idea" ? "idea" : "code");
         setPriority("medium");
         setPinned(false);
         setGithubUrl("");
@@ -1495,20 +2261,66 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
         setEffortEstimate("m");
         setPotentialImpact("medium");
         setStage("concept");
+        setActiveFormTab("manual");
+        setSelectedRepo(null);
       }
     }
   }, [isOpen, projectToEdit, defaultPhase]);
 
-  const handleScanLocal = async () => {
+  // Fetch GitHub repos
+  const fetchRepos = async () => {
+    setReposLoading(true);
+    try {
+      const username = localStorage.getItem("GITHUB_USERNAME") || "coderkavyag";
+      const token = localStorage.getItem("GITHUB_TOKEN") || "";
+      const headers: HeadersInit = {};
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+      const res = await fetch(`/api/github?username=${username}`, { headers });
+      if (!res.ok) throw new Error("Failed to load GitHub repositories");
+      const data = await res.json();
+      setGithubRepos(data.repos || data || []);
+    } catch (err: any) {
+      console.error(err);
+    } finally {
+      setReposLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeFormTab === "github" && githubRepos.length === 0 && isOpen) {
+      fetchRepos();
+    }
+  }, [activeFormTab, isOpen]);
+
+  // Hook up phase changes to dynamically set type
+  const handlePhaseChange = (newPhase: typeof phase) => {
+    setPhaseState(newPhase);
+    setType(newPhase === "idea" ? "idea" : "code");
+  };
+
+  const handleScanLocal = async (isRetry = false) => {
     setLocalScanning(true);
     try {
       const res = await fetch("/api/machine/pick-and-scan-folder", {
         method: "POST",
         headers: { "Content-Type": "application/json" }
       });
+      
       const data = await res.json();
       if (!res.ok) {
         if (data.error === "No folder selected") return;
+        
+        // If agent is offline and we haven't retried yet, auto start it
+        if (data.error === "DevOS Agent is offline." && !isRetry) {
+          // Trigger start agent
+          await fetch("/api/machine/start-agent", { method: "POST" }).catch(() => {});
+          // Wait 1.5s
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          // Retry
+          return handleScanLocal(true);
+        }
         throw new Error(data.error);
       }
       
@@ -1519,6 +2331,7 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
       if (data.githubUrl) {
         setGithubUrl(data.githubUrl);
       }
+      // Scanned folder is an actual project, auto set type to code
       setType("code");
 
       // Auto-register workspace
@@ -1530,6 +2343,12 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
         });
       } catch { }
     } catch (e: any) {
+      // If error message indicates agent is offline and not retried
+      if ((e.message?.includes("offline") || e.message?.includes("fetch")) && !isRetry) {
+        await fetch("/api/machine/start-agent", { method: "POST" }).catch(() => {});
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        return handleScanLocal(true);
+      }
       alert(`Local scan failed: ${e.message}`);
     } finally {
       setLocalScanning(false);
@@ -1601,239 +2420,430 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
 
   if (!isOpen) return null;
 
+  const filteredRepos = githubRepos.filter(repo =>
+    repo.name.toLowerCase().includes(repoSearch.toLowerCase()) ||
+    (repo.description && repo.description.toLowerCase().includes(repoSearch.toLowerCase()))
+  );
+
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm select-none">
       <motion.div
         initial={{ opacity: 0, scale: 0.96 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="w-full max-w-lg bg-surface-1 border border-white/[0.08] rounded-xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh]"
+        className="w-full max-w-2xl bg-surface-1 border border-white/[0.08] rounded-xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh]"
       >
+        {/* Header */}
         <div className="px-5 py-4 border-b border-white/[0.06] flex items-center justify-between">
           <h2 className="text-sm font-semibold text-white">
             {projectToEdit ? `Configure ${projectToEdit.name}` : "Create New Project"}
           </h2>
-          <button onClick={onClose} className="text-white/40 hover:text-white/70 transition-colors">
+          <button onClick={onClose} className="text-white/40 hover:text-white/70 transition-colors cursor-pointer">
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+        {/* Tab Selection (only if not editing) */}
+        {!projectToEdit && (
+          <div className="flex border-b border-white/[0.06] bg-black/20 flex-shrink-0">
+            {(["manual", "github", "local"] as const).map(tab => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => {
+                  setActiveFormTab(tab);
+                  // Reset temporary inputs
+                  setName("");
+                  setDescription("");
+                  setGithubUrl("");
+                  setFolderPath("");
+                  setSelectedRepo(null);
+                }}
+                className={`flex-1 py-2.5 text-xs font-semibold border-b-2 -mb-px transition-all cursor-pointer capitalize flex items-center justify-center gap-1.5
+                  ${activeFormTab === tab
+                    ? "text-purple-300 border-purple-500 bg-white/[0.02] font-bold"
+                    : "text-white/40 border-transparent hover:text-white/60 hover:bg-white/[0.01]"
+                  }`}
+              >
+                {tab === "manual" && <Settings className="w-3.5 h-3.5" />}
+                {tab === "github" && <GitBranch className="w-3.5 h-3.5" />}
+                {tab === "local" && <FolderOpen className="w-3.5 h-3.5" />}
+                {tab === "manual" ? "Manual Details" : tab === "github" ? "GitHub Import" : "Local Folder"}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="flex-1 overflow-y-auto p-5 scrollbar-thin">
           <form onSubmit={handleSave} className="space-y-4">
-            {/* Name & Workspace */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-[10px] uppercase tracking-wider text-white/30 font-bold block mb-1">Project Name</label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={e => setName(e.target.value)}
-                  placeholder="My SaaS App"
-                  className="w-full h-8 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-3 focus:outline-none focus:ring-1 focus:ring-purple-500/30 placeholder:text-white/20"
-                  required
-                />
-              </div>
-              <div>
-                <label className="text-[10px] uppercase tracking-wider text-white/30 font-bold block mb-1">Project Phase</label>
-                <select
-                  value={phase}
-                  onChange={e => setPhaseState(e.target.value as any)}
-                  className="w-full h-8 bg-black/40 border border-white/10 rounded-lg text-[11px] text-white px-3 focus:outline-none focus:ring-1 focus:ring-purple-500/30 font-semibold"
-                >
-                  <option value="idea">Idea Phase</option>
-                  <option value="sketching">Sketching</option>
-                  <option value="in_development">In Development</option>
-                  <option value="launched">Launched</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Type Selection */}
-            <div>
-              <label className="text-[10px] uppercase tracking-wider text-white/30 font-bold block mb-1.5">Project Type</label>
-              <div className="grid grid-cols-4 gap-2">
-                {(["code", "idea", "research", "experiment"] as const).map(t => {
-                  const badge = TYPE_BADGES[t];
-                  const Icon = badge.icon;
-                  const isSelected = type === t;
-                  return (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => setType(t)}
-                      className={`h-9 border rounded-lg flex flex-col items-center justify-center gap-1 transition-all ${isSelected
-                          ? "bg-purple-500/10 border-purple-500/40 text-purple-300"
-                          : "bg-black/20 border-white/10 text-white/40 hover:text-white/60"
-                        }`}
-                    >
-                      <Icon className="w-3.5 h-3.5" />
-                      <span className="text-[9px] font-semibold uppercase">{badge.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Description */}
-            <div>
-              <label className="text-[10px] uppercase tracking-wider text-white/30 font-bold block mb-1">Description</label>
-              <textarea
-                value={description}
-                onChange={e => setDescription(e.target.value)}
-                placeholder="Tell DevOS what this project is about..."
-                className="w-full bg-black/40 border border-white/10 rounded-lg text-xs text-white p-3 focus:outline-none focus:ring-1 focus:ring-purple-500/30 placeholder:text-white/20 h-16 resize-none"
-              />
-            </div>
-
-            {/* Priority & Pinned */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-[10px] uppercase tracking-wider text-white/30 font-bold block mb-1">Priority</label>
-                <div className="flex bg-black/40 rounded-lg p-0.5 border border-white/5 h-8">
-                  {(["low", "medium", "high", "critical"] as const).map(p => (
-                    <button
-                      key={p}
-                      type="button"
-                      onClick={() => setPriority(p)}
-                      className={`flex-1 text-[10px] font-semibold rounded capitalize transition-all ${priority === p ? "bg-white/10 text-white" : "text-white/40 hover:text-white/60"
-                        }`}
-                    >
-                      {p}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="flex items-center justify-between h-8 mt-5 px-3 bg-black/20 border border-white/5 rounded-lg">
-                <span className="text-xs text-white/50">Pin to sidebar</span>
-                <button
-                  type="button"
-                  onClick={() => setPinned(!pinned)}
-                  className={`w-8 h-4 rounded-full p-0.5 transition-colors duration-200 focus:outline-none ${pinned ? "bg-purple-500" : "bg-white/10"
-                    }`}
-                >
-                  <div className={`bg-white w-3 h-3 rounded-full shadow-md transform transition-transform duration-200 ${pinned ? "translate-x-4" : "translate-x-0"
-                    }`} />
-                </button>
-              </div>
-            </div>
-
-            {/* Idea-specific fields */}
-            {type === "idea" && (
-              <div className="p-4 bg-purple-500/[0.02] border border-purple-500/10 rounded-xl space-y-4">
-                <h3 className="text-[10px] uppercase tracking-widest text-purple-400 font-bold font-mono">Idea Validation Parameters</h3>
-
+            
+            {/* MANUAL DETAILS TAB */}
+            {(projectToEdit || activeFormTab === "manual") && (
+              <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-[10px] text-white/45 block mb-1">Confidence Score (1–5)</label>
-                    <div className="flex gap-2">
-                      {[1, 2, 3, 4, 5].map(val => (
-                        <button
-                          key={val}
-                          type="button"
-                          onClick={() => setConfidenceLevel(val)}
-                          className={`flex-1 py-1 rounded border text-xs font-mono transition-all ${confidenceLevel === val
-                              ? "bg-purple-500/20 border-purple-500/50 text-purple-300 font-bold"
-                              : "bg-black/25 border-white/10 text-white/40"
-                            }`}
-                        >
-                          {val}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-white/45 block mb-1">Effort Estimate</label>
-                    <div className="flex gap-1 bg-black/40 rounded-lg p-0.5 border border-white/5">
-                      {(["xs", "s", "m", "l", "xl"] as const).map(ef => (
-                        <button
-                          key={ef}
-                          type="button"
-                          onClick={() => setEffortEstimate(ef)}
-                          className={`flex-1 text-[9px] uppercase font-bold rounded transition-all ${effortEstimate === ef ? "bg-white/15 text-white" : "text-white/40 hover:text-white/60"
-                            }`}
-                        >
-                          {ef}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-[10px] text-white/45 block mb-1">Potential Impact</label>
-                    <select
-                      value={potentialImpact}
-                      onChange={e => setPotentialImpact(e.target.value)}
-                      className="w-full h-8 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-2 focus:outline-none"
-                    >
-                      <option value="low">Low Impact</option>
-                      <option value="medium">Medium Impact</option>
-                      <option value="high">High Impact</option>
-                      <option value="massive">Massive Impact</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-white/45 block mb-1">Idea Stage</label>
-                    <select
-                      value={stage}
-                      onChange={e => setStage(e.target.value)}
-                      className="w-full h-8 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-2 focus:outline-none"
-                    >
-                      <option value="concept">Concept Only</option>
-                      <option value="research">Active Research</option>
-                      <option value="validated">Market Validated</option>
-                      <option value="prototyping">Prototyping</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Integrations URLs */}
-            {type !== "idea" && (
-              <div className="space-y-3 pt-2">
-                <div>
-                  <label className="text-[10px] uppercase tracking-wider text-white/30 block mb-1">GitHub Repo URL (Optional)</label>
-                  <input
-                    type="text"
-                    value={githubUrl}
-                    onChange={e => setGithubUrl(e.target.value)}
-                    placeholder="https://github.com/username/project"
-                    className="w-full h-8 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-3 focus:outline-none focus:ring-1 focus:ring-purple-500/30 placeholder:text-white/25 font-mono"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-[10px] uppercase tracking-wider text-white/30 block mb-1">Production URL (Optional)</label>
+                    <label className="text-[10px] uppercase tracking-wider text-white/30 font-bold block mb-1">Project Name</label>
                     <input
                       type="text"
-                      value={liveUrl}
-                      onChange={e => setLiveUrl(e.target.value)}
-                      placeholder="https://project.vercel.app"
-                      className="w-full h-8 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-3 focus:outline-none focus:ring-1 focus:ring-purple-500/30 placeholder:text-white/25 font-mono"
+                      value={name}
+                      onChange={e => setName(e.target.value)}
+                      placeholder="My SaaS App"
+                      className="w-full h-8 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-3 focus:outline-none focus:ring-1 focus:ring-purple-500/30 placeholder:text-white/20"
+                      required
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] uppercase tracking-wider text-white/30 block mb-1">Local Directory Path (Optional)</label>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={folderPath}
-                        onChange={e => setFolderPath(e.target.value)}
-                        placeholder="C:/Users/name/Projects/app"
-                        className="flex-1 h-8 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-3 focus:outline-none focus:ring-1 focus:ring-purple-500/30 placeholder:text-white/25 font-mono"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleScanLocal}
-                        disabled={localScanning}
-                        className="px-3 h-8 text-[11px] font-semibold rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-400 hover:bg-purple-500/20 hover:text-purple-300 disabled:opacity-50 disabled:pointer-events-none transition-colors cursor-pointer"
-                      >
-                        {localScanning ? "Choosing..." : "Choose Folder"}
-                      </button>
-                    </div>
+                    <label className="text-[10px] uppercase tracking-wider text-white/30 font-bold block mb-1">Project Phase</label>
+                    <select
+                      value={phase}
+                      onChange={e => handlePhaseChange(e.target.value as any)}
+                      className="w-full h-8 bg-black/40 border border-white/10 rounded-lg text-[11px] text-white px-3 focus:outline-none focus:ring-1 focus:ring-purple-500/30 font-semibold"
+                    >
+                      <option value="idea">Idea Phase</option>
+                      <option value="sketching">Sketching</option>
+                      <option value="in_development">In Development</option>
+                      <option value="launched">Launched</option>
+                    </select>
                   </div>
                 </div>
+
+                <div>
+                  <label className="text-[10px] uppercase tracking-wider text-white/30 font-bold block mb-1">Description</label>
+                  <textarea
+                    value={description}
+                    onChange={e => setDescription(e.target.value)}
+                    placeholder="Tell DevOS what this project is about..."
+                    className="w-full bg-black/40 border border-white/10 rounded-lg text-xs text-white p-3 focus:outline-none focus:ring-1 focus:ring-purple-500/30 placeholder:text-white/20 h-16 resize-none"
+                  />
+                </div>
+
+
+
+                {/* Idea-specific fields */}
+                {phase === "idea" && (
+                  <div className="p-4 bg-purple-500/[0.02] border border-purple-500/10 rounded-xl space-y-4">
+                    <h3 className="text-[10px] uppercase tracking-widest text-purple-400 font-bold font-mono">Idea Validation Parameters</h3>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-[10px] text-white/45 block mb-1">Confidence Score (1–5)</label>
+                        <div className="flex gap-2">
+                          {[1, 2, 3, 4, 5].map(val => (
+                            <button
+                              key={val}
+                              type="button"
+                              onClick={() => setConfidenceLevel(val)}
+                              className={`flex-1 py-1 rounded border text-xs font-mono transition-all cursor-pointer ${confidenceLevel === val
+                                  ? "bg-purple-500/20 border-purple-500/50 text-purple-300 font-bold"
+                                  : "bg-black/25 border-white/10 text-white/40"
+                                }`}
+                            >
+                              {val}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-white/45 block mb-1">Effort Estimate</label>
+                        <div className="flex gap-1 bg-black/40 rounded-lg p-0.5 border border-white/5">
+                          {(["xs", "s", "m", "l", "xl"] as const).map(ef => (
+                            <button
+                              key={ef}
+                              type="button"
+                              onClick={() => setEffortEstimate(ef)}
+                              className={`flex-1 text-[9px] uppercase font-bold rounded transition-all cursor-pointer ${effortEstimate === ef ? "bg-white/15 text-white" : "text-white/40 hover:text-white/60"
+                                }`}
+                            >
+                              {ef}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-[10px] text-white/45 block mb-1">Potential Impact</label>
+                        <select
+                          value={potentialImpact}
+                          onChange={e => setPotentialImpact(e.target.value)}
+                          className="w-full h-8 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-2 focus:outline-none"
+                        >
+                          <option value="low">Low Impact</option>
+                          <option value="medium">Medium Impact</option>
+                          <option value="high">High Impact</option>
+                          <option value="massive">Massive Impact</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-white/45 block mb-1">Idea Stage</label>
+                        <select
+                          value={stage}
+                          onChange={e => setStage(e.target.value)}
+                          className="w-full h-8 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-2 focus:outline-none"
+                        >
+                          <option value="concept">Concept Only</option>
+                          <option value="research">Active Research</option>
+                          <option value="validated">Market Validated</option>
+                          <option value="prototyping">Prototyping</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Integrations URLs */}
+                {phase !== "idea" && (
+                  <div className="space-y-3 pt-2">
+                    <div>
+                      <label className="text-[10px] uppercase tracking-wider text-white/30 block mb-1">GitHub Repo URL (Optional)</label>
+                      <input
+                        type="text"
+                        value={githubUrl}
+                        onChange={e => setGithubUrl(e.target.value)}
+                        placeholder="https://github.com/username/project"
+                        className="w-full h-8 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-3 focus:outline-none focus:ring-1 focus:ring-purple-500/30 placeholder:text-white/25 font-mono"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-[10px] uppercase tracking-wider text-white/30 block mb-1">Production URL (Optional)</label>
+                        <input
+                          type="text"
+                          value={liveUrl}
+                          onChange={e => setLiveUrl(e.target.value)}
+                          placeholder="https://project.vercel.app"
+                          className="w-full h-8 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-3 focus:outline-none focus:ring-1 focus:ring-purple-500/30 placeholder:text-white/25 font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] uppercase tracking-wider text-white/30 block mb-1">Local Directory Path (Optional)</label>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={folderPath}
+                            onChange={e => setFolderPath(e.target.value)}
+                            placeholder="C:/Users/name/Projects/app"
+                            className="flex-1 h-8 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-3 focus:outline-none focus:ring-1 focus:ring-purple-500/30 placeholder:text-white/25 font-mono"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleScanLocal(false)}
+                            disabled={localScanning}
+                            className="px-3 h-8 text-[11px] font-semibold rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-400 hover:bg-purple-500/20 hover:text-purple-300 disabled:opacity-50 disabled:pointer-events-none transition-colors cursor-pointer"
+                          >
+                            {localScanning ? "Choosing..." : "Choose Folder"}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* GITHUB IMPORT TAB */}
+            {!projectToEdit && activeFormTab === "github" && (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  {/* Search Repository */}
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 text-white/30 absolute left-3 top-2.5" />
+                    <input
+                      type="text"
+                      value={repoSearch}
+                      onChange={e => setRepoSearch(e.target.value)}
+                      placeholder="Search GitHub repositories..."
+                      className="w-full h-9 bg-black/40 border border-white/10 rounded-lg text-xs text-white pl-9 pr-3 focus:outline-none focus:ring-1 focus:ring-purple-500/30 placeholder:text-white/20"
+                    />
+                  </div>
+
+                  {reposLoading ? (
+                    <div className="py-12 text-center text-xs text-white/40 flex flex-col items-center justify-center gap-2">
+                      <div className="w-5 h-5 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                      <span>Loading repositories...</span>
+                    </div>
+                  ) : filteredRepos.length === 0 ? (
+                    <div className="py-8 text-center text-xs text-white/30 italic border border-dashed border-white/5 rounded-lg">
+                      No repositories found. Ensure GITHUB_USERNAME is configured in widgets panel.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-1.5 max-h-[30vh] overflow-y-auto pr-1">
+                      {filteredRepos.map(repo => {
+                        const isSelected = selectedRepo?.id === repo.id;
+                        return (
+                          <button
+                            key={repo.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedRepo(repo);
+                              setName(repo.name);
+                              setDescription(repo.description || "");
+                              setGithubUrl(repo.html_url);
+                              setType("code");
+                            }}
+                            className={`w-full text-left p-3 rounded-lg border transition-all flex flex-col gap-1 cursor-pointer ${
+                              isSelected
+                                ? "bg-purple-500/10 border-purple-500/40 text-purple-300 font-medium"
+                                : "bg-white/[0.01] border-white/[0.05] hover:bg-white/[0.03] text-white/70"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-semibold">{repo.name}</span>
+                              {repo.language && (
+                                <span className="text-[9px] bg-white/5 px-1.5 py-0.5 rounded text-white/50">{repo.language}</span>
+                              )}
+                            </div>
+                            {repo.description && (
+                              <p className="text-[10px] text-white/45 line-clamp-1">{repo.description}</p>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {selectedRepo && (
+                  <div className="p-4 bg-white/[0.01] border border-white/5 rounded-xl space-y-4 mt-2">
+                    <div>
+                      <label className="text-[9px] uppercase tracking-wider text-white/30 font-bold block mb-1">Selected Repository</label>
+                      <div className="text-[11px] font-mono text-purple-300 truncate bg-black/30 p-2 rounded border border-white/5 select-all">
+                        {selectedRepo.owner?.login || selectedRepo.owner}/{selectedRepo.name}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-[10px] uppercase tracking-wider text-white/30 font-bold block mb-1">Project Name</label>
+                        <input
+                          type="text"
+                          value={name}
+                          onChange={e => setName(e.target.value)}
+                          className="w-full h-8 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-3 focus:outline-none"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] uppercase tracking-wider text-white/30 font-bold block mb-1">Project Phase</label>
+                        <select
+                          value={phase}
+                          onChange={e => handlePhaseChange(e.target.value as any)}
+                          className="w-full h-8 bg-black/40 border border-white/10 rounded-lg text-[11px] text-white px-3 focus:outline-none"
+                        >
+                          <option value="idea">Idea Phase</option>
+                          <option value="sketching">Sketching</option>
+                          <option value="in_development">In Development</option>
+                          <option value="launched">Launched</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] uppercase tracking-wider text-white/30 font-bold block mb-1">Description</label>
+                      <textarea
+                        value={description}
+                        onChange={e => setDescription(e.target.value)}
+                        className="w-full bg-black/40 border border-white/10 rounded-lg text-xs text-white p-3 focus:outline-none h-16 resize-none"
+                      />
+                    </div>
+
+
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* LOCAL SCAN TAB */}
+            {!projectToEdit && activeFormTab === "local" && (
+              <div className="space-y-4">
+                <div className="p-6 bg-black/20 border border-dashed border-white/5 rounded-xl text-center flex flex-col items-center justify-center gap-3">
+                  <FolderOpen className="w-8 h-8 text-purple-400/80" />
+                  <div>
+                    <h3 className="text-xs font-semibold text-white">Import from Local Machine</h3>
+                    <p className="text-[10px] text-white/40 mt-1 max-w-[280px] mx-auto">
+                      Scan any directory on your computer. DevOS Agent will auto-detect configurations and initialize local git integrations.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleScanLocal(false)}
+                    disabled={localScanning}
+                    className="mt-2 px-4 py-2 text-xs font-bold rounded-lg bg-purple-500 hover:bg-purple-600 text-white disabled:opacity-50 transition-all cursor-pointer flex items-center gap-1.5"
+                  >
+                    {localScanning ? (
+                      <>
+                        <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <span>Scanning Folder...</span>
+                      </>
+                    ) : (
+                      <>
+                        <FolderOpen className="w-3.5 h-3.5" />
+                        <span>Choose & Scan Folder</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {folderPath && (
+                  <div className="p-4 bg-white/[0.01] border border-white/5 rounded-xl space-y-4">
+                    <div>
+                      <label className="text-[9px] uppercase tracking-wider text-white/30 font-bold block mb-1">Selected Path</label>
+                      <div className="text-[11px] font-mono text-purple-300 break-all select-all bg-black/30 p-2 rounded border border-white/5">
+                        {folderPath}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-[10px] uppercase tracking-wider text-white/30 font-bold block mb-1">Project Name</label>
+                        <input
+                          type="text"
+                          value={name}
+                          onChange={e => setName(e.target.value)}
+                          className="w-full h-8 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-3 focus:outline-none"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] uppercase tracking-wider text-white/30 font-bold block mb-1">Project Phase</label>
+                        <select
+                          value={phase}
+                          onChange={e => handlePhaseChange(e.target.value as any)}
+                          className="w-full h-8 bg-black/40 border border-white/10 rounded-lg text-[11px] text-white px-3 focus:outline-none"
+                        >
+                          <option value="idea">Idea Phase</option>
+                          <option value="sketching">Sketching</option>
+                          <option value="in_development">In Development</option>
+                          <option value="launched">Launched</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] uppercase tracking-wider text-white/30 font-bold block mb-1">Description</label>
+                      <textarea
+                        value={description}
+                        onChange={e => setDescription(e.target.value)}
+                        className="w-full bg-black/40 border border-white/10 rounded-lg text-xs text-white p-3 focus:outline-none h-16 resize-none"
+                      />
+                    </div>
+
+                    {githubUrl && (
+                      <div>
+                        <label className="text-[10px] uppercase tracking-wider text-white/30 block mb-1">Auto-detected GitHub Repo</label>
+                        <input
+                          type="text"
+                          value={githubUrl}
+                          disabled
+                          className="w-full h-8 bg-black/20 border border-white/5 rounded-lg text-xs text-white/50 px-3 focus:outline-none font-mono"
+                        />
+                      </div>
+                    )}
+
+
+                  </div>
+                )}
               </div>
             )}
 
@@ -1848,9 +2858,10 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
               </button>
               <button
                 type="submit"
-                className="px-4 py-1.5 text-xs font-semibold rounded-lg bg-purple-500 hover:bg-purple-600 text-white transition-all cursor-pointer"
+                disabled={activeFormTab === "github" && !selectedRepo && !projectToEdit}
+                className="px-4 py-1.5 text-xs font-semibold rounded-lg bg-purple-500 hover:bg-purple-600 text-white transition-all cursor-pointer disabled:opacity-50"
               >
-                {projectToEdit ? "Update Project" : "Create Project"}
+                {projectToEdit ? "Update Project" : activeFormTab === "github" ? "Import Repository" : "Create Project"}
               </button>
             </div>
           </form>
@@ -1875,7 +2886,7 @@ export function ProjectOS() {
     setPhase,
     openCommandPalette
   } = useProjectOSStore();
-  const { projects } = useProjectStore();
+  const { projects, addProject, deleteProject } = useProjectStore();
 
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -2037,7 +3048,7 @@ export function ProjectOS() {
   const launchedProjects = projects.filter(p => p.phase === "launched" && curatedLaunched.includes(p.id));
   const inDevProjects = projects.filter(p => p.phase === "in_development" && curatedInDev.includes(p.id));
   const sketchingProjects = projects.filter(p => p.phase === "sketching" && curatedSketching.includes(p.id));
-  const ideaProjects = projects.filter(p => p.phase === "idea" && curatedIdea.includes(p.id));
+  const ideaProjects = projects.filter(p => p.phase === "idea");
 
   // Curated list for the currently active phase tab (for left rail sidebar list)
   const activeCuratedList =
@@ -2212,34 +3223,8 @@ export function ProjectOS() {
         <div className="flex flex-1 min-h-0">
 
           {/* Left Rail Sidebar */}
-          {selectedProjectId && (
+          {selectedProjectId && selectedProject?.phase !== "idea" && (
             <div className="w-60 border-r border-surface-border bg-surface-1 flex flex-col flex-shrink-0 select-none">
-              {/* Phase Selector */}
-              <div className="p-3 border-b border-surface-border space-y-1">
-                <span className="text-[9px] font-bold uppercase tracking-widest text-white/20 px-1.5 font-mono">Project Phase</span>
-                <div className="grid grid-cols-2 gap-1 bg-black/40 rounded-lg p-0.5 border border-white/5 mt-1">
-                  {PHASES.map(phaseObj => {
-                    const isActive = activePhase === phaseObj.id;
-                    const count = stats[phaseObj.id as keyof typeof stats] || 0;
-                    return (
-                      <button
-                        key={phaseObj.id}
-                        onClick={() => {
-                          setPhase(phaseObj.id as any);
-                          selectProject(null); // Return to dashboard
-                        }}
-                        className={`py-1.5 px-0.5 rounded flex flex-col items-center justify-center transition-all cursor-pointer text-center ${isActive
-                            ? "bg-white/10 text-purple-300 font-bold"
-                            : "text-white/40 hover:text-white/60"
-                          }`}
-                      >
-                        <span className="text-[8px] uppercase tracking-wider font-semibold truncate w-full px-1">{phaseObj.label}</span>
-                        <span className="text-[9px] font-mono mt-0.5 opacity-60 leading-none">{count}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
 
               {/* Sidebar projects list search filter */}
               <div className="p-2 border-b border-surface-border bg-[#07070a] flex items-center gap-1.5">
@@ -2361,74 +3346,82 @@ export function ProjectOS() {
             <div className="flex-1 flex flex-col min-w-0 min-h-0 bg-surface-0">
 
               {/* Detailed Project Header */}
-              <div className="px-6 py-4 border-b border-surface-border flex items-start gap-4 flex-shrink-0 bg-surface-1">
-                <div className="w-10 h-10 rounded-lg bg-white/[0.03] border border-white/[0.06] shrink-0 flex items-center justify-center select-none">
-                  {selectedProject.ogImageUrl ? (
-                    <img src={selectedProject.ogImageUrl} className="w-full h-full object-cover rounded-lg" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-purple-400/80 text-[15px] font-bold font-mono bg-purple-500/10 border border-purple-500/20 rounded-lg">
-                      {selectedProject.name[0].toUpperCase()}
+              {selectedProject.phase !== "idea" && (
+                <div className="px-6 py-4 border-b border-surface-border flex items-start gap-4 flex-shrink-0 bg-surface-1">
+                  <div className="w-10 h-10 rounded-lg bg-white/[0.03] border border-white/[0.06] shrink-0 flex items-center justify-center select-none">
+                    {selectedProject.ogImageUrl ? (
+                      <img src={selectedProject.ogImageUrl} className="w-full h-full object-cover rounded-lg" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-purple-400/80 text-[15px] font-bold font-mono bg-purple-500/10 border border-purple-500/20 rounded-lg">
+                        {selectedProject.name[0].toUpperCase()}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h1 className="text-sm font-semibold text-white truncate max-w-sm leading-none">{selectedProject.name}</h1>
+                      {getTypeBadge(selectedProject.type)}
+                      {selectedProject.folderPath && (
+                        <button
+                          onClick={() => window.open(`vscode://file/${selectedProject.folderPath}`)}
+                          className="w-6 h-6 rounded-md hover:bg-[#007acc]/10 text-blue-400 flex items-center justify-center shrink-0 border border-blue-500/20 ml-1 transition-all cursor-pointer bg-transparent"
+                          title="Open in VS Code"
+                        >
+                          <Code2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
-                  )}
-                </div>
 
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h1 className="text-sm font-semibold text-white truncate max-w-sm leading-none">{selectedProject.name}</h1>
-                    {getTypeBadge(selectedProject.type)}
-                    {selectedProject.folderPath && (
-                      <button
-                        onClick={() => window.open(`vscode://file/${selectedProject.folderPath}`)}
-                        className="w-6 h-6 rounded-md hover:bg-[#007acc]/10 text-blue-400 flex items-center justify-center shrink-0 border border-blue-500/20 ml-1 transition-all cursor-pointer bg-transparent"
-                        title="Open in VS Code"
-                      >
-                        <Code2 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
+                    <p className="text-[11px] text-white/40 mt-1 truncate max-w-xl">{selectedProject.description || 'No description provided.'}</p>
 
-                  <p className="text-[11px] text-white/40 mt-1 truncate max-w-xl">{selectedProject.description || 'No description provided.'}</p>
-
-                  <div className="flex items-center gap-3 mt-2 select-none text-[10px] text-white/30">
-                    {selectedProject.githubUrl && (
-                      <a href={selectedProject.githubUrl} target="_blank" className="hover:text-purple-400 flex items-center gap-0.5 font-medium transition-colors">
-                        GitHub ↗
-                      </a>
-                    )}
-                    {selectedProject.liveUrl && (
-                      <a href={selectedProject.liveUrl} target="_blank" className="hover:text-purple-400 flex items-center gap-0.5 font-medium transition-colors">
-                        Live ↗
-                      </a>
-                    )}
-                    <span>·</span>
-                    <span>Updated {timeAgo(selectedProject.updatedAt)}</span>
+                    <div className="flex items-center gap-3 mt-2 select-none text-[10px] text-white/30">
+                      {selectedProject.githubUrl && (
+                        <a href={selectedProject.githubUrl} target="_blank" className="hover:text-purple-400 flex items-center gap-0.5 font-medium transition-colors">
+                          GitHub ↗
+                        </a>
+                      )}
+                      {selectedProject.liveUrl && (
+                        <a href={selectedProject.liveUrl} target="_blank" className="hover:text-purple-400 flex items-center gap-0.5 font-medium transition-colors">
+                          Live ↗
+                        </a>
+                      )}
+                      <span>·</span>
+                      <span>Updated {timeAgo(selectedProject.updatedAt)}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               {/* Tab Navigation Menu */}
-              <div className="px-6 flex items-center gap-1 border-b border-surface-border flex-shrink-0 bg-surface-1 select-none">
-                {TABS.map(tab => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setTab(tab.id as any)}
-                    className={`px-3.5 py-2.5 text-[11px] font-semibold transition-colors border-b-2 -mb-px cursor-pointer
-                      ${activeTab === tab.id
-                        ? 'text-purple-300 border-purple-500'
-                        : 'text-white/35 border-transparent hover:text-white/60'}`}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
+              {selectedProject.phase !== "idea" && (
+                <div className="px-6 flex items-center gap-1 border-b border-surface-border flex-shrink-0 bg-surface-1 select-none">
+                  {TABS.map(tab => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setTab(tab.id as any)}
+                      className={`px-3.5 py-2.5 text-[11px] font-semibold transition-colors border-b-2 -mb-px cursor-pointer
+                        ${activeTab === tab.id
+                          ? 'text-purple-300 border-purple-500'
+                          : 'text-white/35 border-transparent hover:text-white/60'}`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+              )}
 
               {/* Tab content — ideas fills, others scroll */}
-              <div className={`flex-1 min-h-0 ${activeTab === 'ideas' ? 'overflow-hidden' : 'overflow-y-auto custom-scrollbar'}`}>
-                {activeTab === 'overview' && <OverviewTab project={selectedProject} />}
-                {activeTab === 'ideas' && <IdeasTab project={selectedProject} />}
-                {activeTab === 'media' && <MediaVaultTab project={selectedProject} />}
-                {activeTab === 'tasks' && <ProjectTasksTab project={selectedProject} />}
-                {activeTab === 'controlroom' && <ControlRoomTab project={selectedProject} />}
+              <div className={`flex-1 min-h-0 ${selectedProject.phase === "idea" ? "overflow-hidden" : (activeTab === 'ideas' ? 'overflow-hidden' : 'overflow-y-auto custom-scrollbar')}`}>
+                {selectedProject.phase === "idea" ? (
+                  <IdeaCanvasView project={selectedProject} />
+                ) : (
+                  <>
+                    {activeTab === 'ideas' && <IdeasTab project={selectedProject} />}
+                    {activeTab === 'media' && <MediaVaultTab project={selectedProject} />}
+                    {activeTab === 'controlroom' && <ControlRoomTab project={selectedProject} />}
+                  </>
+                )}
               </div>
             </div>
           ) : (
@@ -2484,8 +3477,79 @@ export function ProjectOS() {
                           </button>
                         </div>
 
-                        {/* Spacer for physics overlay */}
-                        <div className="flex-1 w-full relative" />
+                        {col.id === "idea" ? (
+                          <div className="flex-1 flex flex-col min-h-0">
+                            {/* Quick Idea Input */}
+                            <input
+                              type="text"
+                              placeholder="Write a project idea... + Enter"
+                              className="w-full h-9 bg-purple-500/[0.03] border border-purple-500/30 rounded-lg text-xs text-white px-3 mb-3 focus:outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-500/20 placeholder:text-white/30 flex-shrink-0 shadow-[0_0_10px_rgba(168,85,247,0.05)] transition-all"
+                              onKeyDown={async (e) => {
+                                if (e.key === "Enter" && e.currentTarget.value.trim()) {
+                                  const val = e.currentTarget.value.trim();
+                                  e.currentTarget.value = "";
+                                  try {
+                                    await addProject({
+                                      name: val,
+                                      phase: "idea",
+                                      status: "planning",
+                                      description: "",
+                                      tags: [],
+                                    });
+                                  } catch (err) {
+                                    console.error(err);
+                                  }
+                                }
+                              }}
+                            />
+                            
+                            {/* Idea Projects Scrollable List */}
+                            <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                              {filteredList.map(p => (
+                                <div
+                                  key={p.id}
+                                  onDoubleClick={() => selectProject(p.id)}
+                                  className="group relative p-3 bg-white/[0.02] border border-white/[0.05] hover:bg-white/[0.04] hover:border-white/10 rounded-xl cursor-pointer transition-all flex items-start gap-2.5"
+                                  title="Double click to open idea thread"
+                                >
+                                  <span className="w-1.5 h-1.5 rounded-full bg-purple-400 mt-1.5 flex-shrink-0" />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="text-xs font-semibold text-white/90 group-hover:text-white transition-colors truncate">
+                                      {p.name}
+                                    </div>
+                                    {p.description && (
+                                      <p className="text-[10px] text-white/45 line-clamp-2 mt-0.5 leading-normal">
+                                        {p.description}
+                                      </p>
+                                    )}
+                                  </div>
+                                  
+                                  {/* Delete Button */}
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (confirm(`Delete idea "${p.name}"?`)) {
+                                        deleteProject(p.id);
+                                      }
+                                    }}
+                                    className="opacity-0 group-hover:opacity-100 p-1 hover:bg-white/10 rounded text-white/40 hover:text-red-400 transition-all cursor-pointer"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              ))}
+                              {filteredList.length === 0 && (
+                                <div className="h-full flex flex-col items-center justify-center text-center p-4 text-white/20 select-none">
+                                  <Lightbulb className="w-6 h-6 mb-1.5 stroke-[1.5]" />
+                                  <span className="text-[10px]">No ideas yet. Write one above!</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          /* Spacer for physics overlay */
+                          <div className="flex-1 w-full relative" />
+                        )}
                       </div>
                     );
                   })}
