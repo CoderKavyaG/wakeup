@@ -17,8 +17,12 @@ import {
   BookOpen, 
   Terminal, 
   ArrowRight,
-  Sparkles
+  Sparkles,
+  LogOut,
+  RotateCcw
 } from "lucide-react";
+import { useLayoutStore } from "@/store/useLayoutStore";
+import { signOut } from "next-auth/react";
 
 export default function ProjectOSCommandPalette({ 
   onOpenCreateModal 
@@ -34,6 +38,7 @@ export default function ProjectOSCommandPalette({
     close
   } = useProjectOSStore();
   const { projects, updateProject, deleteProject } = useProjectStore();
+  const { loadSavedLayout } = useLayoutStore();
   
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -259,6 +264,29 @@ export default function ProjectOSCommandPalette({
       action: () => {
         setPhase("idea");
         selectProject(null);
+        closeCommandPalette();
+      }
+    });
+    items.push({
+      id: "global-restore-layout",
+      title: "Restore Layout",
+      subtitle: "Restore your last saved workspace layout",
+      category: "System",
+      icon: <RotateCcw className="w-3.5 h-3.5 text-amber-400" />,
+      action: () => {
+        loadSavedLayout();
+        closeCommandPalette();
+      }
+    });
+
+    items.push({
+      id: "global-signout",
+      title: "Sign Out",
+      subtitle: "Sign out of your DevOS session",
+      category: "System",
+      icon: <LogOut className="w-3.5 h-3.5 text-red-400" />,
+      action: () => {
+        signOut({ callbackUrl: "/login" });
         closeCommandPalette();
       }
     });

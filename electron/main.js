@@ -111,22 +111,36 @@ ipcMain.handle('capture-screenshot', async () => {
   return image.toJPEG(80).toString('base64');
 })
 
-app.whenReady().then(() => {
-  startNextServer()
-  startAgent()
-  createTray()
-  waitForNext(() => createWindow())
+const gotTheLock = app.requestSingleInstanceLock()
 
-  app.setLoginItemSettings({
-    openAtLogin: true,
-    path: app.getPath('exe')
+if (!gotTheLock) {
+  app.exit()
+} else {
+  app.on('second-instance', (event, commandLine, workingDirectory) => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      if (!mainWindow.isVisible()) mainWindow.show()
+      mainWindow.focus()
+    }
   })
-})
 
-app.on('window-all-closed', () => {
-  // Keep app running in tray — do NOT quit
-})
+  app.whenReady().then(() => {
+    startNextServer()
+    startAgent()
+    createTray()
+    waitForNext(() => createWindow())
 
-app.on('before-quit', () => {
-  if (nextProcess) nextProcess.kill()
-})
+    app.setLoginItemSettings({
+      openAtLogin: true,
+      path: app.getPath('exe')
+    })
+  })
+
+  app.on('window-all-closed', () => {
+    // Keep app running in tray — do NOT quit
+  })
+
+  app.on('before-quit', () => {
+    if (nextProcess) nextProcess.kill()
+  })
+}

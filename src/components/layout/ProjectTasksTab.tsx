@@ -318,7 +318,7 @@ export default function ProjectTasksTab({ project, isNested }: ProjectTasksTabPr
       {/* Inline Task Creator Form */}
       <form onSubmit={handleCreateTask} className="bg-surface-1 border border-surface-border rounded-xl p-4 space-y-3">
         <div className="flex items-center justify-between border-b border-white/4 pb-2">
-          <h3 className="text-[10px] uppercase tracking-widest text-purple-400 font-bold font-mono flex items-center gap-1.5">
+          <h3 className="text-[10px] uppercase tracking-widest text-amber-400 font-bold font-mono flex items-center gap-1.5">
             <Plus className="w-3.5 h-3.5" /> Create Task
           </h3>
           <div className="flex bg-black/40 rounded-lg p-0.5 border border-white/5 h-6">
@@ -351,7 +351,7 @@ export default function ProjectTasksTab({ project, isNested }: ProjectTasksTabPr
               placeholder={taskType === "global" ? "Focus Panel task details..." : "Project milestone task..."}
               value={newTitle}
               onChange={e => setNewTitle(e.target.value)}
-              className="bg-surface-2 border border-surface-border rounded-lg text-xs text-white px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-purple-500/30"
+              className="bg-surface-2 border border-surface-border rounded-lg text-xs text-white px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-amber-500/30"
               required
             />
           </div>
@@ -385,7 +385,7 @@ export default function ProjectTasksTab({ project, isNested }: ProjectTasksTabPr
               value={newMilestone}
               onChange={e => setNewMilestone(e.target.value)}
               disabled={taskType === "global"}
-              className="bg-surface-2 border border-surface-border rounded-lg text-xs text-white px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-purple-500/30 disabled:opacity-30"
+              className="bg-surface-2 border border-surface-border rounded-lg text-xs text-white px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-amber-500/30 disabled:opacity-30"
             />
           </div>
         </div>
@@ -513,7 +513,7 @@ export default function ProjectTasksTab({ project, isNested }: ProjectTasksTabPr
               type="text"
               value={renameMilestoneValue}
               onChange={(e) => setRenameMilestoneValue(e.target.value)}
-              className="w-full bg-[#1c1c24] border border-white/10 rounded-lg text-xs text-white px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-purple-500/30"
+              className="w-full bg-[#1c1c24] border border-white/10 rounded-lg text-xs text-white px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-amber-500/30"
               placeholder="New milestone name..."
               autoFocus
             />
@@ -531,7 +531,7 @@ export default function ProjectTasksTab({ project, isNested }: ProjectTasksTabPr
                   renameMilestone(renameMilestoneState.oldName, renameMilestoneValue);
                   setRenameMilestoneState({ isOpen: false, oldName: "" });
                 }}
-                className="px-3 py-1.5 rounded-lg bg-purple-500 hover:bg-purple-600 text-white transition-all cursor-pointer font-medium border-0"
+                className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white transition-all cursor-pointer font-medium border-0"
               >
                 Save
               </button>
@@ -571,7 +571,7 @@ function TaskGroup({
         <div className="flex items-center gap-2 mb-3 group/m">
           <span
             className={`text-xs font-semibold uppercase tracking-wider font-mono cursor-pointer transition-colors ${
-              isGlobalGroup ? "text-purple-400/80" : "text-white/60 hover:text-white"
+              isGlobalGroup ? "text-amber-400/80" : "text-white/60 hover:text-white"
             }`}
             title={isGlobalGroup ? "Linked from your daily focus board" : "Double-click to rename"}
             onDoubleClick={() => {

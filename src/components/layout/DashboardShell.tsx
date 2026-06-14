@@ -5,12 +5,11 @@ import { CockpitCommand } from "./CockpitCommand";
 import { OnboardingGuide } from "./OnboardingGuide";
 import { useLayoutStore } from "@/store/useLayoutStore";
 import { useUrlStore } from "@/store/useUrlStore";
-import { Lock, Unlock, Bookmark, X, Search } from "lucide-react";
+import { Lock, Unlock, Bookmark, X, Search, Trash2 } from "lucide-react";
 import { Button } from "../ui/button";
 import { QuickLinksWidget } from "../widgets/QuickLinksWidget";
 import { AnimatePresence, motion } from "framer-motion";
 import AmbientBar from "./AmbientBar";
-import { Download } from "lucide-react";
 import { useBootstrapStore } from "@/store/useBootstrapStore";
 import { useSession, signOut } from "next-auth/react";
 import { useProjectOSStore } from "@/store/useProjectOSStore";
@@ -130,41 +129,15 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
           <div className="w-px h-4 bg-white/10 mx-1"></div>
 
-          {/* Layout Restore */}
-          {mounted && savedLayout && (
-            <>
-              <Button
-                onClick={loadSavedLayout}
-                variant="ghost"
-                size="sm"
-                className="h-6 text-[10px] uppercase tracking-wider font-bold px-2.5 rounded hover:bg-white/5 text-muted-foreground flex items-center gap-1.5"
-              >
-                <Download className="w-3 h-3" /> Restore Layout
-              </Button>
-              <div className="w-px h-4 bg-white/10 mx-1"></div>
-            </>
-          )}
-
-          {/* Clear */}
+          {/* Clear Grid */}
           <Button
             onClick={clearLayout}
             variant="ghost"
             size="sm"
-            className="h-6 text-[10px] uppercase tracking-wider font-bold px-2.5 rounded hover:bg-rose-500/10 hover:text-rose-400 text-muted-foreground"
+            className="h-6 w-6 p-0 rounded hover:bg-rose-500/10 hover:text-rose-400 text-muted-foreground flex items-center justify-center cursor-pointer"
+            title="Clear Grid"
           >
-            Clear Grid
-          </Button>
-
-          <div className="w-px h-4 bg-white/10 mx-1"></div>
-
-          {/* Sign Out */}
-          <Button
-            onClick={() => signOut({ callbackUrl: "/login" })}
-            variant="ghost"
-            size="sm"
-            className="h-6 text-[10px] uppercase tracking-wider font-bold px-2.5 rounded hover:bg-rose-500/10 hover:text-rose-400 text-muted-foreground"
-          >
-            Sign Out
+            <Trash2 className="w-3.5 h-3.5" />
           </Button>
         </div>
         </div>

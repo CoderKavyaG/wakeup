@@ -8,6 +8,7 @@ import { useNoteStore } from "@/store/useNoteStore";
 import { useUrlStore } from "@/store/useUrlStore";
 import { useLayoutStore } from "@/store/useLayoutStore";
 import { useProjectOSStore } from "@/store/useProjectOSStore";
+import { signOut } from "next-auth/react";
 import {
   Terminal,
   Search,
@@ -40,8 +41,6 @@ const ADD_WIDGET_OPTIONS = [
   { type: "focus", name: "Focus Panel", desc: "Tasks and brain dump", icon: <Crosshair className="w-4 h-4 text-primary" /> },
   { type: "machine", name: "Machine Control", desc: "Ports, launcher, workspace files", icon: <Terminal className="w-4 h-4 text-primary" /> },
   { type: "terminal", name: "Terminal", desc: "Embedded terminal with agent connection", icon: <Terminal className="w-4 h-4 text-primary" /> },
-  { type: "portfolio", name: "Portfolio Control", desc: "Manage coderkavyag.me directly", icon: <Globe className="w-4 h-4 text-primary" /> },
-  { type: "social", name: "Social Drafts", desc: "Draft X/Twitter & LinkedIn posts", icon: <Zap className="w-4 h-4 text-primary" /> },
 ];
 
 
@@ -142,7 +141,7 @@ export function CockpitCommand() {
   const { tasks, addTask } = useTaskStore();
   const { notes, addNote } = useNoteStore();
   const { urls } = useUrlStore();
-  const { resetLayout, addWidget, saveCurrentLayout } = useLayoutStore();
+  const { resetLayout, addWidget, saveCurrentLayout, loadSavedLayout } = useLayoutStore();
 
   const suggestions = buildSuggestions(projects, tasks);
 
@@ -386,6 +385,14 @@ export function CockpitCommand() {
       return true;
     }
 
+    if (lower === "restore layout" || lower === "load layout") {
+      loadSavedLayout();
+      setConfirmation(`✓ Layout restored successfully`);
+      setInput("");
+      setTimeout(() => setConfirmation(null), 3000);
+      return true;
+    }
+
     if (lower === "save layout") {
       saveCurrentLayout();
       setConfirmation(`✓ Layout saved successfully`);
@@ -394,9 +401,16 @@ export function CockpitCommand() {
       return true;
     }
 
+    if (lower === "sign out" || lower === "signout" || lower === "logout") {
+      setConfirmation(`✓ Signing out...`);
+      setInput("");
+      setTimeout(() => signOut({ callbackUrl: "/login" }), 1000);
+      return true;
+    }
+
     if (lower.startsWith("add ")) {
       const type = lower.replace("add ", "").trim();
-      if (["projects", "github", "focus", "machine", "terminal", "portfolio", "social"].includes(type)) {
+      if (["projects", "github", "focus", "machine", "terminal"].includes(type)) {
         addWidget(type as any);
         setConfirmation(`✓ Added ${type} widget`);
         setInput("");
@@ -745,7 +759,9 @@ export function CockpitCommand() {
                         { prefix: "task:", desc: "Create a task instantly" },
                         { prefix: "note:", desc: "Save a quick note" },
                         { prefix: "save layout", desc: "Save current grid layout" },
+                        { prefix: "restore layout", desc: "Restore last saved layout" },
                         { prefix: "reset layout", desc: "Reset workspace to defaults" },
+                        { prefix: "sign out", desc: "Sign out of DevOS session" },
                       ].map((c) => (
                         <div key={c.prefix} className="flex items-center gap-1.5 text-[10px] text-muted-foreground/40">
                           <code className="font-mono bg-white/5 px-1.5 py-0.5 rounded text-muted-foreground/60">

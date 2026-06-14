@@ -115,7 +115,7 @@ function NoteCard({
         {linkedProject ? (
           <button
             onClick={handleProjectClick}
-            className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-purple-500/15 border border-purple-500/20 text-purple-300 text-[9px] font-bold hover:bg-purple-500/25 transition-colors"
+            className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/20 text-amber-300 text-[9px] font-bold hover:bg-amber-500/25 transition-colors"
           >
             <Folder className="w-2.5 h-2.5" />
             {linkedProject.name}
@@ -147,7 +147,7 @@ function NoteCard({
       {isLong && (
         <button
           onClick={() => setExpanded(!expanded)}
-          className="mt-1.5 text-[10px] text-purple-400/70 hover:text-purple-300 font-semibold transition-colors"
+          className="mt-1.5 text-[10px] text-amber-400/70 hover:text-amber-300 font-semibold transition-colors"
         >
           {expanded ? "Show less ↑" : "Show more ↓"}
         </button>
@@ -389,7 +389,7 @@ export function FocusPanelWidget() {
   // Hint config
   const hintConfig = {
     task: { label: "→ looks like a task", color: "text-green-400" },
-    note: { label: "→ brain dump", color: "text-purple-400" },
+    note: { label: "→ brain dump", color: "text-amber-400" },
     unclear: { label: "→ task or note", color: "text-white/30" },
   };
   const hint = hintConfig[inputType];
@@ -406,7 +406,7 @@ export function FocusPanelWidget() {
         className="px-4 py-3 shrink-0 bg-[#0f0f11]"
         style={{ position: "relative", zIndex: 50 }}
       >
-        <div className="relative flex flex-col bg-white/[0.03] border border-white/[0.08] rounded-xl focus-within:border-purple-500/50 focus-within:ring-1 focus-within:ring-purple-500/50 transition-all shadow-sm">
+        <div className="relative flex flex-col bg-white/[0.03] border border-white/[0.08] rounded-xl focus-within:border-amber-500/50 focus-within:ring-1 focus-within:ring-amber-500/50 transition-all shadow-sm">
           <Textarea
             id="focus-panel-textarea"
             ref={unifiedInputRef as any}
@@ -444,14 +444,14 @@ export function FocusPanelWidget() {
 
               {/* @mention tag badge */}
               {taggedProjectName && (
-                <span className="text-xs bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded-full flex items-center gap-1 font-bold border border-purple-500/20">
+                <span className="text-xs bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full flex items-center gap-1 font-bold border border-amber-500/20">
                   @{taggedProjectName}
                   <button
                     onClick={() => {
                       setTaggedProjectId(null);
                       setTaggedProjectName(null);
                     }}
-                    className="text-purple-300/60 hover:text-purple-300 ml-0.5 font-bold"
+                    className="text-amber-300/60 hover:text-amber-300 ml-0.5 font-bold"
                   >
                     ×
                   </button>
@@ -461,7 +461,7 @@ export function FocusPanelWidget() {
 
             <div className="flex items-center gap-2 shrink-0">
               {isClassifying && (
-                <div className="flex items-center text-[10px] text-purple-400 gap-1">
+                <div className="flex items-center text-[10px] text-amber-400 gap-1">
                   <Loader2 className="w-3 h-3 animate-spin" /> Saving…
                 </div>
               )}
@@ -490,10 +490,10 @@ export function FocusPanelWidget() {
                 ? { bottom: "calc(100% + 4px)" }
                 : { top: "calc(100% + 4px)" }),
             }}
-            className="bg-[#1a1a24] border border-purple-500/30 rounded-xl overflow-hidden shadow-2xl"
+            className="bg-[#1a1a24] border border-amber-500/30 rounded-xl overflow-hidden shadow-2xl"
           >
             <div className="px-3 py-1.5 border-b border-white/5 flex items-center gap-1.5">
-              <span className="text-[9px] text-purple-400/70 font-bold uppercase tracking-widest">
+              <span className="text-[9px] text-amber-400/70 font-bold uppercase tracking-widest">
                 Tag a Project
               </span>
             </div>
@@ -506,14 +506,14 @@ export function FocusPanelWidget() {
                 }}
                 className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2.5 transition-colors ${
                   index === activeDropdownIndex
-                    ? "bg-purple-500/20 text-purple-200 font-semibold"
+                    ? "bg-amber-500/20 text-amber-200 font-semibold"
                     : "text-white/70 hover:bg-white/5 hover:text-white"
                 }`}
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-green-400 flex-shrink-0 shadow-sm shadow-green-400/50" />
                 <span className="flex-1 truncate">{p.name}</span>
                 {index === activeDropdownIndex && (
-                  <span className="text-[9px] text-purple-400/60 ml-auto">↵ select</span>
+                  <span className="text-[9px] text-amber-400/60 ml-auto">↵ select</span>
                 )}
               </button>
             ))}
@@ -641,7 +641,7 @@ export function FocusPanelWidget() {
         <div className="flex-1 flex flex-col min-h-0">
           <div className="px-4 py-2 flex items-center justify-between shrink-0 bg-[#0f0f11]">
             <div className="flex items-center gap-2">
-              <BrainCircuit className="w-4 h-4 text-purple-400" />
+              <BrainCircuit className="w-4 h-4 text-amber-400" />
               <h3 className="text-sm font-semibold tracking-tight">Brain Dump</h3>
             </div>
             <span className="text-[10px] font-mono text-muted-foreground">{wordCount}w</span>

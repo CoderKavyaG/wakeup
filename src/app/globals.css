@@ -83,7 +83,7 @@
   --surface-3: #161619;
   --surface-border: rgba(255, 255, 255, 0.06);
 
-  --chart-1: #7C5CFF;
+  --chart-1: #F59E0B;
   --chart-2: #22C55E;
   --chart-3: #F59E0B;
   --chart-4: #EF4444;
@@ -93,12 +93,12 @@
   
   --sidebar: #171A21;
   --sidebar-foreground: #F5F7FA;
-  --sidebar-primary: #7C5CFF;
+  --sidebar-primary: #F59E0B;
   --sidebar-primary-foreground: #F5F7FA;
   --sidebar-accent: #202531;
   --sidebar-accent-foreground: #F5F7FA;
   --sidebar-border: #202531;
-  --sidebar-ring: #7C5CFF;
+  --sidebar-ring: #F59E0B;
 }
 
 @layer base {

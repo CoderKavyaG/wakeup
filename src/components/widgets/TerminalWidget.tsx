@@ -10,12 +10,15 @@ interface TerminalWidgetProps {
 export function TerminalWidget({ initialCwd, onClose }: TerminalWidgetProps) {
   const termRef = useRef<HTMLDivElement>(null)
   const [status, setStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting')
+  const [reconnectTrigger, setReconnectTrigger] = useState(0)
   const wsRef = useRef<WebSocket | null>(null)
   const xtermRef = useRef<any>(null)
 
   useEffect(() => {
     let term: any
     let ws: WebSocket
+    let reconnectTimeout: NodeJS.Timeout
+    let isMounted = true
 
     const init = async () => {
       const { Terminal } = await import('xterm')
@@ -23,14 +26,20 @@ export function TerminalWidget({ initialCwd, onClose }: TerminalWidgetProps) {
       const { WebLinksAddon } = await import('xterm-addon-web-links')
       
       // Load styles dynamically
-
+      if (!document.getElementById('xterm-style')) {
+        const link = document.createElement('link')
+        link.id = 'xterm-style'
+        link.rel = 'stylesheet'
+        link.href = 'https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css'
+        document.head.appendChild(link)
+      }
 
       term = new Terminal({
         theme: {
           background: '#0f0f11',
           foreground: '#e2e8f0',
-          cursor: '#7c3aed',
-          selectionBackground: 'rgba(124, 58, 237, 0.3)',
+          cursor: '#f59e0b',
+          selectionBackground: 'rgba(245, 158, 11, 0.3)',
           black: '#1e1e2e', red: '#f38ba8', green: '#a6e3a1',
           yellow: '#f9e2af', blue: '#89b4fa', magenta: '#cba6f7',
           cyan: '#89dceb', white: '#cdd6f4',
@@ -64,11 +73,35 @@ export function TerminalWidget({ initialCwd, onClose }: TerminalWidgetProps) {
       ws = new WebSocket(`ws://localhost:3132${cwd ? `?cwd=${encodeURIComponent(cwd)}` : ''}`)
       wsRef.current = ws
 
-      ws.onopen = () => setStatus('connected')
-      ws.onclose = () => setStatus('disconnected')
-      ws.onerror = () => setStatus('disconnected')
+      ws.onopen = () => {
+        if (isMounted) setStatus('connected')
+      }
+      
+      let isDisconnecting = false;
+      const handleDisconnect = () => {
+        if (!isMounted || isDisconnecting) return;
+        isDisconnecting = true;
+        setStatus('disconnected');
+        
+        reconnectTimeout = setTimeout(async () => {
+          if (!isMounted) return;
+          setStatus('connecting');
+          try {
+            await fetch('/api/machine/start-agent', { method: 'POST' }).catch(() => {});
+          } catch (e) {}
+          if (isMounted) {
+            setReconnectTrigger(prev => prev + 1);
+          }
+        }, 1500);
+      };
 
-      ws.onmessage = (e) => term.write(e.data)
+      ws.onclose = handleDisconnect
+      ws.onerror = handleDisconnect
+
+      ws.onmessage = (e) => {
+        if (isMounted) term.write(e.data)
+      }
+      
       term.onData((data: string) => {
         if (ws.readyState === WebSocket.OPEN) ws.send(data)
       })
@@ -77,10 +110,12 @@ export function TerminalWidget({ initialCwd, onClose }: TerminalWidgetProps) {
     init()
 
     return () => {
+      isMounted = false
+      clearTimeout(reconnectTimeout)
       ws?.close()
       term?.dispose()
     }
-  }, [initialCwd])
+  }, [initialCwd, reconnectTrigger])
 
   const pendingCommand = useTerminalStore((s) => s.pendingCommand);
   const clearCommand = useTerminalStore((s) => s.clearCommand);
@@ -97,6 +132,20 @@ export function TerminalWidget({ initialCwd, onClose }: TerminalWidgetProps) {
     }
   }, [pendingCommand, status, initialCwd, clearCommand]);
 
+  const quickCommands = [
+    { label: 'git status', cmd: 'git status' },
+    { label: 'dev server', cmd: 'npm run dev' },
+    { label: 'prisma studio', cmd: 'npx prisma studio' },
+    { label: 'npm install', cmd: 'npm install' },
+    { label: 'clear', cmd: 'clear' }
+  ]
+
+  const runQuickCommand = (cmd: string) => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(cmd + '\r\n')
+    }
+  }
+
   return (
     <div className="flex flex-col h-full bg-[#0f0f11] overflow-hidden">
       <div className="flex items-center justify-between px-3 py-2 border-b border-border/40 bg-black/20 shrink-0">
@@ -110,9 +159,25 @@ export function TerminalWidget({ initialCwd, onClose }: TerminalWidgetProps) {
             status === 'connecting' ? 'bg-yellow-500 animate-pulse' : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]'
           }`} />
           <span className="text-[10px] uppercase font-bold text-muted-foreground">{status}</span>
-          {onClose && <button onClick={onClose} className="text-muted-foreground hover:text-foreground text-xs ml-2">✕</button>}
+          {onClose && <button onClick={onClose} className="text-muted-foreground hover:text-foreground text-xs ml-2 cursor-pointer">✕</button>}
         </div>
       </div>
+
+      {/* Quick Commands bar */}
+      <div className="flex items-center gap-1.5 px-3 py-1.5 bg-black/10 border-b border-white/[0.04] overflow-x-auto custom-scrollbar shrink-0 select-none">
+        <span className="text-[9px] text-white/30 uppercase font-mono tracking-wider mr-1">Quick:</span>
+        {quickCommands.map((q) => (
+          <button
+            key={q.label}
+            onClick={() => runQuickCommand(q.cmd)}
+            disabled={status !== 'connected'}
+            className="px-2 py-0.5 rounded text-[10px] font-mono bg-[#16161a] border border-white/[0.04] text-white/60 hover:text-amber-400 hover:border-amber-500/30 hover:bg-amber-500/5 transition-all disabled:opacity-40 disabled:hover:text-white/60 disabled:hover:border-white/[0.04] disabled:hover:bg-[#16161a] cursor-pointer"
+          >
+            {q.label}
+          </button>
+        ))}
+      </div>
+
       <div ref={termRef} className="flex-1 min-h-0 relative p-2" />
     </div>
   )

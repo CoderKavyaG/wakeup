@@ -45,7 +45,9 @@ import {
   Mic,
   Play,
   Pause,
-  GripHorizontal
+  GripHorizontal,
+  Sun,
+  Moon
 } from "lucide-react";
 import ProjectTasksTab from "./ProjectTasksTab";
 import ProjectOSCommandPalette from "./ProjectOSCommandPalette";
@@ -63,6 +65,29 @@ const TABS = [
   { id: 'ideas', label: 'Ideas' },
   { id: 'media', label: 'Media' },
 ];
+
+function getProjectFaviconUrl(project: Project): string | null {
+  if (project.ogImageUrl) return project.ogImageUrl;
+  
+  let domain = "";
+  if (project.liveUrl) {
+    try {
+      domain = new URL(project.liveUrl).hostname;
+    } catch {
+      const match = project.liveUrl.match(/(?:https?:\/\/)?([^/]+)/);
+      if (match) domain = match[1];
+    }
+  } else if (project.githubUrl) {
+    domain = "github.com";
+  }
+  
+  if (domain) {
+    return `https://www.google.com/s2/favicons?sz=64&domain=${domain}`;
+  }
+  
+  return null;
+}
+
 
 const timeAgo = (dateInput: any) => {
   if (!dateInput) return "never";
@@ -366,6 +391,7 @@ function IdeaCanvasView({ project }: { project: Project }) {
   const { selectProject } = useProjectOSStore();
   const [items, setItems] = useState<CanvasItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isLightMode, setIsLightMode] = useState(false);
   
   // Recording states
   const [recording, setRecording] = useState(false);
@@ -618,7 +644,11 @@ function IdeaCanvasView({ project }: { project: Project }) {
           const file = fileItem.getAsFile();
           if (file) {
             const base64 = await convertFileToBase64(file);
-            spawnImage(base64, mousePos.current.x, mousePos.current.y);
+            const dims = await getImageDimensions(base64);
+            const maxWidth = 300;
+            const width = dims.w > maxWidth ? maxWidth : dims.w;
+            const height = Math.round((width / dims.w) * dims.h);
+            spawnImage(base64, mousePos.current.x, mousePos.current.y, width, height);
           }
         }
       }
@@ -637,8 +667,21 @@ function IdeaCanvasView({ project }: { project: Project }) {
     });
   };
 
-  const spawnImage = async (base64: string, x: number, y: number) => {
-    const payloadContent = JSON.stringify({ type: "image", x, y, text: "", url: base64, w: 240, h: 180, name: "" });
+  const getImageDimensions = (base64: string): Promise<{ w: number; h: number }> => {
+    return new Promise((resolve) => {
+      const img = new window.Image();
+      img.src = base64;
+      img.onload = () => {
+        resolve({ w: img.naturalWidth || img.width, h: img.naturalHeight || img.height });
+      };
+      img.onerror = () => {
+        resolve({ w: 240, h: 180 });
+      };
+    });
+  };
+
+  const spawnImage = async (base64: string, x: number, y: number, w = 240, h = 180) => {
+    const payloadContent = JSON.stringify({ type: "image", x, y, text: "", url: base64, w, h, name: "" });
     try {
       const res = await fetch(`/api/projects/${project.id}/ideas`, {
         method: 'POST',
@@ -647,7 +690,7 @@ function IdeaCanvasView({ project }: { project: Project }) {
       });
       if (res.ok) {
         const saved = await res.json();
-        setItems(prev => [...prev, { id: saved.id, type: "image", x, y, text: "", url: base64, w: 240, h: 180, name: "" }]);
+        setItems(prev => [...prev, { id: saved.id, type: "image", x, y, text: "", url: base64, w, h, name: "" }]);
       }
     } catch (err) {
       console.error(err);
@@ -732,10 +775,34 @@ function IdeaCanvasView({ project }: { project: Project }) {
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
+    if (!file) return;
+
+    const fileType = file.type;
+    
+    if (fileType.startsWith("image/")) {
       const base64 = await convertFileToBase64(file);
-      spawnImage(base64, 250, 250);
+      const dims = await getImageDimensions(base64);
+      const maxWidth = 300;
+      const width = dims.w > maxWidth ? maxWidth : dims.w;
+      const height = Math.round((width / dims.w) * dims.h);
+      spawnImage(base64, 250, 250, width, height);
+    } else if (fileType.startsWith("audio/")) {
+      const base64 = await convertFileToBase64(file);
+      spawnVoiceNote(base64, 250, 250);
+    } else if (fileType.startsWith("text/") || file.name.endsWith(".md") || file.name.endsWith(".txt")) {
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const text = event.target?.result as string;
+        if (text) {
+          spawnNote(text.substring(0, 1000), 250, 250);
+        }
+      };
+      reader.readAsText(file);
+    } else {
+      alert("Unsupported file type! Please upload an image, audio file, or plain text document.");
     }
+    
+    e.target.value = "";
   };
 
   const askAIWhiteboard = async () => {
@@ -814,10 +881,11 @@ function IdeaCanvasView({ project }: { project: Project }) {
         const saved = await dbRes.json();
         setItems(prev => prev.map(item => item.id === tempId ? { ...item, id: saved.id } : item));
       }
-    } catch (e) {
-      console.error(e);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setAiLoading(false);
     }
-    setAiLoading(false);
   };
 
   return (
@@ -826,10 +894,12 @@ function IdeaCanvasView({ project }: { project: Project }) {
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onDoubleClick={handleCanvasDoubleClick}
-      className="flex-1 h-full relative select-none overflow-hidden cursor-crosshair bg-black"
+      className={`flex-1 h-full relative select-none overflow-hidden cursor-crosshair transition-colors duration-200 ${isLightMode ? 'bg-[#f8f9fa] text-slate-900' : 'bg-black text-[#E8E9EB]'}`}
       style={{
-        backgroundColor: '#070709',
-        backgroundImage: 'radial-gradient(rgba(124, 92, 255, 0.1) 1px, transparent 1px)',
+        backgroundColor: isLightMode ? '#f8f9fa' : '#070709',
+        backgroundImage: isLightMode 
+          ? 'radial-gradient(rgba(0, 0, 0, 0.08) 1px, transparent 1px)' 
+          : 'radial-gradient(rgba(245, 158, 11, 0.15) 1px, transparent 1px)',
         backgroundSize: '24px 24px',
       }}
     >
@@ -860,7 +930,11 @@ function IdeaCanvasView({ project }: { project: Project }) {
           return (
             <div
               key={item.id}
-              className="absolute group select-none hover:shadow-[0_0_25px_rgba(124,92,255,0.15)] transition-shadow duration-200 z-10 cursor-grab active:cursor-grabbing"
+              className={`absolute group select-none transition-shadow duration-200 z-10 cursor-grab active:cursor-grabbing ${
+                isLightMode 
+                  ? 'hover:shadow-[0_0_25px_rgba(245,158,11,0.1)]' 
+                  : 'hover:shadow-[0_0_25px_rgba(245,158,11,0.15)]'
+              }`}
               style={{
                 left: item.x,
                 top: item.y,
@@ -874,13 +948,13 @@ function IdeaCanvasView({ project }: { project: Project }) {
               <img 
                 src={item.url} 
                 alt="Canvas image" 
-                className="w-full h-full object-cover rounded-lg pointer-events-none select-none" 
+                className="w-full h-full object-cover rounded-lg pointer-events-none select-none border border-white/[0.04]" 
               />
               
               {/* Delete button (X) top-right */}
               <button
                 onClick={(e) => { e.stopPropagation(); deleteItem(item.id); }}
-                className="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 flex items-center justify-center w-5 h-5 bg-red-950/90 hover:bg-red-900 border border-red-500/40 hover:border-red-500 rounded-full text-red-400 transition-all cursor-pointer shadow-md z-30"
+                className="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 flex items-center justify-center w-5 h-5 bg-red-955/95 hover:bg-red-900 border border-red-500/40 hover:border-red-500 rounded-full text-red-400 transition-all cursor-pointer shadow-md z-30"
                 title="Delete image"
               >
                 <X className="w-3 h-3" />
@@ -889,7 +963,7 @@ function IdeaCanvasView({ project }: { project: Project }) {
               {/* Resize Handle (bottom-right corner) */}
               <div
                 onMouseDown={(e) => handleResizeMouseDown(item.id, e)}
-                className="absolute bottom-1 right-1 cursor-se-resize text-white/40 hover:text-purple-400 opacity-0 group-hover:opacity-100 transition-colors p-0.5 z-25"
+                className="absolute bottom-1 right-1 cursor-se-resize text-white/40 hover:text-amber-500 opacity-0 group-hover:opacity-100 transition-colors p-0.5 z-25"
                 title="Drag to resize"
               >
                 <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8">
@@ -904,7 +978,11 @@ function IdeaCanvasView({ project }: { project: Project }) {
         return (
           <div
             key={item.id}
-            className="absolute group rounded-xl shadow-2xl border bg-[#121217]/95 border-white/[0.08] p-3 transition-shadow duration-200 select-none hover:shadow-[0_0_25px_rgba(124,92,255,0.15)] hover:border-purple-500/20 flex flex-col"
+            className={`absolute group rounded-xl shadow-2xl border p-3 transition-shadow duration-200 select-none flex flex-col ${
+              isLightMode 
+                ? 'bg-white border-slate-200/80 text-slate-800 hover:shadow-[0_0_25px_rgba(245,158,11,0.08)] hover:border-amber-500/30' 
+                : 'bg-[#121217]/95 border-white/[0.08] text-white hover:shadow-[0_0_25px_rgba(245,158,11,0.15)] hover:border-amber-500/20'
+            }`}
             style={{
               left: item.x,
               top: item.y,
@@ -919,7 +997,9 @@ function IdeaCanvasView({ project }: { project: Project }) {
               onMouseDown={(e) => handleMouseDown(item.id, e)}
               className="flex items-center justify-between cursor-grab active:cursor-grabbing pb-2 mb-2 border-b border-white/[0.04] select-none"
             >
-              <div className="flex items-center gap-1 text-white/40 group-hover:text-purple-400/80 transition-colors">
+              <div className={`flex items-center gap-1 transition-colors ${
+                isLightMode ? 'text-slate-400 group-hover:text-amber-500' : 'text-white/40 group-hover:text-amber-400/80'
+              }`}>
                 <GripHorizontal className="w-3.5 h-3.5" />
                 <span className="text-[9px] font-mono uppercase tracking-widest font-semibold select-none">
                   {item.type === 'text' ? 'Note' : 'Voice'}
@@ -940,7 +1020,9 @@ function IdeaCanvasView({ project }: { project: Project }) {
                 <textarea
                   value={item.text}
                   onChange={(e) => handleTextChange(item.id, e.target.value)}
-                  className="w-full flex-1 bg-transparent border-none outline-none text-xs text-white placeholder:text-white/20 resize-none focus:ring-0 custom-scrollbar font-medium"
+                  className={`w-full flex-1 bg-transparent border-none outline-none text-xs resize-none focus:ring-0 custom-scrollbar font-medium ${
+                    isLightMode ? 'text-slate-800 placeholder:text-slate-300' : 'text-white placeholder:text-white/20'
+                  }`}
                   placeholder="Type notes..."
                 />
               </div>
@@ -949,16 +1031,18 @@ function IdeaCanvasView({ project }: { project: Project }) {
             {item.type === "voice" && (
               <div className="flex flex-col gap-2 flex-1" onMouseDown={(e) => e.stopPropagation()}>
                 <div className="flex items-center gap-3">
-                  <VoicePlayButton base64Audio={item.url} />
+                  <VoicePlayButton base64Audio={item.url} isLightMode={isLightMode} />
                   <div className="flex-1 min-w-0">
                     <input
                       type="text"
                       value={item.name || ""}
                       onChange={(e) => handleNameChange(item.id, e.target.value)}
                       placeholder="Voice note name..."
-                      className="w-full bg-transparent border-b border-transparent hover:border-white/10 focus:border-purple-500/50 outline-none text-[11px] font-bold text-white/95 placeholder:text-white/40 focus:ring-0 p-0"
+                      className={`w-full bg-transparent border-b border-transparent hover:border-white/10 focus:border-amber-500/50 outline-none text-[11px] font-bold focus:ring-0 p-0 ${
+                        isLightMode ? 'text-slate-800 placeholder:text-slate-300' : 'text-white/95 placeholder:text-white/40'
+                      }`}
                     />
-                    <div className="text-[9px] text-white/40 font-mono mt-0.5">Press to replay</div>
+                    <div className={`text-[9px] font-mono mt-0.5 ${isLightMode ? 'text-slate-400' : 'text-white/40'}`}>Press to replay</div>
                   </div>
                 </div>
               </div>
@@ -970,9 +1054,9 @@ function IdeaCanvasView({ project }: { project: Project }) {
       {/* Floating Canvas Instructions */}
       {items.length === 0 && (
         <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center text-center p-8 select-none">
-          <Lightbulb className="w-12 h-12 text-purple-400/40 mb-3 stroke-[1.2] animate-pulse" />
-          <h2 className="text-sm font-semibold text-white/50">Idea Sandbox Canvas</h2>
-          <p className="text-[11px] text-white/30 mt-1 max-w-sm leading-relaxed">
+          <Lightbulb className={`w-12 h-12 mb-3 stroke-[1.2] animate-pulse ${isLightMode ? 'text-amber-500/40' : 'text-amber-400/40'}`} />
+          <h2 className={`text-sm font-semibold ${isLightMode ? 'text-slate-400' : 'text-white/50'}`}>Idea Sandbox Canvas</h2>
+          <p className={`text-[11px] mt-1 max-w-sm leading-relaxed ${isLightMode ? 'text-slate-500' : 'text-white/30'}`}>
             Double-click anywhere to spawn a sticky note.<br />
             Paste an image (`Ctrl + V`) to import. Use the toolbar to record voice or upload assets.
           </p>
@@ -984,22 +1068,22 @@ function IdeaCanvasView({ project }: { project: Project }) {
         <button
           onClick={() => spawnNote("Brainstorm note...", 200, 200)}
           className="flex items-center justify-center p-2 rounded-xl bg-white/5 hover:bg-white/10 hover:text-white text-white/70 transition-all cursor-pointer border border-white/5"
-          title="Add note"
+          title="Add Note (or double-click canvas)"
         >
           <FileText className="w-4 h-4" />
         </button>
 
         <label
           className="flex items-center justify-center p-2 rounded-xl bg-white/5 hover:bg-white/10 hover:text-white text-white/70 transition-all cursor-pointer border border-white/5"
-          title="Upload image asset"
+          title="Upload Asset (Image, Audio, or Text)"
         >
           <input 
             type="file" 
-            accept="image/*" 
+            accept="image/*,audio/*,text/plain,text/markdown,.md,.txt" 
             onChange={handleFileUpload} 
             className="hidden" 
           />
-          <Image className="w-4 h-4" />
+          <PlusCircle className="w-4 h-4" />
         </label>
 
         {recording ? (
@@ -1015,18 +1099,28 @@ function IdeaCanvasView({ project }: { project: Project }) {
           <button
             onClick={startRecording}
             className="flex items-center justify-center p-2 rounded-xl bg-white/5 hover:bg-white/10 hover:text-white text-white/70 transition-all cursor-pointer border border-white/5"
-            title="Record voice note"
+            title="Record Voice Note"
           >
             <Mic className="w-4 h-4" />
           </button>
         )}
+
+        <div className="w-px h-5 bg-white/10" />
+
+        <button
+          onClick={() => setIsLightMode(!isLightMode)}
+          className="flex items-center justify-center p-2 rounded-xl bg-white/5 hover:bg-white/10 hover:text-white text-white/70 transition-all cursor-pointer border border-white/5"
+          title={isLightMode ? "Switch to Dark Canvas" : "Switch to Light Canvas"}
+        >
+          {isLightMode ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+        </button>
 
       </div>
     </div>
   );
 }
 
-function VoicePlayButton({ base64Audio }: { base64Audio: string }) {
+function VoicePlayButton({ base64Audio, isLightMode }: { base64Audio: string; isLightMode: boolean }) {
   const [playing, setPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -1048,10 +1142,12 @@ function VoicePlayButton({ base64Audio }: { base64Audio: string }) {
   return (
     <button
       onClick={togglePlay}
-      className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 border transition-all ${
+      className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 border transition-all cursor-pointer ${
         playing 
-          ? "bg-purple-500 border-purple-400 text-white" 
-          : "bg-purple-500/10 border-purple-500/30 text-purple-400 hover:bg-purple-500/20"
+          ? "bg-amber-500 border-amber-400 text-white" 
+          : isLightMode 
+            ? "bg-amber-500/10 border-amber-500/20 text-amber-600 hover:bg-amber-500/20"
+            : "bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20"
       }`}
     >
       {playing ? (
@@ -1794,6 +1890,7 @@ function ControlRoomTab({ project }: { project: Project }) {
   const [weeklyVisits, setWeeklyVisits] = useState<number[]>([]);
   const [totalVisits, setTotalVisits] = useState(0);
   const [maxVisits, setMaxVisits] = useState(1);
+  const [hoveredBarIndex, setHoveredBarIndex] = useState<number | null>(null);
 
   const [projectLinks, setProjectLinks] = useState<any[]>([]);
   const [linksLoading, setLinksLoading] = useState(false);
@@ -1924,11 +2021,11 @@ function ControlRoomTab({ project }: { project: Project }) {
       <div className="md:col-span-7 space-y-5 flex flex-col min-h-0">
         
         {/* Vercel Deployment & Analytics Card */}
-        <div className="bg-white/[0.02] border border-white/[0.05] p-5 rounded-2xl flex flex-col space-y-4">
+        <div className="bg-[#121217]/40 border border-white/[0.06] backdrop-blur-sm p-6 rounded-2xl flex flex-col space-y-4 shadow-sm">
           <div className="flex items-center justify-between">
             <h4 className="text-[11px] uppercase font-mono tracking-widest text-white/40 font-bold">Vercel Integration</h4>
             {project.vercelProjectId && (
-              <span className="text-[8px] px-2 py-0.5 rounded-full bg-green-500/10 text-green-400 border border-green-500/20 font-mono font-bold uppercase tracking-wider">
+              <span className="text-[8px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-mono font-bold uppercase tracking-wider">
                 connected
               </span>
             )}
@@ -1941,7 +2038,7 @@ function ControlRoomTab({ project }: { project: Project }) {
               </p>
               <select
                 onChange={e => mapVercelProject(e.target.value)}
-                className="w-full h-9 bg-white/[0.02] border border-white/[0.08] rounded-xl text-xs text-white px-3 focus:outline-none focus:border-purple-500/40 cursor-pointer font-semibold transition-all"
+                className="w-full h-9 bg-white/[0.02] border border-white/[0.08] rounded-xl text-xs text-white px-3 focus:outline-none focus:border-amber-500/40 cursor-pointer font-semibold transition-all"
               >
                 <option value="" className="bg-[#0f0f11]">Select Vercel Project...</option>
                 {vercel?.projects?.map((vp: any) => (
@@ -1951,20 +2048,35 @@ function ControlRoomTab({ project }: { project: Project }) {
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="flex items-center justify-between p-3.5 rounded-xl bg-white/[0.01] border border-white/[0.03]">
+              <div className="flex items-center justify-between p-3.5 rounded-xl bg-white/[0.01] border border-white/[0.03] relative">
                 <div>
-                  <span className="text-[9px] font-bold uppercase text-white/30 tracking-wider">Weekly Visits</span>
-                  <p className="text-xl font-bold font-mono text-white mt-0.5">{totalVisits}</p>
+                  <span className="text-[9px] font-bold uppercase text-white/30 tracking-wider">Weekly Traffic</span>
+                  <p className="text-xl font-bold font-mono text-white mt-0.5">{totalVisits} visits</p>
                 </div>
-                <div className="h-9 flex items-end gap-1.5 pr-1 select-none">
-                  {weeklyVisits.map((v, idx) => (
-                    <div
-                      key={idx}
-                      style={{ height: `${Math.max(15, Math.round((v / maxVisits) * 100))}%` }}
-                      className="w-2.5 bg-gradient-to-t from-purple-500 to-indigo-400 hover:from-purple-400 hover:to-indigo-300 rounded-t transition-all duration-300 cursor-help"
-                      title={`${v} visits`}
-                    />
-                  ))}
+                <div className="h-10 flex items-end gap-1.5 pr-1 select-none relative">
+                  {weeklyVisits.map((v, idx) => {
+                    const daysAgo = 6 - idx;
+                    let dayLabel = `${daysAgo}d ago`;
+                    if (daysAgo === 0) dayLabel = "Today";
+                    else if (daysAgo === 1) dayLabel = "Yesterday";
+
+                    return (
+                      <div
+                        key={idx}
+                        onMouseEnter={() => setHoveredBarIndex(idx)}
+                        onMouseLeave={() => setHoveredBarIndex(null)}
+                        style={{ height: `${Math.max(15, Math.round((v / maxVisits) * 100))}%` }}
+                        className="w-2.5 bg-gradient-to-t from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 rounded-t transition-all duration-300 cursor-pointer relative"
+                      >
+                        {hoveredBarIndex === idx && (
+                          <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50 bg-[#121217] border border-white/10 px-2 py-1 rounded shadow-xl pointer-events-none text-center min-w-[70px]">
+                            <div className="text-[9px] font-bold text-white/90 whitespace-nowrap">{dayLabel}</div>
+                            <div className="text-[10px] font-mono font-bold text-amber-400 whitespace-nowrap">{v} visits</div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -1984,7 +2096,7 @@ function ControlRoomTab({ project }: { project: Project }) {
                           <span className="truncate flex-1 pr-3 text-[11px] font-medium text-white/85">{dep.meta?.githubCommitMessage || dep.name || "Production Deploy"}</span>
                           <span className={`text-[8px] font-mono font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${isReady ? "bg-green-500/10 text-green-400 border border-green-500/20" :
                               isError ? "bg-red-500/10 text-red-400 border border-red-500/20" :
-                                "bg-purple-500/10 text-purple-400 border border-purple-500/20"
+                                "bg-amber-500/10 text-amber-400 border border-amber-500/20"
                             }`}>
                             {dep.state.toLowerCase()}
                           </span>
@@ -1999,10 +2111,10 @@ function ControlRoomTab({ project }: { project: Project }) {
         </div>
 
         {/* Combined Infrastructure Links & Add Form Card */}
-        <div className="bg-white/[0.02] border border-white/[0.05] p-5 rounded-2xl flex flex-col space-y-3">
+        <div className="bg-[#121217]/40 border border-white/[0.06] backdrop-blur-sm p-6 rounded-2xl flex flex-col space-y-3 shadow-sm">
           <div className="flex items-center justify-between border-b border-white/[0.04] pb-2">
             <div className="flex items-center gap-1.5">
-              <Activity className="w-3.5 h-3.5 text-purple-400" />
+              <Activity className="w-3.5 h-3.5 text-amber-400" />
               <h4 className="text-[11px] uppercase font-mono tracking-wider text-white/40 font-bold">Infrastructure Registry</h4>
             </div>
             <div className="flex items-center gap-2">
@@ -2018,7 +2130,7 @@ function ControlRoomTab({ project }: { project: Project }) {
               <Button
                 size="sm"
                 variant="outline"
-                className={`h-6 text-[9px] cursor-pointer px-2 rounded-md ${showAddLinkForm ? 'bg-purple-500/10 border-purple-500/20 text-purple-400' : 'bg-transparent border-white/10 text-white/50 hover:bg-white/5'}`}
+                className={`h-6 text-[9px] cursor-pointer px-2 rounded-md ${showAddLinkForm ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-transparent border-white/10 text-white/50 hover:bg-white/5'}`}
                 onClick={() => setShowAddLinkForm(!showAddLinkForm)}
               >
                 {showAddLinkForm ? "Cancel" : "+ Add Link"}
@@ -2036,7 +2148,7 @@ function ControlRoomTab({ project }: { project: Project }) {
                     value={newLinkLabel}
                     onChange={e => setNewLinkLabel(e.target.value)}
                     placeholder="Neon DB Console"
-                    className="h-8 bg-[#07070a] border border-white/[0.08] focus:border-purple-500/40 text-xs text-white rounded-lg px-2.5 focus:ring-0 placeholder:text-white/20"
+                    className="h-8 bg-[#07070a] border border-white/[0.08] focus:border-amber-500/40 text-xs text-white rounded-lg px-2.5 focus:ring-0 placeholder:text-white/20"
                   />
                 </div>
                 <div className="space-y-1">
@@ -2044,7 +2156,7 @@ function ControlRoomTab({ project }: { project: Project }) {
                   <select
                     value={newLinkType}
                     onChange={e => setNewLinkType(e.target.value)}
-                    className="w-full h-8 bg-[#07070a] border border-white/[0.08] focus:border-purple-500/40 rounded-lg text-xs text-white px-2.5 cursor-pointer outline-none font-medium"
+                    className="w-full h-8 bg-[#07070a] border border-white/[0.08] focus:border-amber-500/40 rounded-lg text-xs text-white px-2.5 cursor-pointer outline-none font-medium"
                   >
                     <option value="frontend" className="bg-[#0f0f11]">Frontend</option>
                     <option value="backend" className="bg-[#0f0f11]">Backend</option>
@@ -2064,7 +2176,7 @@ function ControlRoomTab({ project }: { project: Project }) {
                     value={newLinkUrl}
                     onChange={e => setNewLinkUrl(e.target.value)}
                     placeholder="https://console.neon.tech/..."
-                    className="h-8 bg-[#07070a] border border-white/[0.08] focus:border-purple-500/40 text-xs text-white rounded-lg flex-1 px-2.5 focus:ring-0 placeholder:text-white/20"
+                    className="h-8 bg-[#07070a] border border-white/[0.08] focus:border-amber-500/40 text-xs text-white rounded-lg flex-1 px-2.5 focus:ring-0 placeholder:text-white/20"
                   />
                   <Button
                     size="sm"
@@ -2137,9 +2249,9 @@ function ControlRoomTab({ project }: { project: Project }) {
       </div>
 
       {/* RIGHT COLUMN: Tasks full height */}
-      <div className="md:col-span-5 bg-[#121217]/60 border border-white/[0.05] p-5 rounded-2xl flex flex-col space-y-4 min-h-[380px] overflow-hidden">
+      <div className="md:col-span-5 bg-[#121217]/40 border border-white/[0.06] backdrop-blur-sm p-6 rounded-2xl flex flex-col space-y-4 overflow-hidden">
         <div className="flex items-center gap-1.5 border-b border-white/[0.04] pb-2 flex-shrink-0 select-none">
-          <CheckSquare className="w-4 h-4 text-purple-400" />
+          <CheckSquare className="w-4 h-4 text-amber-400" />
           <h4 className="text-xs uppercase font-mono tracking-widest text-white/40 font-bold">Project Tasks</h4>
         </div>
         <div className="flex-1 overflow-y-auto custom-scrollbar pr-0.5">
@@ -2164,10 +2276,38 @@ const PRIORITY_BADGES = {
 
 const TYPE_BADGES = {
   code: { label: "Code", color: "text-blue-400 bg-blue-400/10 border-blue-500/20", icon: Code2 },
-  idea: { label: "Idea", color: "text-purple-400 bg-purple-400/10 border-purple-500/20", icon: Lightbulb },
+  idea: { label: "Idea", color: "text-amber-400 bg-amber-400/10 border-amber-500/20", icon: Lightbulb },
   research: { label: "Research", color: "text-indigo-400 bg-indigo-400/10 border-indigo-500/20", icon: BookOpen },
   experiment: { label: "Experiment", color: "text-amber-400 bg-amber-400/10 border-amber-500/20", icon: FlaskConical },
 };
+
+function ProjectIcon({ project, className = "w-3.5 h-3.5", isLarge = false }: { project: Project; className?: string; isLarge?: boolean }) {
+  const [imgError, setImgError] = useState(false);
+  const faviconUrl = getProjectFaviconUrl(project);
+
+  if (faviconUrl && !imgError) {
+    return (
+      <img
+        src={faviconUrl}
+        alt=""
+        onError={() => setImgError(true)}
+        className={`${className} rounded shrink-0 object-contain bg-white/5 p-0.5`}
+      />
+    );
+  }
+
+  if (isLarge) {
+    return (
+      <div className={`${className} flex items-center justify-center text-amber-400/85 font-bold font-mono bg-amber-500/10 border border-amber-500/20 rounded-lg`}>
+        {project.name[0].toUpperCase()}
+      </div>
+    );
+  }
+
+  const badge = TYPE_BADGES[project.type as keyof typeof TYPE_BADGES] || TYPE_BADGES.code;
+  const IconComponent = badge.icon;
+  return <IconComponent className={`${className} text-amber-400 shrink-0`} />;
+}
 
 const getPriorityBadge = (priority: string) => {
   const cfg = PRIORITY_BADGES[priority as keyof typeof PRIORITY_BADGES] || PRIORITY_BADGES.medium;
@@ -2180,10 +2320,8 @@ const getPriorityBadge = (priority: string) => {
 
 const getTypeBadge = (type: string) => {
   const cfg = TYPE_BADGES[type as keyof typeof TYPE_BADGES] || TYPE_BADGES.code;
-  const Icon = cfg.icon;
   return (
     <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium border flex items-center gap-1 ${cfg.color}`}>
-      <Icon className="w-2.5 h-2.5" />
       {cfg.label}
     </span>
   );
@@ -3262,10 +3400,10 @@ export function ProjectOS() {
                             onClick={() => selectProject(p.id)}
                             className={`w-full text-left px-3 py-1.5 flex items-center gap-2 border-l-2 transition-all cursor-pointer group/item
                               ${isSelected
-                                ? 'bg-white/[0.06] text-white border-purple-500 font-semibold'
+                                ? 'bg-white/[0.06] text-white border-amber-500 font-semibold'
                                 : 'text-white/50 hover:text-white/80 hover:bg-white/[0.02] border-transparent'}`}
                           >
-                            <Icon className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                            <ProjectIcon project={p} className="w-3.5 h-3.5" />
                             <span className="text-[12px] truncate flex-1">{p.name}</span>
                             {p.folderPath && (
                               <span
@@ -3303,10 +3441,10 @@ export function ProjectOS() {
                             onClick={() => selectProject(p.id)}
                             className={`w-full text-left px-3 py-1.5 flex items-center gap-2 border-l-2 transition-all cursor-pointer group/item
                               ${isSelected
-                                ? 'bg-white/[0.06] text-white border-purple-500 font-semibold'
+                                ? 'bg-white/[0.06] text-white border-amber-500 font-semibold'
                                 : 'text-white/50 hover:text-white/80 hover:bg-white/[0.02] border-transparent'}`}
                           >
-                            <Icon className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                            <ProjectIcon project={p} className="w-3.5 h-3.5" />
                             <span className="text-[12px] truncate flex-1">{p.name}</span>
                             {p.folderPath && (
                               <span
@@ -3332,7 +3470,7 @@ export function ProjectOS() {
               <div className="p-3 border-t border-surface-border">
                 <button
                   onClick={() => setCreateModalOpen(true)}
-                  className="w-full py-1.5 text-xs text-purple-400 hover:text-purple-300 border border-purple-500/20 hover:border-purple-500/40 rounded-lg transition-all cursor-pointer text-center font-medium bg-purple-500/5 flex items-center justify-center gap-1.5"
+                  className="w-full py-1.5 text-xs text-amber-400 hover:text-amber-300 border border-amber-500/20 hover:border-amber-500/40 rounded-lg transition-all cursor-pointer text-center font-medium bg-amber-500/5 flex items-center justify-center gap-1.5"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>New Project</span>
@@ -3349,13 +3487,7 @@ export function ProjectOS() {
               {selectedProject.phase !== "idea" && (
                 <div className="px-6 py-4 border-b border-surface-border flex items-start gap-4 flex-shrink-0 bg-surface-1">
                   <div className="w-10 h-10 rounded-lg bg-white/[0.03] border border-white/[0.06] shrink-0 flex items-center justify-center select-none">
-                    {selectedProject.ogImageUrl ? (
-                      <img src={selectedProject.ogImageUrl} className="w-full h-full object-cover rounded-lg" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-purple-400/80 text-[15px] font-bold font-mono bg-purple-500/10 border border-purple-500/20 rounded-lg">
-                        {selectedProject.name[0].toUpperCase()}
-                      </div>
-                    )}
+                    <ProjectIcon project={selectedProject} className="w-full h-full" isLarge={true} />
                   </div>
 
                   <div className="flex-1 min-w-0">
@@ -3377,12 +3509,12 @@ export function ProjectOS() {
 
                     <div className="flex items-center gap-3 mt-2 select-none text-[10px] text-white/30">
                       {selectedProject.githubUrl && (
-                        <a href={selectedProject.githubUrl} target="_blank" className="hover:text-purple-400 flex items-center gap-0.5 font-medium transition-colors">
+                        <a href={selectedProject.githubUrl} target="_blank" className="hover:text-amber-400 flex items-center gap-0.5 font-medium transition-colors">
                           GitHub ↗
                         </a>
                       )}
                       {selectedProject.liveUrl && (
-                        <a href={selectedProject.liveUrl} target="_blank" className="hover:text-purple-400 flex items-center gap-0.5 font-medium transition-colors">
+                        <a href={selectedProject.liveUrl} target="_blank" className="hover:text-amber-400 flex items-center gap-0.5 font-medium transition-colors">
                           Live ↗
                         </a>
                       )}

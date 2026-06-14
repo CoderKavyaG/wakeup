@@ -574,7 +574,7 @@ wss.on('connection', (ws, req) => {
   const pty = spawn(shell, [], {
     cwd,
     env: process.env,
-    windowsHide: false
+    windowsHide: true
   });
 
   if (ws.readyState === ws.OPEN) {

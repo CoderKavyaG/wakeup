@@ -582,50 +582,8 @@ export function ProjectsWidget() {
     }
   }, [selectedProject?.id]);
 
-  // Auto-Sync GitHub Repos on Mount
-  useEffect(() => {
-    if (loading || projects.length === 0 || hasSynced) return;
-    
-    let isMounted = true;
-    const syncGithub = async () => {
-      try {
-        const savedUsername = localStorage.getItem("GITHUB_USERNAME") || "coderkavyag";
-        const savedToken = localStorage.getItem("GITHUB_TOKEN");
-        const headers: HeadersInit = {};
-        if (savedToken) {
-          headers["Authorization"] = `Bearer ${savedToken}`;
-        }
-        
-        const res = await fetch(`/api/github?username=${encodeURIComponent(savedUsername)}`, { headers });
-        if (!res.ok) return;
-        const data = await res.json();
-        
-        if (data && data.repos && isMounted) {
-          const existingUrls = new Set(projects.map(p => p.githubUrl?.toLowerCase()).filter(Boolean));
-          
-          for (const repo of data.repos) {
-            const repoUrlLower = repo.html_url.toLowerCase();
-            if (!existingUrls.has(repoUrlLower) && isMounted) {
-              await addProject({
-                name: repo.name,
-                description: repo.description || "",
-                status: "planning",
-                tags: [repo.language].filter(Boolean),
-                githubUrl: repo.html_url,
-              });
-              existingUrls.add(repoUrlLower);
-            }
-          }
-          setHasSynced(true);
-        }
-      } catch (err) {
-        console.error("Auto-sync failed", err);
-      }
-    };
-    
-    syncGithub();
-    return () => { isMounted = false; };
-  }, [projects, loading, hasSynced]);
+  // Auto-Sync GitHub Repos on Mount disabled to prevent auto-seeding
+
 
   useEffect(() => {
     const handleFilterStale = () => {
@@ -1397,7 +1355,7 @@ export function ProjectsWidget() {
                           <div className="text-center py-6">
                             <div className="text-xs text-white/30">No notes yet.</div>
                             <div className="text-xs text-white/20 mt-1">
-                              Tag this project in Focus Panel using <span className="font-mono text-purple-400/60">@{selectedProject.name}</span>
+                              Tag this project in Focus Panel using <span className="font-mono text-amber-400/60">@{selectedProject.name}</span>
                             </div>
                           </div>
                         );
@@ -1406,7 +1364,7 @@ export function ProjectsWidget() {
                       const categoryStyle = {
                         feedback: 'bg-orange-500/15 text-orange-300 border-orange-500/20',
                         bug: 'bg-red-500/15 text-red-300 border-red-500/20',
-                        idea: 'bg-purple-500/15 text-purple-300 border-purple-500/20',
+                        idea: 'bg-amber-500/15 text-amber-300 border-amber-500/20',
                         note: 'bg-white/5 text-white/40 border-white/10'
                       };
 
@@ -1961,12 +1919,12 @@ export function ProjectsWidget() {
               <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg p-3 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] text-white/50 font-medium">Your Link Code:</span>
-                  <code className="text-xs font-mono font-bold text-purple-400 select-all bg-purple-500/10 px-1.5 py-0.5 rounded border border-purple-500/20">
+                  <code className="text-xs font-mono font-bold text-amber-400 select-all bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
                     DEVOS-{userId ? userId.slice(0, 8) : 'unknown'}
                   </code>
                 </div>
                 <p className="text-[10px] text-muted-foreground leading-relaxed">
-                  Message this code to the bot <a href="https://t.me/AssistmeOs_Bot" target="_blank" rel="noreferrer" className="text-purple-400 hover:underline">@AssistmeOs_Bot</a> to link your accounts. Once linked, you can capture tasks, ideas, or notes directly from chat!
+                  Message this code to the bot <a href="https://t.me/AssistmeOs_Bot" target="_blank" rel="noreferrer" className="text-amber-400 hover:underline">@AssistmeOs_Bot</a> to link your accounts. Once linked, you can capture tasks, ideas, or notes directly from chat!
                 </p>
               </div>
             </div>

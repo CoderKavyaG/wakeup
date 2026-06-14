@@ -138,7 +138,7 @@ export function GithubWidget() {
       {/* Header */}
       <div className="flex items-center justify-between mb-3 shrink-0">
         <div className="flex items-center space-x-2">
-          <GitBranch className="w-4 h-4 text-purple-400" />
+          <GitBranch className="w-4 h-4 text-amber-400" />
           <h2 className="text-sm font-semibold tracking-tight text-white">GitHub Activity</h2>
         </div>
         <div className="flex items-center space-x-1.5">
@@ -194,7 +194,7 @@ export function GithubWidget() {
         <div className="grid grid-cols-4 gap-1.5 mb-3 shrink-0">
           <div className="p-2 border border-white/[0.06] bg-white/[0.01] rounded text-center flex flex-col justify-center">
             <div className="text-[8px] uppercase font-bold text-white/30">Streak</div>
-            <div className="text-xs font-mono font-semibold text-purple-400">{stats.currentStreak}d</div>
+            <div className="text-xs font-mono font-semibold text-amber-400">{stats.currentStreak}d</div>
           </div>
           <div className="p-2 border border-white/[0.06] bg-white/[0.01] rounded text-center flex flex-col justify-center">
             <div className="text-[8px] uppercase font-bold text-white/30">Contribs</div>
@@ -223,7 +223,7 @@ export function GithubWidget() {
               </div>
               <div className="flex h-1.5 rounded overflow-hidden w-full bg-white/[0.04]">
                 {stats.languageBreakdown.slice(0, 4).map((lang, idx) => {
-                  const colors = ["bg-purple-500", "bg-zinc-400", "bg-zinc-500", "bg-zinc-600"];
+                  const colors = ["bg-amber-500", "bg-zinc-400", "bg-zinc-500", "bg-zinc-600"];
                   return (
                     <div 
                       key={lang.language} 
@@ -254,8 +254,8 @@ export function GithubWidget() {
               ) : (
                 commits.map((commit, i) => (
                   <div key={commit.sha + i} className="flex items-start space-x-1.5 text-[9px] pb-1.5 border-b border-white/[0.04] last:border-0">
-                    <div className="mt-0.5 p-1 bg-purple-500/10 rounded shrink-0">
-                      <GitCommit className="w-2.5 h-2.5 text-purple-400" />
+                    <div className="mt-0.5 p-1 bg-amber-500/10 rounded shrink-0">
+                      <GitCommit className="w-2.5 h-2.5 text-amber-400" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-1">
@@ -289,7 +289,7 @@ export function GithubWidget() {
                   return (
                     <div key={repo.id} className="p-2 border border-white/[0.06] bg-white/[0.01] rounded flex flex-col justify-between gap-1">
                       <div className="flex items-start justify-between gap-1">
-                        <a href={repo.html_url} target="_blank" rel="noopener noreferrer" className="font-bold text-xs text-white hover:text-purple-400 truncate flex items-center gap-1">
+                        <a href={repo.html_url} target="_blank" rel="noopener noreferrer" className="font-bold text-xs text-white hover:text-amber-400 truncate flex items-center gap-1">
                           {repo.name}
                           <ExternalLink className="w-3 h-3 opacity-40 shrink-0" />
                         </a>
@@ -299,7 +299,7 @@ export function GithubWidget() {
                               {repo.open_issues_count} Iss
                             </Badge>
                           )}
-                          <Badge variant="outline" className={`text-[7px] uppercase px-1 py-0 h-4 rounded font-medium ${isStale ? 'bg-white/5 text-white/40 border border-white/10' : 'bg-purple-500/10 text-purple-400 border border-purple-500/20'}`}>
+                          <Badge variant="outline" className={`text-[7px] uppercase px-1 py-0 h-4 rounded font-medium ${isStale ? 'bg-white/5 text-white/40 border border-white/10' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'}`}>
                             {isStale ? 'stale' : 'active'}
                           </Badge>
                         </div>

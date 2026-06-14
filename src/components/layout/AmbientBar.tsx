@@ -28,11 +28,9 @@ export default function AmbientBar() {
   const staleCount = derived?.totalStale ?? 0
 
   const vercel = useBootstrapStore(s => s.vercel)
-  const failedPortfolioDeploy = vercel?.deployments?.find((dep: any) => {
-    const isError = dep.state?.toUpperCase() === "ERROR"
-    if (!isError) return false
-    const n = (dep.name || "").toLowerCase()
-    return n.includes("coderkavyag") || n.includes("portfolio") || n.includes("kavya")
+  const failedDeploy = vercel?.deployments?.find((dep: any) => {
+    const state = dep.state?.toUpperCase()
+    return state === "ERROR" || state === "FAILED"
   })
 
   return (
@@ -55,15 +53,15 @@ export default function AmbientBar() {
 
       {/* Right: live signals */}
       <div className="flex items-center gap-3">
-        {failedPortfolioDeploy && (
-          <span className="text-[11px] text-red-400/85 flex items-center gap-1 font-mono uppercase font-bold bg-red-400/10 px-2 py-0.5 rounded border border-red-500/20">
+        {failedDeploy && (
+          <span className="text-[11px] text-red-400/85 flex items-center gap-1 font-mono uppercase font-bold bg-red-400/10 px-2 py-0.5 rounded border border-red-500/20" title={`Failed deployment for ${failedDeploy.name}`}>
             <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse inline-block" />
-            portfolio deploy failed
+            deploy failed
           </span>
         )}
         {overdueCount > 0 && (
           <span className="text-[11px] text-red-400/80 flex items-center gap-1">
-            <span className="w-1 h-1 rounded-full bg-red-400 inline-block" />
+            <span className="w-1.5 h-1.5 rounded-full bg-red-400 inline-block" />
             {overdueCount} overdue
           </span>
         )}
@@ -177,11 +175,11 @@ function SessionBriefingInline() {
 
   return (
     <div className={`flex items-center gap-2 max-w-xl transition-opacity duration-1000 ${isFading ? 'opacity-0' : 'opacity-100'}`}>
-      <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse shrink-0" />
-      <span className="text-[11px] text-purple-300 font-sans truncate" title={briefText}>
+      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
+      <span className="text-[11px] text-amber-300 font-sans truncate" title={briefText}>
         {displayedBrief}
         {displayedBrief.length < briefText.length && (
-          <span className="inline-block w-1 h-3 bg-purple-500 ml-0.5 animate-pulse align-middle" />
+          <span className="inline-block w-1 h-3 bg-amber-500 ml-0.5 animate-pulse align-middle" />
         )}
       </span>
       <button 

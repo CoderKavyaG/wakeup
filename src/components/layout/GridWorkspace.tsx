@@ -10,10 +10,8 @@ import { GithubWidget } from "../widgets/GithubWidget";
 import { FocusPanelWidget } from "../widgets/FocusPanelWidget";
 import { MachineControlWidget } from "../widgets/MachineControlWidget";
 import { TerminalWidget } from "../widgets/TerminalWidget";
-import { PortfolioWidget } from "../widgets/PortfolioWidget";
-import { SocialWidget } from "../widgets/SocialWidget";
 import { WidgetShell } from "./WidgetShell";
-import { FolderOpen, GitBranch, Crosshair, Terminal, Globe, Zap } from "lucide-react";
+import { FolderOpen, GitBranch, Crosshair, Terminal } from "lucide-react";
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
 
@@ -52,10 +50,6 @@ export function GridWorkspace() {
         return <FocusPanelWidget />;
       case "machine":
         return <MachineControlWidget />;
-      case "portfolio":
-        return <PortfolioWidget />;
-      case "social":
-        return <SocialWidget />;
       case "terminal":
         return <TerminalWidget initialCwd={widget.metadata?.initialCwd} />;
       default:
@@ -75,10 +69,6 @@ export function GridWorkspace() {
         return { title: "machine control", icon: <Terminal className="w-3.5 h-3.5 text-amber-400" /> };
       case "terminal":
         return { title: "terminal", icon: <Terminal className="w-3.5 h-3.5 text-zinc-400" /> };
-      case "portfolio":
-        return { title: "coderkavyag.me", icon: <Globe className="w-3.5 h-3.5 text-blue-400" /> };
-      case "social":
-        return { title: "social drafts", icon: <Zap className="w-3.5 h-3.5 text-amber-400" /> };
       default:
         return { title: widget.type, icon: <Terminal className="w-3.5 h-3.5 text-zinc-400" /> };
     }

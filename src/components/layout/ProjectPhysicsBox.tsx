@@ -647,7 +647,7 @@ export default function ProjectPhysicsBox({
               Priority: <span className="tooltip-priority text-white/60 capitalize">medium</span>
             </span>
             <span>•</span>
-            <span className="text-purple-400 font-medium">Double-click to view</span>
+            <span className="text-amber-400 font-medium">Double-click to view</span>
           </div>
         </div>
         
