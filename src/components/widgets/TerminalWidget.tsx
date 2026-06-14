@@ -78,10 +78,15 @@ export function TerminalWidget({ initialCwd, onClose }: TerminalWidgetProps) {
       }
       
       let isDisconnecting = false;
-      const handleDisconnect = () => {
+      const handleDisconnect = (code?: number) => {
         if (!isMounted || isDisconnecting) return;
         isDisconnecting = true;
         setStatus('disconnected');
+        
+        if (code === 1000) {
+          // Clean/explicit exit, do not auto-reconnect
+          return;
+        }
         
         reconnectTimeout = setTimeout(async () => {
           if (!isMounted) return;
@@ -95,8 +100,8 @@ export function TerminalWidget({ initialCwd, onClose }: TerminalWidgetProps) {
         }, 1500);
       };
 
-      ws.onclose = handleDisconnect
-      ws.onerror = handleDisconnect
+      ws.onclose = (event: any) => handleDisconnect(event.code);
+      ws.onerror = () => handleDisconnect();
 
       ws.onmessage = (e) => {
         if (isMounted) term.write(e.data)
@@ -154,6 +159,14 @@ export function TerminalWidget({ initialCwd, onClose }: TerminalWidgetProps) {
           {initialCwd && <span className="text-[10px] font-mono text-primary/70">{initialCwd.split(/[/\\]/).pop()}</span>}
         </div>
         <div className="flex items-center gap-2">
+          {status === 'disconnected' && (
+            <button
+              onClick={() => setReconnectTrigger(prev => prev + 1)}
+              className="text-[9px] uppercase bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded border border-amber-500/30 transition-all font-mono font-bold cursor-pointer"
+            >
+              Reconnect
+            </button>
+          )}
           <div className={`w-1.5 h-1.5 rounded-full ${
             status === 'connected' ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' :
             status === 'connecting' ? 'bg-yellow-500 animate-pulse' : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]'
