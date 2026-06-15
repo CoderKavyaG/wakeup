@@ -104,7 +104,7 @@ export async function GET() {
               {
                 uid: "dep_1",
                 projectId: "prj_wakeup",
-                state: "ERROR",
+                state: "READY",
                 name: "wakeup",
                 created: Date.now() - 3600000,
                 meta: {
@@ -215,15 +215,7 @@ export async function GET() {
                 return {
                   projectId: p.id,
                   analytics: {
-                    data: [
-                      { visits: 12 },
-                      { visits: 24 },
-                      { visits: 8 },
-                      { visits: 42 },
-                      { visits: 19 },
-                      { visits: 31 },
-                      { visits: 55 }
-                    ]
+                    error: "Unable to fetch the right visits from Vercel"
                   }
                 };
               }
