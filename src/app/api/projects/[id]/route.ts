@@ -30,7 +30,7 @@ function getFaviconUrl(urlString: string): string | null {
       cleanUrl = "https://" + cleanUrl;
     }
     const url = new URL(cleanUrl);
-    return `https://www.google.com/s2/favicons?domain=${url.hostname}&sz=128`;
+    return `https://icons.duckduckgo.com/ip3/${url.hostname}.ico`;
   } catch {
     return null;
   }

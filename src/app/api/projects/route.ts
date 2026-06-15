@@ -30,6 +30,26 @@ export async function GET(request: Request) {
   }
 }
 
+function normalizeGithubUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  let clean = url.trim().toLowerCase();
+  
+  // Remove protocol and subdomains
+  clean = clean.replace(/^(https?:\/\/)?(www\.)?github\.com\//, "");
+  
+  // Remove trailing .git
+  if (clean.endsWith(".git")) {
+    clean = clean.slice(0, -4);
+  }
+  
+  // Remove trailing slash
+  if (clean.endsWith("/")) {
+    clean = clean.slice(0, -1);
+  }
+  
+  return clean;
+}
+
 function getFaviconUrl(urlString: string): string | null {
   try {
     let cleanUrl = urlString.trim();
@@ -37,7 +57,7 @@ function getFaviconUrl(urlString: string): string | null {
       cleanUrl = "https://" + cleanUrl;
     }
     const url = new URL(cleanUrl);
-    return `https://www.google.com/s2/favicons?domain=${url.hostname}&sz=128`;
+    return `https://icons.duckduckgo.com/ip3/${url.hostname}.ico`;
   } catch {
     return null;
   }
@@ -190,27 +210,42 @@ export async function POST(request: Request) {
 
     // Check if project already exists to prevent duplication for this user
     let existingProject = null;
-    if (githubUrl) {
+
+    // 1. Search by name (case-insensitive)
+    if (name) {
       existingProject = await prisma.project.findFirst({
         where: {
           userId,
-          githubUrl: {
-            equals: githubUrl,
+          name: {
+            equals: name.trim(),
             mode: "insensitive"
           }
         }
       });
     }
+
+    // 2. Search by folderPath (case-insensitive)
     if (!existingProject && folderPath) {
       existingProject = await prisma.project.findFirst({
         where: {
           userId,
           folderPath: {
-            equals: folderPath,
+            equals: folderPath.trim(),
             mode: "insensitive"
           }
         }
       });
+    }
+
+    // 3. Search by normalized githubUrl
+    if (!existingProject && githubUrl) {
+      const targetNormalized = normalizeGithubUrl(githubUrl);
+      if (targetNormalized) {
+        const userProjects = await prisma.project.findMany({
+          where: { userId }
+        });
+        existingProject = userProjects.find(p => normalizeGithubUrl(p.githubUrl) === targetNormalized) || null;
+      }
     }
 
     if (existingProject) {
