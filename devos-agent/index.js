@@ -568,8 +568,18 @@ const wss = new WebSocketServer({ port: 3132 });
 
 wss.on('connection', (ws, req) => {
   const params = new URL(req.url, 'http://localhost').searchParams;
-  const cwd = params.get('cwd') || os.homedir();
-  const shell = process.platform === 'win32' ? 'cmd.exe' : 'bash';
+  const rawCwd = params.get('cwd') || os.homedir();
+  
+  let cwd = rawCwd;
+  try {
+    if (!fs.existsSync(cwd) || !fs.statSync(cwd).isDirectory()) {
+      cwd = os.homedir();
+    }
+  } catch (e) {
+    cwd = os.homedir();
+  }
+
+  const shell = process.platform === 'win32' ? 'powershell.exe' : 'bash';
 
   const pty = spawn(shell, [], {
     cwd,
@@ -578,8 +588,16 @@ wss.on('connection', (ws, req) => {
   });
 
   if (ws.readyState === ws.OPEN) {
-    ws.send(`\r\n*** Connected to DevOS Terminal (CWD: ${cwd}) ***\r\n\r\n`);
+    ws.send(`\r\n*** Connected to DevOS Terminal (${process.platform === 'win32' ? 'Powershell' : 'Bash'}) (CWD: ${cwd}) ***\r\n\r\n`);
   }
+
+  pty.on('error', (err) => {
+    console.error('[pty] Spawn error:', err);
+    if (ws.readyState === ws.OPEN) {
+      ws.send(`\r\n*** Terminal Error: Failed to spawn shell in directory ${cwd} ***\r\n${err.message}\r\n`);
+      ws.close(1011, "PTY spawn failed");
+    }
+  });
 
   ws.on('message', data => {
     const raw = data.toString();
@@ -607,7 +625,7 @@ wss.on('connection', (ws, req) => {
   });
 
   ws.on('close', () => pty.kill());
-  pty.on('exit', () => { if (ws.readyState === ws.OPEN) ws.close() });
+  pty.on('exit', () => { if (ws.readyState === ws.OPEN) ws.close(1000, "Shell exited") });
 });
 
 console.log('Terminal WS server on port 3132');

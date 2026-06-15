@@ -83,7 +83,7 @@ export function TerminalWidget({ initialCwd, onClose }: TerminalWidgetProps) {
         isDisconnecting = true;
         setStatus('disconnected');
         
-        if (code === 1000) {
+        if (code === 1000 || code === 1001 || code === 1005 || code === 1011) {
           // Clean/explicit exit, do not auto-reconnect
           return;
         }
@@ -137,12 +137,16 @@ export function TerminalWidget({ initialCwd, onClose }: TerminalWidgetProps) {
     }
   }, [pendingCommand, status, initialCwd, clearCommand]);
 
+  const isWindows = typeof window !== 'undefined' && navigator.userAgent.includes('Windows')
   const quickCommands = [
     { label: 'git status', cmd: 'git status' },
+    { label: 'git log', cmd: 'git log -n 5 --oneline' },
     { label: 'dev server', cmd: 'npm run dev' },
+    { label: 'prisma push', cmd: 'npx prisma db push' },
     { label: 'prisma studio', cmd: 'npx prisma studio' },
     { label: 'npm install', cmd: 'npm install' },
-    { label: 'clear', cmd: 'clear' }
+    { label: 'npm build', cmd: 'npm run build' },
+    { label: 'clear', cmd: isWindows ? 'cls' : 'clear' }
   ]
 
   const runQuickCommand = (cmd: string) => {
