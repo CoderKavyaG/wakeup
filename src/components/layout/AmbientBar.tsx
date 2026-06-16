@@ -26,13 +26,22 @@ export default function AmbientBar() {
   const todayTaskCount = derived?.todayTasks.length ?? 0
   const overdueCount = derived?.totalOverdue ?? 0
   const staleCount = derived?.totalStale ?? 0
-
   const vercel = useBootstrapStore(s => s.vercel)
   const failedDeploy = vercel?.deployments?.find((dep: any) => {
+    const projectDeps = vercel.deployments.filter((d: any) => d.name === dep.name)
+    const latestDep = projectDeps.reduce((latest: any, current: any) => {
+      if (!latest) return current
+      const latestTime = new Date(latest.created).getTime()
+      const currentTime = new Date(current.created).getTime()
+      return currentTime > latestTime ? current : latest
+    }, null)
+    
+    const isLatest = latestDep === dep
+    if (!isLatest) return false
+    
     const state = dep.state?.toUpperCase()
     return state === "ERROR" || state === "FAILED"
   })
-
   return (
     <div className="w-full h-10 flex items-center justify-between px-4 border-b border-white/[0.04] bg-[#0a0a0f] select-none shrink-0 z-30">
 
@@ -56,7 +65,7 @@ export default function AmbientBar() {
         {failedDeploy && (
           <span className="text-[11px] text-red-400/85 flex items-center gap-1 font-mono uppercase font-bold bg-red-400/10 px-2 py-0.5 rounded border border-red-500/20" title={`Failed deployment for ${failedDeploy.name}`}>
             <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse inline-block" />
-            deploy failed
+            deploy failed: {failedDeploy.name}
           </span>
         )}
         {overdueCount > 0 && (

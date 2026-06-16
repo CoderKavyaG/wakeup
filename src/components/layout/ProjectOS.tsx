@@ -67,22 +67,30 @@ const TABS = [
 ];
 
 function getProjectFaviconUrl(project: Project): string | null {
-  if (project.ogImageUrl) return project.ogImageUrl;
-  
   let domain = "";
   if (project.liveUrl) {
     try {
-      domain = new URL(project.liveUrl).hostname;
+      const cleanUrl = project.liveUrl.startsWith('http') ? project.liveUrl : `https://${project.liveUrl}`;
+      domain = new URL(cleanUrl).hostname;
     } catch {
       const match = project.liveUrl.match(/(?:https?:\/\/)?([^/]+)/);
       if (match) domain = match[1];
     }
   } else if (project.githubUrl) {
-    domain = "github.com";
+    try {
+      const cleanUrl = project.githubUrl.startsWith('http') ? project.githubUrl : `https://${project.githubUrl}`;
+      domain = new URL(cleanUrl).hostname;
+      if (domain === "github.com") {
+        return `https://icons.duckduckgo.com/ip3/github.com.ico`;
+      }
+    } catch {
+      const match = project.githubUrl.match(/(?:https?:\/\/)?([^/]+)/);
+      if (match) domain = match[1];
+    }
   }
   
   if (domain) {
-    return `https://www.google.com/s2/favicons?sz=64&domain=${domain}`;
+    return `https://icons.duckduckgo.com/ip3/${domain}.ico`;
   }
   
   return null;
@@ -1904,6 +1912,15 @@ function ControlRoomTab({ project }: { project: Project }) {
 
   const [showAddLinkForm, setShowAddLinkForm] = useState(false);
 
+  // Redesigned deck state fields
+  const [gitInfo, setGitInfo] = useState<{ branch: string; commit: string } | null>(null);
+  const [gitLoading, setGitLoading] = useState(false);
+  const [npmScripts, setNpmScripts] = useState<Record<string, string>>({});
+  const [scriptsLoading, setScriptsLoading] = useState(false);
+  const [runningScript, setRunningScript] = useState<string | null>(null);
+  const [systemStats, setSystemStats] = useState<{ cpu: number; ram: number } | null>(null);
+  const [visitsError, setVisitsError] = useState<string | null>(null);
+
   const fetchDeploymentsAndVisits = () => {
     if (!project.vercelProjectId) return;
     setDeploymentsLoading(true);
@@ -1915,20 +1932,31 @@ function ControlRoomTab({ project }: { project: Project }) {
       })
       .catch(() => setDeploymentsLoading(false));
 
-    fetch(`/api/vercel?type=analytics&projectId=${project.vercelProjectId}`)
-      .then(r => r.json())
-      .then(data => {
-        const rawVisits = data.data?.map((d: any) => d.visits ?? d.views ?? 0) || [];
-        const visits = [...Array(7)].map((_, i) => rawVisits[i] ?? 0);
-        setWeeklyVisits(visits);
-        setTotalVisits(visits.reduce((a, b) => a + b, 0));
-        setMaxVisits(Math.max(...visits, 1));
-      })
-      .catch(() => {
-        setWeeklyVisits([0, 0, 0, 0, 0, 0, 0]);
-        setTotalVisits(0);
-        setMaxVisits(1);
-      });
+    if (!vercel?.analytics?.[project.id] || vercel.analytics[project.id].error) {
+      fetch(`/api/vercel?type=analytics&projectId=${project.vercelProjectId}`)
+        .then(async r => {
+          if (!r.ok) {
+            const errData = await r.json().catch(() => ({}));
+            throw new Error(errData.error || "Unable to fetch the right visits from Vercel");
+          }
+          return r.json();
+        })
+        .then(data => {
+          if (data.error) throw new Error(data.error);
+          const rawVisits = data.data?.map((d: any) => d.visits ?? d.views ?? 0) || [];
+          const visits = [...Array(7)].map((_, i) => rawVisits[i] ?? 0);
+          setWeeklyVisits(visits);
+          setTotalVisits(visits.reduce((a, b) => a + b, 0));
+          setMaxVisits(Math.max(...visits, 1));
+          setVisitsError(null);
+        })
+        .catch(() => {
+          setWeeklyVisits([0, 0, 0, 0, 0, 0, 0]);
+          setTotalVisits(0);
+          setMaxVisits(1);
+          setVisitsError("Unable to fetch the right visits from Vercel");
+        });
+    }
   };
 
   const fetchLinks = async () => {
@@ -1942,9 +1970,95 @@ function ControlRoomTab({ project }: { project: Project }) {
   };
 
   useEffect(() => {
-    fetchDeploymentsAndVisits();
+    if (project.vercelProjectId) {
+      if (vercel?.analytics?.[project.id]) {
+        const cached = vercel.analytics[project.id];
+        if (cached.error) {
+          setVisitsError(cached.error);
+          setWeeklyVisits([0, 0, 0, 0, 0, 0, 0]);
+          setTotalVisits(0);
+          setMaxVisits(1);
+        } else {
+          const rawVisits = cached.data?.map((d: any) => d.visits ?? d.views ?? 0) || [];
+          const visits = [...Array(7)].map((_, i) => rawVisits[i] ?? 0);
+          setWeeklyVisits(visits);
+          setTotalVisits(visits.reduce((a, b) => a + b, 0));
+          setMaxVisits(Math.max(...visits, 1));
+          setVisitsError(null);
+        }
+      }
+      fetchDeploymentsAndVisits();
+    } else {
+      setWeeklyVisits([]);
+      setTotalVisits(0);
+      setMaxVisits(1);
+      setVisitsError(null);
+    }
     fetchLinks();
   }, [project.id, project.vercelProjectId]);
+
+  // Fetch Git branch/commit and NPM scripts on folder path change
+  useEffect(() => {
+    if (project.folderPath) {
+      setGitLoading(true);
+      fetch(`/api/machine/git?path=${encodeURIComponent(project.folderPath)}`)
+        .then(r => r.json())
+        .then(data => {
+          setGitInfo(data);
+          setGitLoading(false);
+        })
+        .catch(() => setGitLoading(false));
+
+      setScriptsLoading(true);
+      fetch(`/api/machine/npm-scripts?path=${encodeURIComponent(project.folderPath)}`)
+        .then(r => r.json())
+        .then(data => {
+          setNpmScripts(data.scripts || {});
+          setScriptsLoading(false);
+        })
+        .catch(() => setScriptsLoading(false));
+    } else {
+      setGitInfo(null);
+      setNpmScripts({});
+    }
+  }, [project.folderPath, project.id]);
+
+  // Fetch cpu/ram statistics periodically
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    const fetchStats = () => {
+      fetch("/api/machine/stats")
+        .then(r => r.json())
+        .then(data => {
+          if (data && typeof data.cpu === "number" && typeof data.ram === "number") {
+            setSystemStats({ cpu: data.cpu, ram: data.ram });
+          }
+        })
+        .catch(() => {});
+    };
+
+    fetchStats();
+    interval = setInterval(fetchStats, 3500);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const runNpmScript = async (scriptName: string) => {
+    if (!project.folderPath) return;
+    setRunningScript(scriptName);
+    try {
+      const res = await fetch("/api/machine/run-npm-script", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: project.folderPath, script: scriptName })
+      });
+      if (!res.ok) throw new Error("Failed to start script execution");
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setTimeout(() => setRunningScript(null), 1000);
+    }
+  };
 
   const pingLinks = async () => {
     if (projectLinks.length === 0) return;
@@ -2015,113 +2129,242 @@ function ControlRoomTab({ project }: { project: Project }) {
   };
 
   return (
-    <div className="p-4 grid grid-cols-1 md:grid-cols-12 gap-5 max-w-6xl mx-auto animate-in fade-in duration-300 min-h-0 select-none">
-      
-      {/* LEFT COLUMN: deployments, analytics and environments links registry */}
-      <div className="md:col-span-7 space-y-5 flex flex-col min-h-0">
+    <div className="p-5 grid grid-cols-1 lg:grid-cols-12 gap-5 max-w-7xl mx-auto animate-in fade-in duration-300 min-h-0 select-none">
+      {/* Left 8-col deck */}
+      <div className="lg:col-span-8 space-y-5 flex flex-col min-h-0">
         
-        {/* Vercel Deployment & Analytics Card */}
-        <div className="bg-[#121217]/40 border border-white/[0.06] backdrop-blur-sm p-6 rounded-2xl flex flex-col space-y-4 shadow-sm">
+        {/* Tile 1: Repository Info & Git Status Card */}
+        <div className="bg-[#121217]/40 border border-white/[0.06] backdrop-blur-sm p-5 rounded-2xl flex flex-col space-y-3 shadow-sm">
           <div className="flex items-center justify-between">
-            <h4 className="text-[11px] uppercase font-mono tracking-widest text-white/40 font-bold">Vercel Integration</h4>
-            {project.vercelProjectId && (
-              <span className="text-[8px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-mono font-bold uppercase tracking-wider">
-                connected
+            <div className="flex items-center gap-2">
+              <FolderOpen className="w-4 h-4 text-amber-400" />
+              <h4 className="text-[11px] uppercase font-mono tracking-widest text-white/40 font-bold">Project Command Deck</h4>
+            </div>
+            {project.folderPath && (
+              <span className="text-[9px] font-mono text-white/30 truncate max-w-[280px]">
+                {project.folderPath}
               </span>
             )}
           </div>
 
-          {!project.vercelProjectId ? (
-            <div className="flex-1 flex flex-col justify-center space-y-4 py-6">
-              <p className="text-xs text-white/55 leading-relaxed">
-                Connect a Vercel project to load visitor traffic metrics and trigger production deployments.
-              </p>
-              <select
-                onChange={e => mapVercelProject(e.target.value)}
-                className="w-full h-9 bg-white/[0.02] border border-white/[0.08] rounded-xl text-xs text-white px-3 focus:outline-none focus:border-amber-500/40 cursor-pointer font-semibold transition-all"
-              >
-                <option value="" className="bg-[#0f0f11]">Select Vercel Project...</option>
-                {vercel?.projects?.map((vp: any) => (
-                  <option key={vp.id} value={vp.id} className="bg-[#0f0f11]">{vp.name}</option>
-                ))}
-              </select>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-3.5 rounded-xl bg-white/[0.01] border border-white/[0.03] relative">
-                <div>
-                  <span className="text-[9px] font-bold uppercase text-white/30 tracking-wider">Weekly Traffic</span>
-                  <p className="text-xl font-bold font-mono text-white mt-0.5">{totalVisits} visits</p>
-                </div>
-                <div className="h-10 flex items-end gap-1.5 pr-1 select-none relative">
-                  {weeklyVisits.map((v, idx) => {
-                    const daysAgo = 6 - idx;
-                    let dayLabel = `${daysAgo}d ago`;
-                    if (daysAgo === 0) dayLabel = "Today";
-                    else if (daysAgo === 1) dayLabel = "Yesterday";
-
-                    return (
-                      <div
-                        key={idx}
-                        onMouseEnter={() => setHoveredBarIndex(idx)}
-                        onMouseLeave={() => setHoveredBarIndex(null)}
-                        style={{ height: `${Math.max(15, Math.round((v / maxVisits) * 100))}%` }}
-                        className="w-2.5 bg-gradient-to-t from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 rounded-t transition-all duration-300 cursor-pointer relative"
-                      >
-                        {hoveredBarIndex === idx && (
-                          <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50 bg-[#121217] border border-white/10 px-2 py-1 rounded shadow-xl pointer-events-none text-center min-w-[70px]">
-                            <div className="text-[9px] font-bold text-white/90 whitespace-nowrap">{dayLabel}</div>
-                            <div className="text-[10px] font-mono font-bold text-amber-400 whitespace-nowrap">{v} visits</div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <span className="text-[9px] font-bold uppercase text-white/30 tracking-wider block">Production Deployments</span>
-                {deploymentsLoading ? (
-                  <p className="text-[10px] text-white/30 animate-pulse font-mono">Fetching deployment history...</p>
-                ) : deployments.length === 0 ? (
-                  <p className="text-[10px] text-white/20 italic">No deployments found for this Vercel project.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+            <div className="p-3 bg-white/[0.01] border border-white/[0.03] rounded-xl flex items-center gap-3">
+              <GitBranch className="w-4 h-4 text-amber-500 shrink-0" />
+              <div className="min-w-0">
+                <span className="text-[9px] font-bold text-white/30 uppercase tracking-wider block font-mono">Git Branch</span>
+                {gitLoading ? (
+                  <span className="text-xs text-white/40 font-mono animate-pulse">Reading branch...</span>
+                ) : gitInfo?.branch ? (
+                  <span className="text-xs font-mono font-bold text-white/85 truncate block">{gitInfo.branch}</span>
                 ) : (
-                  <div className="space-y-2 max-h-[140px] overflow-y-auto pr-1 custom-scrollbar">
-                    {deployments.slice(0, 3).map((dep: any) => {
-                      const isReady = dep.state === "READY";
-                      const isError = dep.state === "ERROR" || dep.state === "FAILED";
-                      return (
-                        <div key={dep.uid} className="flex items-center justify-between p-2 rounded-xl bg-white/[0.01] border border-white/[0.03] text-xs text-white/60 hover:bg-white/[0.03] transition-colors">
-                          <span className="truncate flex-1 pr-3 text-[11px] font-medium text-white/85">{dep.meta?.githubCommitMessage || dep.name || "Production Deploy"}</span>
-                          <span className={`text-[8px] font-mono font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${isReady ? "bg-green-500/10 text-green-400 border border-green-500/20" :
-                              isError ? "bg-red-500/10 text-red-400 border border-red-500/20" :
-                                "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                            }`}>
-                            {dep.state.toLowerCase()}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
+                  <span className="text-xs text-white/20 italic">No git initialization detected</span>
                 )}
               </div>
+            </div>
+
+            <div className="p-3 bg-white/[0.01] border border-white/[0.03] rounded-xl flex items-center gap-3">
+              <Code2 className="w-4 h-4 text-amber-500 shrink-0" />
+              <div className="min-w-0">
+                <span className="text-[9px] font-bold text-white/30 uppercase tracking-wider block font-mono">Last Commit</span>
+                {gitLoading ? (
+                  <span className="text-xs text-white/40 font-mono animate-pulse">Reading log...</span>
+                ) : gitInfo?.commit ? (
+                  <span className="text-xs font-mono text-white/70 truncate block" title={gitInfo.commit}>{gitInfo.commit}</span>
+                ) : (
+                  <span className="text-xs text-white/20 italic">No commit history</span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Tile 2 & 3 Grid: Vercel & System Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          
+          {/* Vercel Metrics Card */}
+          <div className="bg-[#121217]/40 border border-white/[0.06] backdrop-blur-sm p-5 rounded-2xl flex flex-col space-y-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <Globe className="w-3.5 h-3.5 text-amber-400" />
+                <h4 className="text-[11px] uppercase font-mono tracking-widest text-white/40 font-bold">Vercel Analytics</h4>
+              </div>
+              {project.vercelProjectId && (
+                <span className="text-[8px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-mono font-bold uppercase tracking-wider">
+                  connected
+                </span>
+              )}
+            </div>
+
+            {!project.vercelProjectId ? (
+              <div className="flex-1 flex flex-col justify-center space-y-3 py-4">
+                <p className="text-[11px] text-white/50 leading-normal">
+                  Connect a Vercel project to load visitor traffic metrics and trigger production deployments.
+                </p>
+                <select
+                  onChange={e => mapVercelProject(e.target.value)}
+                  className="w-full h-8 bg-white/[0.02] border border-white/[0.08] rounded-xl text-xs text-white px-3 focus:outline-none focus:border-amber-500/40 cursor-pointer font-semibold transition-all"
+                >
+                  <option value="" className="bg-[#0f0f11]">Select Vercel Project...</option>
+                  {vercel?.projects?.map((vp: any) => (
+                    <option key={vp.id} value={vp.id} className="bg-[#0f0f11]">{vp.name}</option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3.5 rounded-xl bg-white/[0.01] border border-white/[0.03] relative min-h-[58px]">
+                  <div>
+                    <span className="text-[9px] font-bold uppercase text-white/30 tracking-wider">Weekly Traffic</span>
+                    {visitsError ? (
+                      <p className="text-[10px] text-amber-500/80 font-mono mt-1 font-semibold leading-snug">{visitsError}</p>
+                    ) : (
+                      <p className="text-lg font-bold font-mono text-white mt-0.5">{totalVisits} visits</p>
+                    )}
+                  </div>
+                  {!visitsError && (
+                    <div className="h-10 flex items-end gap-1 select-none relative">
+                      {weeklyVisits.map((v, idx) => {
+                        const daysAgo = 6 - idx;
+                        let dayLabel = `${daysAgo}d ago`;
+                        if (daysAgo === 0) dayLabel = "Today";
+                        else if (daysAgo === 1) dayLabel = "Yesterday";
+
+                        return (
+                          <div
+                            key={idx}
+                            onMouseEnter={() => setHoveredBarIndex(idx)}
+                            onMouseLeave={() => setHoveredBarIndex(null)}
+                            style={{ height: `${Math.max(15, Math.round((v / maxVisits) * 100))}%` }}
+                            className="w-2.5 bg-gradient-to-t from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 rounded-t transition-all duration-300 cursor-pointer relative"
+                          >
+                            {hoveredBarIndex === idx && (
+                              <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50 bg-[#121217] border border-white/10 px-2 py-1 rounded shadow-xl pointer-events-none text-center min-w-[70px]">
+                                <div className="text-[9px] font-bold text-white/90 whitespace-nowrap">{dayLabel}</div>
+                                <div className="text-[10px] font-mono font-bold text-amber-400 whitespace-nowrap">{v} visits</div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-1.5">
+                  <span className="text-[9px] font-bold uppercase text-white/30 tracking-wider block font-mono">Recent Builds</span>
+                  {deploymentsLoading ? (
+                    <p className="text-[10px] text-white/30 animate-pulse font-mono py-1">Fetching deployments...</p>
+                  ) : deployments.length === 0 ? (
+                    <p className="text-[10px] text-white/20 italic py-1">No builds found.</p>
+                  ) : (
+                    <div className="space-y-1.5 max-h-[120px] overflow-y-auto pr-0.5 custom-scrollbar">
+                      {deployments.slice(0, 3).map((dep: any) => {
+                        const isReady = dep.state === "READY";
+                        const isError = dep.state === "ERROR" || dep.state === "FAILED";
+                        return (
+                          <div key={dep.uid} className="flex items-center justify-between p-2 rounded-xl bg-white/[0.01] border border-white/[0.03] text-[11px] text-white/60 hover:bg-white/[0.02] transition-colors">
+                            <span className="truncate flex-1 pr-3 font-mono text-white/85">{dep.meta?.githubCommitMessage || dep.name || "Deploy"}</span>
+                            <span className={`text-[8px] font-mono font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                              isReady ? "bg-green-500/10 text-green-400 border border-green-500/20" :
+                              isError ? "bg-red-500/10 text-red-400 border border-red-500/20" :
+                              "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                            }`}>
+                              {dep.state.toLowerCase()}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* System Performance Card */}
+          <div className="bg-[#121217]/40 border border-white/[0.06] backdrop-blur-sm p-5 rounded-2xl flex flex-col space-y-4 shadow-sm">
+            <div className="flex items-center gap-1.5">
+              <Activity className="w-3.5 h-3.5 text-amber-400" />
+              <h4 className="text-[11px] uppercase font-mono tracking-widest text-white/40 font-bold">System Performance</h4>
+            </div>
+
+            <div className="flex-1 flex flex-col justify-center space-y-5 py-2">
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center text-[10px] uppercase tracking-wider font-mono">
+                  <span className="text-white/40">CPU Load</span>
+                  <span className="text-white font-bold">{systemStats ? `${systemStats.cpu}%` : "—"}</span>
+                </div>
+                <div className="h-2 w-full bg-white/[0.02] border border-white/[0.06] rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-gradient-to-r from-amber-500 to-yellow-400 transition-all duration-1000"
+                    style={{ width: systemStats ? `${systemStats.cpu}%` : "0%" }}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center text-[10px] uppercase tracking-wider font-mono">
+                  <span className="text-white/40">RAM Utilization</span>
+                  <span className="text-white font-bold">{systemStats ? `${systemStats.ram}%` : "—"}</span>
+                </div>
+                <div className="h-2 w-full bg-white/[0.02] border border-white/[0.06] rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-gradient-to-r from-amber-500 to-yellow-400 transition-all duration-1000"
+                    style={{ width: systemStats ? `${systemStats.ram}%` : "0%" }}
+                  />
+                </div>
+              </div>
+
+              <p className="text-[9px] text-white/20 italic font-mono text-center">
+                Refreshed live every 3.5 seconds
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Tile 4: Quick Scripts Dashboard */}
+        <div className="bg-[#121217]/40 border border-white/[0.06] backdrop-blur-sm p-5 rounded-2xl flex flex-col space-y-3 shadow-sm">
+          <div className="flex items-center gap-1.5">
+            <Terminal className="w-3.5 h-3.5 text-amber-400" />
+            <h4 className="text-[11px] uppercase font-mono tracking-widest text-white/40 font-bold">NPM Scripts Dashboard</h4>
+          </div>
+
+          {!project.folderPath ? (
+            <p className="text-[10px] text-white/20 italic py-2">Select a local directory path to read and run npm scripts.</p>
+          ) : scriptsLoading ? (
+            <p className="text-[10px] text-white/30 animate-pulse font-mono py-2">Loading scripts from package.json...</p>
+          ) : Object.keys(npmScripts).length === 0 ? (
+            <p className="text-[10px] text-white/20 italic py-2">No scripts found in package.json.</p>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 pt-1">
+              {Object.keys(npmScripts).map(scriptName => {
+                return (
+                  <button
+                    key={scriptName}
+                    onClick={() => runNpmScript(scriptName)}
+                    className="px-3 py-1.5 rounded-xl text-[11px] font-mono text-left bg-white/[0.01] border border-white/[0.04] text-white/75 hover:bg-amber-500/5 hover:border-amber-500/20 hover:text-amber-400 transition-all cursor-pointer flex items-center justify-between"
+                  >
+                    <span className="truncate mr-1">{scriptName}</span>
+                    <Play className="w-2.5 h-2.5 text-amber-500/50 shrink-0" />
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
 
-        {/* Combined Infrastructure Links & Add Form Card */}
-        <div className="bg-[#121217]/40 border border-white/[0.06] backdrop-blur-sm p-6 rounded-2xl flex flex-col space-y-3 shadow-sm">
+        {/* Tile 5: Combined Infrastructure Links Registry */}
+        <div className="bg-[#121217]/40 border border-white/[0.06] backdrop-blur-sm p-5 rounded-2xl flex flex-col space-y-3 shadow-sm">
           <div className="flex items-center justify-between border-b border-white/[0.04] pb-2">
             <div className="flex items-center gap-1.5">
               <Activity className="w-3.5 h-3.5 text-amber-400" />
-              <h4 className="text-[11px] uppercase font-mono tracking-wider text-white/40 font-bold">Infrastructure Registry</h4>
+              <h4 className="text-[11px] uppercase font-mono tracking-widest text-white/40 font-bold">Infrastructure Registry</h4>
             </div>
             <div className="flex items-center gap-2">
               <Button
                 size="sm"
                 variant="outline"
-                className="h-6 text-[9px] bg-transparent border-white/10 text-white/50 hover:bg-white/5 cursor-pointer px-2 rounded-md"
+                className="h-6 text-[9px] bg-transparent border-white/10 text-white/50 hover:bg-white/5 cursor-pointer px-2 rounded-md font-bold uppercase tracking-wider"
                 onClick={pingLinks}
                 disabled={pingingLinks}
               >
@@ -2130,7 +2373,7 @@ function ControlRoomTab({ project }: { project: Project }) {
               <Button
                 size="sm"
                 variant="outline"
-                className={`h-6 text-[9px] cursor-pointer px-2 rounded-md ${showAddLinkForm ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-transparent border-white/10 text-white/50 hover:bg-white/5'}`}
+                className={`h-6 text-[9px] cursor-pointer px-2 rounded-md font-bold uppercase tracking-wider ${showAddLinkForm ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-transparent border-white/10 text-white/50 hover:bg-white/5'}`}
                 onClick={() => setShowAddLinkForm(!showAddLinkForm)}
               >
                 {showAddLinkForm ? "Cancel" : "+ Add Link"}
@@ -2248,8 +2491,8 @@ function ControlRoomTab({ project }: { project: Project }) {
         </div>
       </div>
 
-      {/* RIGHT COLUMN: Tasks full height */}
-      <div className="md:col-span-5 bg-[#121217]/40 border border-white/[0.06] backdrop-blur-sm p-6 rounded-2xl flex flex-col space-y-4 overflow-hidden">
+      {/* Right 4-col checklist deck */}
+      <div className="lg:col-span-4 bg-[#121217]/40 border border-white/[0.06] backdrop-blur-sm p-5 rounded-2xl flex flex-col space-y-4 overflow-hidden">
         <div className="flex items-center gap-1.5 border-b border-white/[0.04] pb-2 flex-shrink-0 select-none">
           <CheckSquare className="w-4 h-4 text-amber-400" />
           <h4 className="text-xs uppercase font-mono tracking-widest text-white/40 font-bold">Project Tasks</h4>
@@ -2258,7 +2501,6 @@ function ControlRoomTab({ project }: { project: Project }) {
           <ProjectTasksTab project={project} isNested={true} />
         </div>
       </div>
-
     </div>
   );
 }
@@ -2283,14 +2525,76 @@ const TYPE_BADGES = {
 
 function ProjectIcon({ project, className = "w-3.5 h-3.5", isLarge = false }: { project: Project; className?: string; isLarge?: boolean }) {
   const [imgError, setImgError] = useState(false);
-  const faviconUrl = getProjectFaviconUrl(project);
+  const [imgSrc, setImgSrc] = useState<string | null>(null);
 
-  if (faviconUrl && !imgError) {
+  useEffect(() => {
+    let domain = "";
+    if (project.liveUrl) {
+      try {
+        const cleanUrl = project.liveUrl.startsWith('http') ? project.liveUrl : `https://${project.liveUrl}`;
+        domain = new URL(cleanUrl).hostname;
+      } catch {
+        const match = project.liveUrl.match(/(?:https?:\/\/)?([^/]+)/);
+        if (match) domain = match[1];
+      }
+    } else if (project.githubUrl) {
+      try {
+        const cleanUrl = project.githubUrl.startsWith('http') ? project.githubUrl : `https://${project.githubUrl}`;
+        domain = new URL(cleanUrl).hostname;
+      } catch {
+        const match = project.githubUrl.match(/(?:https?:\/\/)?([^/]+)/);
+        if (match) domain = match[1];
+      }
+    }
+
+    if (domain) {
+      if (domain === "github.com") {
+        setImgSrc("https://icons.duckduckgo.com/ip3/github.com.ico");
+      } else if (project.liveUrl) {
+        const cleanUrl = project.liveUrl.startsWith('http') ? project.liveUrl : `https://${project.liveUrl}`;
+        try {
+          const origin = new URL(cleanUrl).origin;
+          setImgSrc(`${origin}/favicon.ico`);
+        } catch {
+          setImgSrc(`https://icons.duckduckgo.com/ip3/${domain}.ico`);
+        }
+      } else {
+        setImgSrc(`https://icons.duckduckgo.com/ip3/${domain}.ico`);
+      }
+    } else {
+      setImgSrc(null);
+    }
+    setImgError(false);
+  }, [project.liveUrl, project.githubUrl]);
+
+  const handleImageError = () => {
+    if (imgSrc && !imgSrc.includes("duckduckgo.com") && !imgSrc.includes("google.com")) {
+      let domain = "";
+      if (project.liveUrl) {
+        try {
+          const cleanUrl = project.liveUrl.startsWith('http') ? project.liveUrl : `https://${project.liveUrl}`;
+          domain = new URL(cleanUrl).hostname;
+        } catch {
+          const match = project.liveUrl.match(/(?:https?:\/\/)?([^/]+)/);
+          if (match) domain = match[1];
+        }
+      }
+      if (domain) {
+        setImgSrc(`https://icons.duckduckgo.com/ip3/${domain}.ico`);
+      } else {
+        setImgError(true);
+      }
+    } else {
+      setImgError(true);
+    }
+  };
+
+  if (imgSrc && !imgError) {
     return (
       <img
-        src={faviconUrl}
+        src={imgSrc}
         alt=""
-        onError={() => setImgError(true)}
+        onError={handleImageError}
         className={`${className} rounded shrink-0 object-contain bg-white/5 p-0.5`}
       />
     );
@@ -2436,6 +2740,14 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
   const handlePhaseChange = (newPhase: typeof phase) => {
     setPhaseState(newPhase);
     setType(newPhase === "idea" ? "idea" : "code");
+    if (newPhase === "idea") {
+      setActiveFormTab("manual");
+      setName("");
+      setDescription("");
+      setGithubUrl("");
+      setFolderPath("");
+      setSelectedRepo(null);
+    }
   };
 
   const handleScanLocal = async (isRetry = false) => {
@@ -2581,7 +2893,7 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
         </div>
 
         {/* Tab Selection (only if not editing) */}
-        {!projectToEdit && (
+        {!projectToEdit && phase !== "idea" && (
           <div className="flex border-b border-white/[0.06] bg-black/20 flex-shrink-0">
             {(["manual", "github", "local"] as const).map(tab => (
               <button
@@ -2598,7 +2910,7 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
                 }}
                 className={`flex-1 py-2.5 text-xs font-semibold border-b-2 -mb-px transition-all cursor-pointer capitalize flex items-center justify-center gap-1.5
                   ${activeFormTab === tab
-                    ? "text-purple-300 border-purple-500 bg-white/[0.02] font-bold"
+                    ? "text-amber-300 border-amber-500 bg-white/[0.02] font-bold"
                     : "text-white/40 border-transparent hover:text-white/60 hover:bg-white/[0.01]"
                   }`}
               >
@@ -2625,7 +2937,7 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
                       value={name}
                       onChange={e => setName(e.target.value)}
                       placeholder="My SaaS App"
-                      className="w-full h-8 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-3 focus:outline-none focus:ring-1 focus:ring-purple-500/30 placeholder:text-white/20"
+                      className="w-full h-8 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-3 focus:outline-none focus:ring-1 focus:ring-amber-500/30 placeholder:text-white/20"
                       required
                     />
                   </div>
@@ -2634,7 +2946,7 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
                     <select
                       value={phase}
                       onChange={e => handlePhaseChange(e.target.value as any)}
-                      className="w-full h-8 bg-black/40 border border-white/10 rounded-lg text-[11px] text-white px-3 focus:outline-none focus:ring-1 focus:ring-purple-500/30 font-semibold"
+                      className="w-full h-8 bg-black/40 border border-white/10 rounded-lg text-[11px] text-white px-3 focus:outline-none focus:ring-1 focus:ring-amber-500/30 font-semibold"
                     >
                       <option value="idea">Idea Phase</option>
                       <option value="sketching">Sketching</option>
@@ -2650,84 +2962,13 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
                     value={description}
                     onChange={e => setDescription(e.target.value)}
                     placeholder="Tell DevOS what this project is about..."
-                    className="w-full bg-black/40 border border-white/10 rounded-lg text-xs text-white p-3 focus:outline-none focus:ring-1 focus:ring-purple-500/30 placeholder:text-white/20 h-16 resize-none"
+                    className="w-full bg-black/40 border border-white/10 rounded-lg text-xs text-white p-3 focus:outline-none focus:ring-1 focus:ring-amber-500/30 placeholder:text-white/20 h-16 resize-none"
                   />
                 </div>
 
 
 
-                {/* Idea-specific fields */}
-                {phase === "idea" && (
-                  <div className="p-4 bg-purple-500/[0.02] border border-purple-500/10 rounded-xl space-y-4">
-                    <h3 className="text-[10px] uppercase tracking-widest text-purple-400 font-bold font-mono">Idea Validation Parameters</h3>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-[10px] text-white/45 block mb-1">Confidence Score (1–5)</label>
-                        <div className="flex gap-2">
-                          {[1, 2, 3, 4, 5].map(val => (
-                            <button
-                              key={val}
-                              type="button"
-                              onClick={() => setConfidenceLevel(val)}
-                              className={`flex-1 py-1 rounded border text-xs font-mono transition-all cursor-pointer ${confidenceLevel === val
-                                  ? "bg-purple-500/20 border-purple-500/50 text-purple-300 font-bold"
-                                  : "bg-black/25 border-white/10 text-white/40"
-                                }`}
-                            >
-                              {val}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      <div>
-                        <label className="text-[10px] text-white/45 block mb-1">Effort Estimate</label>
-                        <div className="flex gap-1 bg-black/40 rounded-lg p-0.5 border border-white/5">
-                          {(["xs", "s", "m", "l", "xl"] as const).map(ef => (
-                            <button
-                              key={ef}
-                              type="button"
-                              onClick={() => setEffortEstimate(ef)}
-                              className={`flex-1 text-[9px] uppercase font-bold rounded transition-all cursor-pointer ${effortEstimate === ef ? "bg-white/15 text-white" : "text-white/40 hover:text-white/60"
-                                }`}
-                            >
-                              {ef}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-[10px] text-white/45 block mb-1">Potential Impact</label>
-                        <select
-                          value={potentialImpact}
-                          onChange={e => setPotentialImpact(e.target.value)}
-                          className="w-full h-8 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-2 focus:outline-none"
-                        >
-                          <option value="low">Low Impact</option>
-                          <option value="medium">Medium Impact</option>
-                          <option value="high">High Impact</option>
-                          <option value="massive">Massive Impact</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-[10px] text-white/45 block mb-1">Idea Stage</label>
-                        <select
-                          value={stage}
-                          onChange={e => setStage(e.target.value)}
-                          className="w-full h-8 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-2 focus:outline-none"
-                        >
-                          <option value="concept">Concept Only</option>
-                          <option value="research">Active Research</option>
-                          <option value="validated">Market Validated</option>
-                          <option value="prototyping">Prototyping</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                )}
+                {/* Idea-specific fields removed */}
 
                 {/* Integrations URLs */}
                 {phase !== "idea" && (
@@ -2739,7 +2980,7 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
                         value={githubUrl}
                         onChange={e => setGithubUrl(e.target.value)}
                         placeholder="https://github.com/username/project"
-                        className="w-full h-8 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-3 focus:outline-none focus:ring-1 focus:ring-purple-500/30 placeholder:text-white/25 font-mono"
+                        className="w-full h-8 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-3 focus:outline-none focus:ring-1 focus:ring-amber-500/30 placeholder:text-white/25 font-mono"
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
@@ -2750,7 +2991,7 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
                           value={liveUrl}
                           onChange={e => setLiveUrl(e.target.value)}
                           placeholder="https://project.vercel.app"
-                          className="w-full h-8 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-3 focus:outline-none focus:ring-1 focus:ring-purple-500/30 placeholder:text-white/25 font-mono"
+                          className="w-full h-8 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-3 focus:outline-none focus:ring-1 focus:ring-amber-500/30 placeholder:text-white/25 font-mono"
                         />
                       </div>
                       <div>
@@ -2761,13 +3002,13 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
                             value={folderPath}
                             onChange={e => setFolderPath(e.target.value)}
                             placeholder="C:/Users/name/Projects/app"
-                            className="flex-1 h-8 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-3 focus:outline-none focus:ring-1 focus:ring-purple-500/30 placeholder:text-white/25 font-mono"
+                            className="flex-1 h-8 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-3 focus:outline-none focus:ring-1 focus:ring-amber-500/30 placeholder:text-white/25 font-mono"
                           />
                           <button
                             type="button"
                             onClick={() => handleScanLocal(false)}
                             disabled={localScanning}
-                            className="px-3 h-8 text-[11px] font-semibold rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-400 hover:bg-purple-500/20 hover:text-purple-300 disabled:opacity-50 disabled:pointer-events-none transition-colors cursor-pointer"
+                            className="px-3 h-8 text-[11px] font-semibold rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/20 hover:text-amber-300 disabled:opacity-50 disabled:pointer-events-none transition-colors cursor-pointer"
                           >
                             {localScanning ? "Choosing..." : "Choose Folder"}
                           </button>
@@ -3099,29 +3340,53 @@ export function ProjectOS() {
 
   const loadCurationLists = () => {
     if (typeof window !== "undefined") {
-      const loadList = (phase: string) => {
+      const migrationKey = "devos_curated_migrated_v5";
+      if (!localStorage.getItem(migrationKey)) {
+        localStorage.setItem("devos_curated_launched", JSON.stringify([]));
+        localStorage.setItem("devos_curated_in_development", JSON.stringify([]));
+        localStorage.setItem("devos_curated_sketching", JSON.stringify([]));
+        localStorage.setItem("devos_curated_idea", JSON.stringify([]));
+        localStorage.setItem(migrationKey, "true");
+      }
+
+      const getStoredList = (phase: string) => {
         const stored = localStorage.getItem(`devos_curated_${phase}`);
         if (stored) {
-          try {
-            return JSON.parse(stored) as string[];
-          } catch {
-            return [];
-          }
-        } else {
-          // If no stored curation list exists yet, default to showing ALL projects in this phase!
-          const ids = projects.filter(p => p.phase === phase).map(p => p.id);
-          localStorage.setItem(`devos_curated_${phase}`, JSON.stringify(ids));
-          return ids;
+          try { return JSON.parse(stored) as string[]; } catch { return []; }
         }
+        return null;
       };
-      setCuratedLaunched(loadList("launched"));
-      setCuratedInDev(loadList("in_development"));
-      setCuratedSketching(loadList("sketching"));
-      setCuratedIdea(loadList("idea"));
+
+      let launched = getStoredList("launched");
+      let inDev = getStoredList("in_development");
+      let sketching = getStoredList("sketching");
+      let idea = getStoredList("idea");
+
+      // Initialize lists if they do not exist to empty
+      if (launched === null) {
+        launched = [];
+        localStorage.setItem("devos_curated_launched", JSON.stringify(launched));
+      }
+      if (inDev === null) {
+        inDev = [];
+        localStorage.setItem("devos_curated_in_development", JSON.stringify(inDev));
+      }
+      if (sketching === null) {
+        sketching = [];
+        localStorage.setItem("devos_curated_sketching", JSON.stringify(sketching));
+      }
+      if (idea === null) {
+        idea = [];
+        localStorage.setItem("devos_curated_idea", JSON.stringify(idea));
+      }
+
+      setCuratedLaunched(launched);
+      setCuratedInDev(inDev);
+      setCuratedSketching(sketching);
+      setCuratedIdea(idea);
     }
   };
 
-  // Synchronize curation lists when projects or overlay open state changes
   useEffect(() => {
     loadCurationLists();
   }, [projects, isOpen]);
@@ -3186,7 +3451,7 @@ export function ProjectOS() {
   const launchedProjects = projects.filter(p => p.phase === "launched" && curatedLaunched.includes(p.id));
   const inDevProjects = projects.filter(p => p.phase === "in_development" && curatedInDev.includes(p.id));
   const sketchingProjects = projects.filter(p => p.phase === "sketching" && curatedSketching.includes(p.id));
-  const ideaProjects = projects.filter(p => p.phase === "idea");
+  const ideaProjects = projects.filter(p => p.phase === "idea" && curatedIdea.includes(p.id));
 
   // Curated list for the currently active phase tab (for left rail sidebar list)
   const activeCuratedList =
@@ -3417,6 +3682,30 @@ export function ProjectOS() {
                                 <Code2 className="w-3.5 h-3.5 text-blue-400" />
                               </span>
                             )}
+                            <span
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                if (confirm(`Are you sure you want to permanently delete the project "${p.name}"?`)) {
+                                  try {
+                                    await deleteProject(p.id);
+                                    if (selectedProjectId === p.id) {
+                                      const remaining = projects.filter(proj => proj.id !== p.id);
+                                      if (remaining.length > 0) {
+                                        selectProject(remaining[0].id);
+                                      } else {
+                                        selectProject("");
+                                      }
+                                    }
+                                  } catch (err: any) {
+                                    alert(`Failed to delete project: ${err.message}`);
+                                  }
+                                }
+                              }}
+                              className="text-white/35 hover:text-red-400 p-0.5 hover:bg-white/5 rounded transition-all cursor-pointer opacity-0 group-hover/item:opacity-100 shrink-0 ml-1"
+                              title="Delete Project"
+                            >
+                              <Trash2 className="w-3 h-3 text-red-400" />
+                            </span>
                           </button>
                         );
                       })}
@@ -3458,6 +3747,30 @@ export function ProjectOS() {
                                 <Code2 className="w-3.5 h-3.5 text-blue-400" />
                               </span>
                             )}
+                            <span
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                if (confirm(`Are you sure you want to permanently delete the project "${p.name}"?`)) {
+                                  try {
+                                    await deleteProject(p.id);
+                                    if (selectedProjectId === p.id) {
+                                      const remaining = projects.filter(proj => proj.id !== p.id);
+                                      if (remaining.length > 0) {
+                                        selectProject(remaining[0].id);
+                                      } else {
+                                        selectProject("");
+                                      }
+                                    }
+                                  } catch (err: any) {
+                                    alert(`Failed to delete project: ${err.message}`);
+                                  }
+                                }
+                              }}
+                              className="text-white/35 hover:text-red-400 p-0.5 hover:bg-white/5 rounded transition-all cursor-pointer opacity-0 group-hover/item:opacity-100 shrink-0 ml-1"
+                              title="Delete Project"
+                            >
+                              <Trash2 className="w-3 h-3 text-red-400" />
+                            </span>
                           </button>
                         );
                       })}
@@ -3597,16 +3910,30 @@ export function ProjectOS() {
                             <span className="opacity-40 font-mono">({filteredList.length})</span>
                           </span>
 
-                          <button
-                            onClick={() => {
-                              setSelectedDefaultPhase(col.id as any);
-                              setCreateModalOpen(true);
-                            }}
-                            className="w-5 h-5 rounded hover:bg-white/10 flex items-center justify-center text-white/50 hover:text-white transition-colors cursor-pointer border-0 p-0"
-                            title={`Add project to ${col.label}`}
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                          </button>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPhase(col.id as any);
+                                setSelectModalOpen(true);
+                              }}
+                              className="w-5 h-5 rounded hover:bg-white/10 flex items-center justify-center text-white/50 hover:text-white transition-colors cursor-pointer border-0 p-0"
+                              title={`Manage projects in ${col.label}`}
+                            >
+                              <Settings className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedDefaultPhase(col.id as any);
+                                setCreateModalOpen(true);
+                              }}
+                              className="w-5 h-5 rounded hover:bg-white/10 flex items-center justify-center text-white/50 hover:text-white transition-colors cursor-pointer border-0 p-0"
+                              title={`Add project to ${col.label}`}
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
 
                         {col.id === "idea" ? (

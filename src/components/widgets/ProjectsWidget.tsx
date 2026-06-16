@@ -39,74 +39,46 @@ import {
 } from "lucide-react";
 import { timeAgo } from "@/lib/utils";
 
-interface HealthScoreProps {
-  project: any;
-  size?: "sm" | "md";
-}
-
-function HealthScoreWithPopover({ project, size = "sm" }: HealthScoreProps) {
-  const [hovered, setHovered] = useState(false);
-  const health = project.health;
-
-  if (health === undefined || health === null) {
-    return <span className="text-white/20 text-[10px] select-none ml-1.5">—</span>;
+const normalizeGithubUrl = (url: string | null | undefined): string => {
+  if (!url) return "";
+  let clean = url.trim().toLowerCase();
+  if (clean.endsWith(".git")) {
+    clean = clean.substring(0, clean.length - 4);
   }
-
-  let colorClass = "text-red-400";
-  if (health >= 80) {
-    colorClass = "text-green-400";
-  } else if (health >= 50) {
-    colorClass = "text-yellow-400";
+  if (clean.endsWith("/")) {
+    clean = clean.substring(0, clean.length - 1);
   }
-
-  // Parse health signals
-  let healthSignals: string[] = [];
-  try {
-    if (project.healthSignals) {
-      healthSignals = JSON.parse(project.healthSignals);
-    }
-  } catch (e) {
-    console.error("Error parsing health signals", e);
-  }
-
-  return (
-    <div 
-      className="relative inline-block shrink-0 select-none ml-1.5"
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
-      {size === "sm" ? (
-        <span className={`text-[10px] font-bold font-mono cursor-help ${colorClass}`}>
-          {health}%
-        </span>
-      ) : (
-        <span className={`text-xs font-bold font-mono px-2 py-0.5 rounded bg-black/30 border border-white/5 cursor-help ${colorClass}`}>
-          Health: {health}%
-        </span>
-      )}
-
-      {hovered && (
-        <div className="absolute top-full mt-1 right-0 bg-[#1a1a24] border border-white/10 rounded-lg p-3 w-52 shadow-xl z-[100] text-left">
-          <div className="text-xs text-white/40 mb-2 font-semibold">Health breakdown</div>
-          {healthSignals.map(signal => (
-            <div key={signal} className="flex items-center gap-2 text-xs text-white/60 mb-1">
-              <span className="text-red-400 font-bold">−</span> {signal}
-            </div>
-          ))}
-          {healthSignals.length === 0 && <div className="text-xs text-green-400">All signals healthy</div>}
-          <div className="mt-2 pt-2 border-t border-white/5 text-[9px] text-white/30 font-mono">
-            Last computed: {timeAgo(project.updatedAt)}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+  return clean;
+};
 
 export function ProjectsWidget() {
   const { projects, deleteProject, updateProject, addProject, loading } = useProjectStore();
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const currentProject = projects.find(p => p.id === selectedProject?.id) || selectedProject;
+
+  const getCuratedPhase = (projectId: string): string | null => {
+    if (typeof window === "undefined") return null;
+    const phases = ["launched", "in_development", "sketching", "idea"];
+    for (const phase of phases) {
+      const stored = localStorage.getItem(`devos_curated_${phase}`);
+      if (stored) {
+        try {
+          const list = JSON.parse(stored) as string[];
+          if (list.includes(projectId)) {
+            return phase;
+          }
+        } catch {}
+      }
+    }
+    return null;
+  };
+
+  const PHASE_MAP = {
+    launched: { label: "Launched", color: "bg-green-500/10 text-green-400 border-green-500/20" },
+    in_development: { label: "In Development", color: "bg-blue-500/10 text-blue-400 border-blue-500/20" },
+    sketching: { label: "Sketching", color: "bg-amber-500/10 text-amber-400 border-amber-500/20" },
+    idea: { label: "Idea Phase", color: "bg-white/5 text-white/60 border-white/10" },
+  };
 
   const vercel = useBootstrapStore(s => s.vercel);
   const loaded = useBootstrapStore(s => s.loaded);
@@ -660,7 +632,7 @@ export function ProjectsWidget() {
           
           if (data.repos) {
             data.repos.forEach((repo: any) => {
-              const url = repo.html_url.toLowerCase();
+              const url = normalizeGithubUrl(repo.html_url);
               stats[url] = {
                 lastCommit: repo.updated_at,
                 issues: repo.open_issues_count || 0,
@@ -668,10 +640,10 @@ export function ProjectsWidget() {
                 lastCommitMsg: repo.last_commit_message || null
               };
 
-              // Check staleness (older than 14 days)
+              // Check staleness (older than 90 days)
               const updated = new Date(repo.updated_at);
               const daysAgo = (Date.now() - updated.getTime()) / (1000 * 3600 * 24);
-              if (daysAgo > 14) {
+              if (daysAgo > 90) {
                 staleCount++;
               }
             });
@@ -681,7 +653,7 @@ export function ProjectsWidget() {
           projects.forEach(p => {
             if (!p.githubUrl && p.status !== "stale" && p.status !== "completed") {
               const daysAgo = (Date.now() - new Date(p.updatedAt).getTime()) / (1000 * 3600 * 24);
-              if (daysAgo > 14) staleCount++;
+              if (daysAgo > 90) staleCount++;
             }
           });
 
@@ -690,17 +662,21 @@ export function ProjectsWidget() {
           
           // Auto-update projects based on staleness
           projects.forEach((proj) => {
-            if (proj.githubUrl && stats[proj.githubUrl.toLowerCase()]) {
-              const repo = stats[proj.githubUrl.toLowerCase()];
+            if (proj.githubUrl && stats[normalizeGithubUrl(proj.githubUrl)]) {
+              const repo = stats[normalizeGithubUrl(proj.githubUrl)];
               const updated = new Date(repo.lastCommit);
               const daysAgo = (Date.now() - updated.getTime()) / (1000 * 3600 * 24);
-              if (daysAgo > 14 && proj.status !== "stale" && proj.status !== "completed" && proj.status !== "archived") {
+              if (daysAgo > 90 && proj.status !== "stale" && proj.status !== "completed" && proj.status !== "archived") {
                 updateProject(proj.id, { status: "stale" });
+              } else if (daysAgo <= 90 && proj.status === "stale") {
+                updateProject(proj.id, { status: "active" });
               }
             } else if (!proj.githubUrl) {
               const daysAgo = (Date.now() - new Date(proj.updatedAt).getTime()) / (1000 * 3600 * 24);
-              if (daysAgo > 14 && proj.status !== "stale" && proj.status !== "completed" && proj.status !== "archived") {
+              if (daysAgo > 90 && proj.status !== "stale" && proj.status !== "completed" && proj.status !== "archived") {
                 updateProject(proj.id, { status: "stale" });
+              } else if (daysAgo <= 90 && proj.status === "stale") {
+                updateProject(proj.id, { status: "active" });
               }
             }
           });
@@ -810,6 +786,18 @@ export function ProjectsWidget() {
             </button>
           </div>
           <div className="flex items-center space-x-2">
+            {!selectedProject && (
+              <button 
+                onClick={() => setShowStaleOnly(!showStaleOnly)}
+                className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase transition-all duration-300 border ${
+                  showStaleOnly 
+                    ? "bg-amber-500/20 border-amber-500/30 text-amber-400 hover:bg-amber-500/30" 
+                    : "bg-green-500/20 border-green-500/30 text-green-400 hover:bg-green-500/30"
+                }`}
+              >
+                {showStaleOnly ? "Stale" : "Active"}
+              </button>
+            )}
             <Button
               variant="ghost"
               size="icon"
@@ -819,21 +807,6 @@ export function ProjectsWidget() {
             >
               <Settings className="w-3.5 h-3.5" />
             </Button>
-            {!selectedProject && staleWarningCount > 0 && activeListTab === "github" && (
-              <button 
-                onClick={() => setShowStaleOnly(!showStaleOnly)}
-                className={`px-1.5 py-0.5 border rounded flex items-center space-x-1 transition-colors ${
-                  showStaleOnly 
-                    ? "bg-primary/20 border-primary/40" 
-                    : "bg-orange-500/10 border-orange-500/20 hover:bg-orange-500/20"
-                }`}
-              >
-                <AlertCircle className={`w-2.5 h-2.5 ${showStaleOnly ? "text-primary" : "text-orange-400"}`} />
-                <span className={`text-[9px] font-bold ${showStaleOnly ? "text-primary" : "text-orange-400"}`}>
-                  {showStaleOnly ? "Clear" : `${staleWarningCount}`}
-                </span>
-              </button>
-            )}
           </div>
           
         </div>
@@ -845,31 +818,33 @@ export function ProjectsWidget() {
           >
              {activeListTab === "github" && (
               <>
-              {projects.filter(p => p.githubUrl && !p.folderPath).length === 0 && (
+              {projects.filter(p => p.githubUrl).length === 0 && (
                 <div className="text-center py-6 text-xs text-muted-foreground">No GitHub repositories synced yet.</div>
               )}
-              {projects.filter(p => p.githubUrl && !p.folderPath).sort((a, b) => {
-                const aCommit = githubStats[a.githubUrl!.toLowerCase()]?.lastCommit;
-                const bCommit = githubStats[b.githubUrl!.toLowerCase()]?.lastCommit;
+              {projects.filter(p => p.githubUrl).sort((a, b) => {
+                const aCommit = githubStats[normalizeGithubUrl(a.githubUrl)]?.lastCommit;
+                const bCommit = githubStats[normalizeGithubUrl(b.githubUrl)]?.lastCommit;
                 if (!aCommit) return 1;
                 if (!bCommit) return -1;
                 return new Date(bCommit).getTime() - new Date(aCommit).getTime();
               }).filter(p => {
                 if (p.status === "archived") return false;
-                if (!showStaleOnly) return true;
-                const stats = githubStats[p.githubUrl!.toLowerCase()];
-                if (!stats) return false;
-                const daysAgo = (Date.now() - new Date(stats.lastCommit).getTime()) / (1000 * 3600 * 24);
-                return daysAgo > 14;
+                const stats = githubStats[normalizeGithubUrl(p.githubUrl)];
+                const isStale = (() => {
+                  if (!stats) return false;
+                  const daysAgo = (Date.now() - new Date(stats.lastCommit).getTime()) / (1000 * 3600 * 24);
+                  return daysAgo > 90;
+                })();
+                return showStaleOnly ? isStale : !isStale;
               }).map((project) => {
-                const stats = githubStats[project.githubUrl!.toLowerCase()];
+                const stats = githubStats[normalizeGithubUrl(project.githubUrl)];
                 const isSelected = selectedProject?.id === project.id;
-                
                 const daysAgo = stats ? Math.floor((Date.now() - new Date(stats.lastCommit).getTime()) / (1000 * 3600 * 24)) : 0;
-                const isStale = daysAgo > 14;
-                
+                const isStale = daysAgo > 90;
+
                 return (
                   <div 
+
                     key={project.id} 
                     className={`px-3 py-2.5 rounded-lg flex items-center justify-between cursor-pointer transition-all duration-200 border border-transparent 
                       ${isSelected ? "bg-primary/10 border-primary/20 shadow-sm" : "bg-transparent hover:bg-white/5 hover:border-white/10"}
@@ -890,7 +865,6 @@ export function ProjectsWidget() {
                         >
                           {project.name}
                         </div>
-                        <HealthScoreWithPopover project={project} />
                         {stats?.issues > 0 && (
                           <button 
                             onClick={(e) => { e.stopPropagation(); window.open(`${project.githubUrl}/issues`); }}
@@ -989,21 +963,21 @@ export function ProjectsWidget() {
                 </Button>
               </div>
               {projects.filter(p => (p.folderPath || !p.githubUrl) && p.status !== "archived").filter(p => {
-                if (!showStaleOnly) return true;
                 const daysAgo = (Date.now() - new Date(p.updatedAt).getTime()) / (1000 * 3600 * 24);
-                return daysAgo > 14;
+                const isStale = daysAgo > 90;
+                return showStaleOnly ? isStale : !isStale;
               }).length === 0 && (
                 <div className="text-center py-6 text-xs text-muted-foreground">No local workspaces found.</div>
               )}
               {projects.filter(p => (p.folderPath || !p.githubUrl) && p.status !== "archived").filter(p => {
-                if (!showStaleOnly) return true;
                 const daysAgo = (Date.now() - new Date(p.updatedAt).getTime()) / (1000 * 3600 * 24);
-                return daysAgo > 14;
+                const isStale = daysAgo > 90;
+                return showStaleOnly ? isStale : !isStale;
               }).map((project) => {
                 const isSelected = selectedProject?.id === project.id;
                 
                 const daysAgo = Math.floor((Date.now() - new Date(project.updatedAt).getTime()) / (1000 * 3600 * 24));
-                const isStale = daysAgo > 14;
+                const isStale = daysAgo > 90;
                 
                 return (
                   <div 
@@ -1029,7 +1003,6 @@ export function ProjectsWidget() {
                       >
                         {project.name}
                       </div>
-                      <HealthScoreWithPopover project={project} />
                     </div>
                     
                     <div className="flex items-center gap-2 shrink-0">
@@ -1099,11 +1072,11 @@ export function ProjectsWidget() {
         </div>
       </div>
 
-       {selectedProject && currentProject && (
+      {selectedProject && currentProject && (
         <div className="w-2/3 flex flex-col h-full overflow-hidden pl-3">
           <div className="flex items-center justify-between mb-3 shrink-0 bg-[#0f0f11] p-3 rounded-xl border border-white/10">
             <div className="flex-1 min-w-0 pr-4 space-y-1">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 flex-wrap">
                 <div className={`w-2.5 h-2.5 rounded-full shadow-sm ${
                   currentProject.status === "active" ? "bg-green-400 shadow-green-400/50" :
                   currentProject.status === "planning" ? "bg-blue-400 shadow-blue-400/50" :
@@ -1111,118 +1084,36 @@ export function ProjectsWidget() {
                   currentProject.status === "stale" ? "bg-amber-400 shadow-amber-400/50" : "bg-zinc-400 shadow-zinc-500/50"
                 }`} />
                 <h3 className="text-base font-bold text-foreground truncate">{currentProject.name}</h3>
-                <span className="text-[10px] font-mono text-muted-foreground ml-1 mt-0.5">Updated: {new Date(currentProject.updatedAt).toLocaleDateString()}</span>
-                <HealthScoreWithPopover project={currentProject} size="md" />
+                
+                {(() => {
+                  const curatedPhase = getCuratedPhase(currentProject.id);
+                  if (!curatedPhase) return null;
+                  const phaseInfo = PHASE_MAP[curatedPhase as keyof typeof PHASE_MAP];
+                  if (!phaseInfo) return null;
+                  return (
+                    <Badge variant="outline" className={`text-[9px] font-bold uppercase tracking-wider ${phaseInfo.color}`}>
+                      {phaseInfo.label}
+                    </Badge>
+                  );
+                })()}
               </div>
 
-              <div className="flex items-center gap-3 text-[10px] font-mono text-muted-foreground">
-                {selectedProject.githubUrl && (
-                  <a href={selectedProject.githubUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 hover:text-foreground">
-                    <GitBranch className="w-3 h-3" /> GitHub
-                  </a>
-                )}
-                {selectedProject.liveUrl && (
-                  <a href={selectedProject.liveUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 hover:text-foreground">
-                    <ExternalLink className="w-3 h-3" /> Live
-                  </a>
-                )}
-              </div>
+              <p className="text-xs text-white/50 leading-relaxed truncate max-w-[400px]">
+                {currentProject.description || "No description provided."}
+              </p>
 
-              {!selectedProject.folderPath && selectedProject.githubUrl && (
-                <div className="pt-3 pb-2">
-                  <div className="bg-primary/10 border border-primary/20 rounded-md p-2 flex items-center justify-between gap-3 overflow-hidden group hover:border-primary/40 transition-colors">
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded bg-primary/20 flex items-center justify-center shrink-0">
-                        <FolderOpen className="w-3.5 h-3.5 text-primary" />
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-[11px] font-bold text-primary leading-tight">Unlinked</span>
-                        <span className="text-[9px] text-primary/70 leading-tight">Connect local folder for IDE features</span>
-                      </div>
-                    </div>
-                    <Button 
-                      size="sm"
-                      onClick={() => handlePickFolder("link")}
-                      disabled={isPickingFolder}
-                      className="h-6 text-[10px] font-semibold px-3 bg-primary hover:bg-primary/90 text-primary-foreground shrink-0"
-                    >
-                      {isPickingFolder ? "..." : "Link Now"}
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {selectedProject.tags && selectedProject.tags.length > 0 && (
+              {currentProject.tags && currentProject.tags.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 pt-1">
-                  {selectedProject.tags.map((tag: string) => (
+                  {currentProject.tags.map((tag: string) => (
                     <Badge key={tag} variant="secondary" className="text-[8px] py-0 px-1.5 uppercase bg-primary/10 text-primary border-primary/20">
                       {tag}
                     </Badge>
                   ))}
                 </div>
               )}
-              
-              <div className="pt-2">
-                <DropdownMenu>
-                  <DropdownMenuTrigger className="text-[9px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-full whitespace-nowrap transition-colors border bg-white/5 text-foreground hover:bg-white/10 border-white/10 flex items-center gap-2 outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer">
-                      Status: {
-                        [
-                          { label: "Not started", value: 0 },
-                          { label: "Planning", value: 25 },
-                          { label: "Building", value: 50 },
-                          { label: "Almost done", value: 75 },
-                          { label: "Done", value: 100 }
-                        ].find(p => p.value === getDerivedCompletion(selectedProject))?.label || "Unknown"
-                      }
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="bg-[#0f0f11] border-white/10 text-foreground min-w-[140px] shadow-xl">
-                    {[
-                      { label: "Not started", value: 0 },
-                      { label: "Planning", value: 25 },
-                      { label: "Building", value: 50 },
-                      { label: "Almost done", value: 75 },
-                      { label: "Done", value: 100 }
-                    ].map((pill) => {
-                       const isActive = getDerivedCompletion(selectedProject) === pill.value;
-                       return (
-                         <DropdownMenuItem 
-                           key={pill.value}
-                           className={`text-xs font-bold uppercase cursor-pointer focus:bg-white/10 focus:text-white ${isActive ? "bg-white/10 text-white" : "text-muted-foreground"}`}
-                           onClick={() => {
-                              updateProject(selectedProject.id, { completionPercentage: pill.value });
-                              setSelectedProject({ ...selectedProject, completionPercentage: pill.value });
-                           }}
-                         >
-                           {pill.label}
-                         </DropdownMenuItem>
-                       )
-                    })}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
             </div>
             
             <div className="flex items-center gap-1 shrink-0 self-start">
-              {selectedProject.folderPath && (
-                <>
-                  <Button 
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 px-2 text-[10px] font-bold text-amber-400 hover:text-amber-300 hover:bg-amber-400/10 transition-colors flex items-center gap-1 shrink-0"
-                    onClick={handleGenerateContext}
-                    disabled={generatingContext}
-                  >
-                    {generatingContext ? "⚡ Generating..." : "⚡ CLAUDE.md"}
-                  </Button>
-                  <button 
-                    className="w-7 h-7 text-muted-foreground hover:text-[#007acc] hover:bg-[#007acc]/10 transition-colors inline-flex items-center justify-center rounded-md"
-                    onClick={() => window.open(`vscode://file/${selectedProject.folderPath}`)}
-                    title="Open in VS Code"
-                  >
-                    <Code2 className="w-3.5 h-3.5" />
-                  </button>
-                </>
-              )}
               <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
                 <DialogTrigger className="w-7 h-7 text-muted-foreground hover:text-foreground transition-colors inline-flex items-center justify-center rounded-md" onClick={() => {
                   setFormData({
@@ -1322,133 +1213,214 @@ export function ProjectsWidget() {
             </div>
           </div>
 
-          <div className="flex items-center gap-4 border-b border-white/10 px-1 mb-4 shrink-0">
-            <button
-              onClick={() => setActiveTab("overview")}
-              className={`pb-2 text-[10px] uppercase font-bold tracking-wider border-b-2 transition-colors ${activeTab === "overview" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
-            >
-              Overview
-            </button>
-            <button
-              onClick={() => setActiveTab("control_room")}
-              className={`pb-2 text-[10px] uppercase font-bold tracking-wider border-b-2 transition-colors ${activeTab === "control_room" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
-            >
-              Control Room
-            </button>
-          </div>
-
           {/* Drawer Content */}
           <ScrollArea className="flex-1 pr-2 custom-scrollbar">
-            {activeTab === "overview" && (
-              <div className="space-y-4 pb-4">
+            <div className="space-y-4 pb-4">
+              
+              {/* GitHub and Live URL Actions */}
+              {(currentProject.githubUrl || currentProject.liveUrl) && (
+                <div className="grid grid-cols-2 gap-3">
+                  {currentProject.githubUrl && (
+                    <a 
+                      href={currentProject.githubUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-between p-3 rounded-xl border border-white/5 bg-white/[0.01] hover:bg-white/[0.03] hover:border-white/10 transition-all text-xs font-semibold text-white/80 group animate-in fade-in slide-in-from-bottom-1 duration-200"
+                    >
+                      <span className="flex items-center gap-2">
+                        <GitBranch className="w-4 h-4 text-purple-400 group-hover:scale-110 transition-transform" />
+                        GitHub Repo
+                      </span>
+                      <ExternalLink className="w-3.5 h-3.5 text-white/30" />
+                    </a>
+                  )}
+                  {currentProject.liveUrl && (
+                    <a 
+                      href={currentProject.liveUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-between p-3 rounded-xl border border-white/5 bg-white/[0.01] hover:bg-white/[0.03] hover:border-white/10 transition-all text-xs font-semibold text-white/80 group animate-in fade-in slide-in-from-bottom-1 duration-200"
+                    >
+                      <span className="flex items-center gap-2">
+                        <ExternalLink className="w-4 h-4 text-green-400 group-hover:scale-110 transition-transform" />
+                        Live Link
+                      </span>
+                      <ExternalLink className="w-3.5 h-3.5 text-white/30" />
+                    </a>
+                  )}
+                </div>
+              )}
+
+              {/* Local Folder Connection Card */}
+              <div className="p-3.5 rounded-xl border bg-white/[0.01] border-white/5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-white/45">Local Connection</span>
+                  <Badge variant="outline" className={`text-[8px] font-bold uppercase ${
+                    currentProject.folderPath 
+                      ? "bg-green-500/10 text-green-400 border-green-500/20" 
+                      : "bg-red-500/10 text-red-400 border-red-500/20"
+                  }`}>
+                    {currentProject.folderPath ? "Connected" : "Unlinked"}
+                  </Badge>
+                </div>
                 
-                {/* Unified Feedback Feed */}
-                <div className="pt-2 space-y-3">
-                  <div className="flex items-center justify-between pb-1.5 border-b border-white/[0.04]">
-                    <span className="text-[10px] font-medium text-white/40 tracking-wider lowercase">brain dump</span>
-                  </div>
-
+                {currentProject.folderPath ? (
                   <div className="space-y-3">
-                    {(() => {
-                      if (projectNotes.length === 0) {
-                        return (
-                          <div className="text-center py-6">
-                            <div className="text-xs text-white/30">No notes yet.</div>
-                            <div className="text-xs text-white/20 mt-1">
-                              Tag this project in Focus Panel using <span className="font-mono text-amber-400/60">@{selectedProject.name}</span>
-                            </div>
-                          </div>
-                        );
-                      }
+                    <div className="flex items-center justify-between gap-3 bg-black/40 border border-white/5 rounded-lg p-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <FolderOpen className="w-3.5 h-3.5 text-primary shrink-0" />
+                        <span className="text-[11px] font-mono text-white/70 truncate" title={currentProject.folderPath}>
+                          {currentProject.folderPath}
+                        </span>
+                      </div>
+                      <button 
+                        onClick={() => window.open(`vscode://file/${currentProject.folderPath}`)}
+                        className="text-[10px] font-bold text-sky-400 hover:text-sky-300 hover:underline shrink-0 cursor-pointer"
+                      >
+                        Open in VS Code
+                      </button>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <Button 
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-[10px] px-3 border-white/10 bg-transparent text-muted-foreground hover:text-foreground hover:bg-white/5"
+                        onClick={() => handlePickFolder("link")}
+                        disabled={isPickingFolder}
+                      >
+                        Change Link
+                      </Button>
+                      <Button 
+                        size="sm"
+                        className="h-7 text-[10px] px-3 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 hover:text-amber-300 border border-amber-500/20 transition-all font-semibold"
+                        onClick={handleGenerateContext}
+                        disabled={generatingContext}
+                      >
+                        {generatingContext ? "⚡ Generating..." : "⚡ Generate Context (CLAUDE.md)"}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between gap-3 bg-black/20 border border-white/5 rounded-lg p-3">
+                    <div className="space-y-0.5">
+                      <p className="text-xs font-semibold text-white/80">Not linked to local folder</p>
+                      <p className="text-[10px] text-white/45 leading-normal">Connect local folder to enable VS Code launching & context generation</p>
+                    </div>
+                    <Button 
+                      size="sm"
+                      onClick={() => handlePickFolder("link")}
+                      disabled={isPickingFolder}
+                      className="h-7 text-[10px] font-bold px-3 bg-primary hover:bg-primary/90 text-primary-foreground shrink-0"
+                    >
+                      {isPickingFolder ? "Linking..." : "Link Folder"}
+                    </Button>
+                  </div>
+                )}
+              </div>
 
+              {/* Unified Feedback Feed */}
+              <div className="pt-2 space-y-3">
+                <div className="flex items-center justify-between pb-1.5 border-b border-white/[0.04]">
+                  <span className="text-[10px] font-medium text-white/40 tracking-wider lowercase">brain dump</span>
+                </div>
+
+                <div className="space-y-3">
+                  {projectNotes.length === 0 ? (
+                    <div className="text-center py-6">
+                      <div className="text-xs text-white/30">No notes yet.</div>
+                      <div className="text-xs text-white/20 mt-1">
+                        Tag this project in Focus Panel using <span className="font-mono text-amber-400/60">@{selectedProject.name}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    (() => {
                       const categoryStyle = {
                         feedback: 'bg-orange-500/15 text-orange-300 border-orange-500/20',
                         bug: 'bg-red-500/15 text-red-300 border-red-500/20',
                         idea: 'bg-amber-500/15 text-amber-300 border-amber-500/20',
                         note: 'bg-white/5 text-white/40 border-white/10'
                       };
+                      return projectNotes.map(note => {
+                        const cat = note.category;
+                        let colorClass = categoryStyle.note;
+                        if (cat && cat !== 'classifying...') {
+                          const validCat = cat.toLowerCase() as keyof typeof categoryStyle;
+                          colorClass = categoryStyle[validCat] || categoryStyle.note;
+                        }
 
-                      return projectNotes.map(note => (
-                        <div key={note.id} className="group p-3 border border-white/5 bg-transparent hover:bg-white/[0.04] transition-colors rounded-lg flex flex-col gap-2 relative">
-                          <div className="flex justify-between items-center gap-2">
-                            {(() => {
-                              const cat = note.category;
-                              if (!cat || cat === 'classifying...') {
-                                return (
-                                  <Badge variant="secondary" className="text-[8px] py-0 px-1.5 uppercase bg-white/5 text-muted-foreground border-white/10 animate-pulse shrink-0">
-                                    classifying...
-                                  </Badge>
-                                );
-                              }
-                              const validCat = (cat.toLowerCase() as keyof typeof categoryStyle);
-                              const colorClass = categoryStyle[validCat] || categoryStyle.note;
-                              return (
+                        return (
+                          <div key={note.id} className="group p-3 border border-white/5 bg-transparent hover:bg-white/[0.04] transition-colors rounded-lg flex flex-col gap-2 relative">
+                            <div className="flex justify-between items-center gap-2">
+                              {(!cat || cat === 'classifying...') ? (
+                                <Badge variant="secondary" className="text-[8px] py-0 px-1.5 uppercase bg-white/5 text-muted-foreground border-white/10 animate-pulse shrink-0">
+                                  classifying...
+                                </Badge>
+                              ) : (
                                 <Badge variant="secondary" className={`text-[8px] py-0 px-1.5 uppercase shrink-0 ${colorClass}`}>
                                   {cat}
                                 </Badge>
-                              );
-                            })()}
-                            
-                            <p className="text-[9px] text-muted-foreground font-mono ml-auto mr-1 truncate">
-                              {timeAgo(note.createdAt)}
-                            </p>
+                              )}
+                              
+                              <p className="text-[9px] text-muted-foreground font-mono ml-auto mr-1 truncate">
+                                {timeAgo(note.createdAt)}
+                              </p>
 
-                            <Button variant="ghost" size="icon" className="w-5 h-5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-400" onClick={() => handleDeleteNote(note.id)}>
-                              <Trash2 className="w-3 h-3" />
-                            </Button>
-                          </div>
-                          <p className="text-xs leading-relaxed text-foreground/90 whitespace-pre-wrap pr-1 line-clamp-4">{note.content}</p>
-                          <div className="flex justify-end gap-2 mt-1">
-                            {/* Resolve — marks note as done by deleting it */}
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-6 text-[9px] px-2 bg-green-500/10 border-green-500/20 text-green-400 hover:bg-green-500/20"
-                              onClick={() => handleDeleteNote(note.id)}
-                            >
-                              <CheckCircle2 className="w-3 h-3 mr-1" /> Resolve
-                            </Button>
-                            {/* Open as Issue — only shown when project has a GitHub URL */}
-                            {selectedProject.githubUrl && (
+                              <Button variant="ghost" size="icon" className="w-5 h-5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-400" onClick={() => handleDeleteNote(note.id)}>
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </div>
+                            <p className="text-xs leading-relaxed text-foreground/90 whitespace-pre-wrap pr-1 line-clamp-4">{note.content}</p>
+                            <div className="flex justify-end gap-2 mt-1">
                               <Button
                                 size="sm"
                                 variant="outline"
-                                disabled={isCreatingIssue === note.id}
-                                className="h-6 text-[9px] px-2 bg-transparent border-white/10 hover:bg-blue-500/10 hover:border-blue-500/20 hover:text-blue-300 transition-colors"
-                                onClick={() => createGitHubIssue(note)}
+                                className="h-6 text-[9px] px-2 bg-green-500/10 border-green-500/20 text-green-400 hover:bg-green-500/20"
+                                onClick={() => handleDeleteNote(note.id)}
                               >
-                                {isCreatingIssue === note.id ? (
-                                  <><span className="w-3 h-3 mr-1 rounded-full border-2 border-current border-t-transparent animate-spin inline-block" /> Creating...</>
-                                ) : (
-                                  <><GitBranch className="w-3 h-3 mr-1" /> Open as Issue</>
-                                )}
+                                <CheckCircle2 className="w-3 h-3 mr-1" /> Resolve
                               </Button>
-                            )}
+                              {selectedProject.githubUrl && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={isCreatingIssue === note.id}
+                                  className="h-6 text-[9px] px-2 bg-transparent border-white/10 hover:bg-blue-500/10 hover:border-blue-500/20 hover:text-blue-300 transition-colors"
+                                  onClick={() => createGitHubIssue(note)}
+                                >
+                                  {isCreatingIssue === note.id ? (
+                                    <><span className="w-3 h-3 mr-1 rounded-full border-2 border-current border-t-transparent animate-spin inline-block" /> Creating...</>
+                                  ) : (
+                                    <><GitBranch className="w-3 h-3 mr-1" /> Open as Issue</>
+                                  )}
+                                </Button>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      ));
-                    })()}
-                  </div>
+                        );
+                      });
+                    })()
+                  )}
                 </div>
+              </div>
 
-                {/* Recent Commits Feed */}
-                {selectedProject.githubUrl && (
-                  <div className="pt-4 border-t border-white/[0.04] space-y-3">
-                    <div className="flex items-center justify-between pb-1.5 border-b border-white/[0.04]">
-                      <span className="text-[10px] font-medium text-white/40 tracking-wider lowercase">recent commits</span>
-                    </div>
+              {/* Recent Commits Feed */}
+              {selectedProject.githubUrl && (
+                <div className="pt-4 border-t border-white/[0.04] space-y-3">
+                  <div className="flex items-center justify-between pb-1.5 border-b border-white/[0.04]">
+                    <span className="text-[10px] font-medium text-white/40 tracking-wider lowercase">recent commits</span>
+                  </div>
 
-                    <div className="px-1">
-                      {commitsLoading && projectCommits.length === 0 ? (
-                        <div className="text-center py-4">
-                          <span className="text-xs text-muted-foreground animate-pulse">Loading commits...</span>
-                        </div>
-                      ) : projectCommits.length === 0 ? (
-                        <div className="text-center py-4">
-                          <span className="text-xs text-muted-foreground">No recent commits found.</span>
-                        </div>
-                      ) : (
-                        <div className="space-y-3 relative before:absolute before:inset-0 before:ml-2 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-white/10 before:to-transparent">
+                  <div className="px-1">
+                    {commitsLoading && projectCommits.length === 0 ? (
+                      <div className="text-center py-4">
+                        <span className="text-xs text-muted-foreground animate-pulse">Loading commits...</span>
+                      </div>
+                    ) : projectCommits.length === 0 ? (
+                      <div className="text-center py-4">
+                        <span className="text-xs text-muted-foreground">No recent commits found.</span>
+                      </div>
+                    ) : (
+                      <div className="space-y-3 relative before:absolute before:inset-0 before:ml-2 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-white/10 before:to-transparent">
                         {projectCommits.slice(0, commitLimit).map((commit: any) => {
                           const commitAgo = Math.floor((Date.now() - new Date(commit.date).getTime()) / (1000 * 60 * 60));
                           const timeAgoString = commitAgo < 24 ? `${commitAgo}h ago` : `${Math.floor(commitAgo / 24)}d ago`;
@@ -1493,346 +1465,9 @@ export function ProjectsWidget() {
                     )}
                   </div>
                 </div>
-                )}
-              </div>
-            )}
-
-            {activeTab === "control_room" && (
-              <div className="space-y-6 pb-4">
-                
-                {/* Project Configurations Card */}
-                <div className="space-y-4 p-4 rounded-xl bg-black/30 border border-white/5">
-                  <div className="flex items-center gap-2 pb-1 border-b border-white/5">
-                    <Settings className="w-4 h-4 text-primary" />
-                    <h4 className="text-xs font-semibold text-foreground">Project Configurations</h4>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-semibold text-muted-foreground uppercase">Project Name</label>
-                      <Input
-                        value={controlRoomName}
-                        onChange={(e) => setControlRoomName(e.target.value)}
-                        placeholder="e.g. My Project"
-                        className="h-8 text-xs bg-black/40 border-white/10 rounded-lg focus-visible:ring-primary/30"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-semibold text-muted-foreground uppercase">GitHub Repository URL</label>
-                      <Input
-                        value={controlRoomGithub}
-                        onChange={(e) => setControlRoomGithub(e.target.value)}
-                        placeholder="https://github.com/..."
-                        className="h-8 text-xs bg-black/40 border-white/10 rounded-lg focus-visible:ring-primary/30"
-                      />
-                    </div>
-                  </div>
-
-                  {vercel?.hasToken && (
-                    <div className="space-y-1.5 col-span-2">
-                      <label className="text-[10px] font-semibold text-muted-foreground uppercase">Linked Vercel Project</label>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger className="w-full text-left text-xs font-semibold px-3 py-2 rounded-lg border bg-black/40 border-white/10 text-muted-foreground hover:bg-white/5 flex items-center justify-between outline-none cursor-pointer">
-                          {vercel.projects?.find((vp: any) => vp.id === currentProject.vercelProjectId)?.name || "Select Vercel Project..."}
-                          <ChevronRight className="w-3.5 h-3.5 rotate-90" />
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="start" className="bg-[#0f0f11] border-white/10 text-foreground w-[240px] max-h-[200px] overflow-y-auto shadow-xl custom-scrollbar">
-                          {vercel.projects?.length === 0 ? (
-                            <DropdownMenuItem disabled className="text-xs text-muted-foreground">
-                              No projects found on Vercel
-                            </DropdownMenuItem>
-                          ) : (
-                            vercel.projects?.map((vp: any) => (
-                              <DropdownMenuItem
-                                key={vp.id}
-                                className="text-xs font-semibold cursor-pointer focus:bg-white/10"
-                                onClick={() => handleMapProject(vp.id)}
-                              >
-                                {vp.name}
-                              </DropdownMenuItem>
-                            ))
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  )}
-
-                  <div className="flex justify-end pt-1">
-                    <Button
-                      size="sm"
-                      onClick={handleSaveControlRoomConfig}
-                      disabled={isUpdatingControlRoom || !controlRoomName.trim()}
-                      className="h-8 bg-primary text-primary-foreground hover:bg-primary/90 text-xs font-semibold px-4"
-                    >
-                      {isUpdatingControlRoom ? "Saving..." : "Save Configurations"}
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Vercel Integration Section */}
-                <div className="space-y-3 p-4 rounded-xl bg-black/30 border border-white/5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="w-4 h-4 text-[#0070f3]" />
-                      <h4 className="text-xs font-semibold text-foreground">Vercel Integration</h4>
-                    </div>
-                    {vercel?.hasToken && (
-                      <button
-                        onClick={removeVercelToken}
-                        className="text-[9px] text-red-400 hover:text-red-300 font-bold uppercase tracking-wider cursor-pointer"
-                      >
-                        Disconnect
-                      </button>
-                    )}
-                  </div>
-
-                  {!vercel?.hasToken ? (
-                    <div className="space-y-2 pt-1">
-                      <p className="text-[10px] text-muted-foreground leading-normal">
-                        Connect Vercel to see real visit stats, deployments, and live status.
-                      </p>
-                      <Button
-                        size="sm"
-                        onClick={openSettingsDialog}
-                        className="h-8 bg-[#0070f3] hover:bg-[#0070f3]/95 text-white font-semibold text-xs cursor-pointer w-full"
-                      >
-                        Configure Integrations
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="space-y-3 pt-1">
-                      {/* Vercel Project Mapping */}
-                      {!currentProject.vercelProjectId ? (
-                        <div className="space-y-2">
-                          <p className="text-[10px] text-yellow-400/80 leading-normal">
-                            ⚠️ Vercel project not linked. Please select a Vercel project in Configurations above to load analytics and deployments.
-                          </p>
-                        </div>
-                      ) : (
-                        <div>
-                          {/* Visit Stats & Sparkline */}
-                          <div className="flex items-center justify-between p-3 rounded-lg bg-white/[0.02] border border-white/5">
-                            <div className="space-y-1">
-                              <span className="text-[9px] font-bold uppercase text-muted-foreground tracking-widest leading-none">Visit Stats</span>
-                              <div className="flex items-baseline gap-2">
-                                <span className="text-lg font-bold font-mono text-white leading-none">{totalVisits}</span>
-                                <span className="text-[10px] text-muted-foreground font-sans">visits</span>
-                              </div>
-                              {totalVisits > 0 && weeklyVisits.length >= 7 && (
-                                <span className={`text-[10px] font-bold flex items-center gap-1 ${
-                                  (weeklyVisits[4] + weeklyVisits[5] + weeklyVisits[6] >= weeklyVisits[0] + weeklyVisits[1] + weeklyVisits[2]) ? 'text-green-400' : 'text-red-400'
-                                }`}>
-                                  {(weeklyVisits[4] + weeklyVisits[5] + weeklyVisits[6] >= weeklyVisits[0] + weeklyVisits[1] + weeklyVisits[2]) ? '↑' : '↓'}{' '}
-                                  {Math.round(Math.abs(
-                                    ((weeklyVisits[4] + weeklyVisits[5] + weeklyVisits[6]) - (weeklyVisits[0] + weeklyVisits[1] + weeklyVisits[2])) / 
-                                    Math.max(1, weeklyVisits[0] + weeklyVisits[1] + weeklyVisits[2]) * 100
-                                  ))}% this week
-                                </span>
-                              )}
-                            </div>
-
-                            {/* Sparkline */}
-                            <div className="h-8 flex items-end gap-1.5 pb-1 select-none pr-1">
-                              {weeklyVisits.map((v, idx) => {
-                                const heightPercent = Math.max(15, Math.round((v / maxVisits) * 100));
-                                return (
-                                  <div
-                                    key={idx}
-                                    style={{ height: `${heightPercent}%` }}
-                                    className="w-1.5 bg-[#0070f3]/60 hover:bg-[#0070f3] rounded-t transition-all duration-300"
-                                    title={`${v} visits`}
-                                  />
-                                );
-                              })}
-                            </div>
-                          </div>
-
-                          {/* Deployments Section */}
-                          <div className="space-y-2">
-                            <span className="text-[9px] font-bold uppercase text-muted-foreground tracking-widest px-0.5">Deployments</span>
-                            {deploymentsLoading ? (
-                              <p className="text-[10px] text-muted-foreground text-center py-2 animate-pulse">
-                                Loading deployments...
-                              </p>
-                            ) : deployments.length === 0 ? (
-                              <p className="text-[10px] text-muted-foreground text-center py-2">
-                                No deployments found.
-                              </p>
-                            ) : (
-                              <div className="space-y-2">
-                                {deployments.slice(0, 3).map((dep: any) => {
-                                  const depAgo = Math.floor((Date.now() - (dep.createdAt || dep.created)) / (1000 * 60 * 60));
-                                  const timeAgoStr = depAgo < 24 ? `${depAgo}h ago` : `${Math.floor(depAgo / 24)}d ago`;
-                                  const commitMsg = dep.meta?.githubCommitMessage || dep.name || "Manual deploy";
-                                  const branch = dep.meta?.githubCommitRef || "main";
-
-                                  const getDeployStatusClass = (state: string) => {
-                                    const s = state.toUpperCase();
-                                    if (s === "READY") return "bg-green-400 shadow-green-400/50";
-                                    if (s === "ERROR") return "bg-red-400 shadow-red-400/50";
-                                    if (s === "BUILDING") return "bg-amber-400 shadow-amber-400/50 animate-pulse";
-                                    return "bg-zinc-500 shadow-zinc-500/50";
-                                  };
-
-                                  return (
-                                    <div key={dep.uid} className="flex items-center justify-between p-2 rounded-lg bg-white/[0.01] border border-white/5 hover:bg-white/[0.03] transition-colors gap-2">
-                                      <div className="flex items-center gap-2.5 min-w-0">
-                                        <div className={`w-2 h-2 rounded-full shrink-0 shadow-sm ${getDeployStatusClass(dep.state)}`} title={dep.state} />
-                                        <span className="text-xs text-foreground font-medium truncate" title={commitMsg}>
-                                          {commitMsg}
-                                        </span>
-                                      </div>
-                                      <div className="flex items-center gap-2 shrink-0">
-                                        <span className="text-[9px] text-muted-foreground font-mono">{timeAgoStr}</span>
-                                        <Badge className="text-[8px] py-0 px-1.5 uppercase bg-white/5 text-muted-foreground border-white/10 font-bold shrink-0">
-                                          {branch}
-                                        </Badge>
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Live Link Section */}
-                {selectedProject.liveUrl && (
-                  <div className="space-y-2">
-                    <h3 className="text-xs font-semibold text-foreground">Live Link</h3>
-                    <div className="flex items-center justify-between p-3 rounded-lg bg-primary/10 border border-primary/20">
-                      <div className="flex items-center gap-3">
-                        <div className="w-2 h-2 rounded-full bg-green-500 shadow-sm shadow-green-500/50" />
-                        <span className="text-xs font-semibold text-foreground">{selectedProject.name} (Live)</span>
-                      </div>
-                      <a href={selectedProject.liveUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-xs font-medium text-primary hover:text-primary/80 transition-colors truncate pl-4">
-                        {selectedProject.liveUrl.replace(/^https?:\/\//, '')} <ExternalLink className="w-3.5 h-3.5 shrink-0" />
-                      </a>
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex items-center justify-between pt-2 border-t border-white/10">
-                  <h3 className="text-xs font-semibold text-foreground">Infrastructure Links</h3>
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    className="h-7 text-[10px] bg-transparent border-white/10 hover:bg-white/5"
-                    onClick={() => pingLinks(selectedProject.id)}
-                    disabled={pingingLinks}
-                  >
-                    {pingingLinks ? "Pinging..." : "Ping All"}
-                  </Button>
-                </div>
-
-                {/* Always-visible Add Link Form */}
-                <div className="p-3 rounded-xl bg-black/40 border border-white/5 relative overflow-hidden group shadow-inner">
-                  <div className="flex items-center gap-3 relative z-10">
-                    <Input 
-                      value={newLinkLabel} 
-                      onChange={e => setNewLinkLabel(e.target.value)} 
-                      placeholder="Label (e.g. Vercel)" 
-                      className="h-9 text-xs bg-black/40 border-white/10 rounded-lg focus-visible:ring-primary/30 w-[120px]" 
-                    />
-                    <select
-                      value={newLinkType}
-                      onChange={e => setNewLinkType(e.target.value)}
-                      className="h-9 px-2 text-xs bg-black/40 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-1 focus:ring-primary/30 w-[110px]"
-                    >
-                      <option value="frontend">Frontend</option>
-                      <option value="backend">Backend</option>
-                      <option value="database">Database</option>
-                      <option value="storage">Storage</option>
-                      <option value="monitoring">Monitoring</option>
-                      <option value="logs">Logs</option>
-                      <option value="other">Other</option>
-                    </select>
-                    <Input 
-                      value={newLinkUrl} 
-                      onChange={e => setNewLinkUrl(e.target.value)} 
-                      onPaste={handleUrlPaste}
-                      placeholder="URL (paste to auto-detect)" 
-                      className="h-9 text-xs bg-black/40 border-white/10 rounded-lg focus-visible:ring-primary/30 flex-1 min-w-0"
-                      onKeyDown={e => e.key === 'Enter' && submitNewLink()}
-                    />
-                    <Button 
-                      size="sm" 
-                      onClick={submitNewLink} 
-                      disabled={creatingLink || !newLinkUrl || !newLinkLabel}
-                      className={`h-9 px-5 text-xs font-semibold tracking-wide rounded-lg transition-all shrink-0 ${justAdded ? 'bg-green-500 hover:bg-green-600 text-white shadow-[0_0_15px_rgba(34,197,94,0.3)]' : 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-md'}`}
-                    >
-                      {creatingLink ? "..." : justAdded ? "Added!" : "Add Link"}
-                    </Button>
-                  </div>
-                </div>
-
-                {linksLoading ? (
-                  <div className="text-center py-4 text-xs text-muted-foreground">Loading links...</div>
-                ) : (
-                  <div className="space-y-6">
-                    {['frontend', 'backend', 'database', 'storage', 'monitoring', 'logs', 'other'].map(type => {
-                      const typeLinks = projectLinks.filter(l => l.type === type);
-                      if (typeLinks.length === 0) return null;
-
-                      return (
-                        <div key={type} className="space-y-2">
-                          <h4 className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">{type.toUpperCase()}</h4>
-                          <div className="space-y-1">
-                            {typeLinks.map(link => (
-                              <div key={link.id} className="group flex items-center justify-between p-2 rounded-md hover:bg-white/5 transition-colors border border-transparent hover:border-white/5">
-                                <div className="flex items-center gap-3 min-w-0">
-                                  <div 
-                                    className={`w-2 h-2 rounded-full shrink-0 shadow-sm ${
-                                      !link.lastPinged || link.lastStatus === null || link.lastStatus === undefined ? 'bg-gray-500' :
-                                      (link.lastStatus >= 200 && link.lastStatus < 300) ? 'bg-green-400 shadow-green-400/50' :
-                                      (link.lastStatus >= 300 && link.lastStatus < 400) ? 'bg-amber-300 shadow-amber-300/50' :
-                                      'bg-red-400 shadow-red-400/50'
-                                    }`}
-                                    title={link.lastPinged ? `Last status: ${link.lastStatus} (Pinged: ${timeAgo(link.lastPinged)})` : 'Never pinged'}
-                                  />
-                                  <div className="flex flex-col min-w-0">
-                                    <span className="text-xs font-medium text-foreground truncate">{link.label}</span>
-                                    <span className="text-[10px] font-mono text-muted-foreground truncate" title={link.url}>{link.url.replace(/^https?:\/\//, '')}</span>
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                                  <Button 
-                                    size="icon" 
-                                    variant="ghost" 
-                                    className="w-6 h-6 text-muted-foreground hover:text-foreground" 
-                                    onClick={() => {
-                                      navigator.clipboard.writeText(link.url);
-                                      alert("Copied to clipboard!");
-                                    }}
-                                    title="Copy URL"
-                                  >
-                                    <Copy className="w-3 h-3" />
-                                  </Button>
-                                  <a href={link.url} target="_blank" rel="noopener noreferrer" className="w-6 h-6 text-muted-foreground hover:text-foreground inline-flex items-center justify-center rounded-md hover:bg-white/5" title="Open Link">
-                                    <ExternalLink className="w-3 h-3" />
-                                  </a>
-                                  <Button size="icon" variant="ghost" className="w-6 h-6 text-muted-foreground hover:text-red-400" onClick={() => deleteLink(link.id)} title="Delete Link">
-                                    <Trash2 className="w-3 h-3" />
-                                  </Button>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })}
-                    {projectLinks.length === 0 && (
-                      <div className="text-center py-8">
-                        <span className="text-xs text-muted-foreground">No infrastructure links added yet.</span>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
+              )}
+              
+            </div>
           </ScrollArea>
         </div>
       )}

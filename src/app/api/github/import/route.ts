@@ -2,6 +2,26 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 
+function normalizeGithubUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  let clean = url.trim().toLowerCase();
+  
+  // Remove protocol and subdomains
+  clean = clean.replace(/^(https?:\/\/)?(www\.)?github\.com\//, "");
+  
+  // Remove trailing .git
+  if (clean.endsWith(".git")) {
+    clean = clean.slice(0, -4);
+  }
+  
+  // Remove trailing slash
+  if (clean.endsWith("/")) {
+    clean = clean.slice(0, -1);
+  }
+  
+  return clean;
+}
+
 export async function POST(request: Request) {
   try {
     const session = await auth();
@@ -16,15 +36,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing repository name." }, { status: 400 });
     }
 
-    // Check if repository already exists in project registry for this user
-    const existingProject = await prisma.project.findFirst({
-      where: {
-        userId,
-        githubUrl: {
-          contains: `github.com/${username}/${repoName}`,
-          mode: 'insensitive'
-        }
-      }
+    // Check if repository already exists in project registry for this user (by name or normalized GitHub URL)
+    const targetNormalized = normalizeGithubUrl(`github.com/${username}/${repoName}`);
+    const userProjects = await prisma.project.findMany({
+      where: { userId }
+    });
+
+    const existingProject = userProjects.find(p => {
+      // 1. Match by name
+      if (p.name.trim().toLowerCase() === repoName.trim().toLowerCase()) return true;
+      // 2. Match by normalized githubUrl
+      if (targetNormalized && normalizeGithubUrl(p.githubUrl) === targetNormalized) return true;
+      return false;
     });
 
     if (existingProject) {

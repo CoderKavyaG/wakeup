@@ -35,7 +35,7 @@ export async function GET(req: Request) {
           {
             uid: "dep_1",
             projectId: "prj_wakeup",
-            state: "ERROR",
+            state: "READY",
             name: "wakeup",
             created: Date.now() - 3600000,
             meta: {
@@ -91,33 +91,7 @@ export async function GET(req: Request) {
       }
 
       if (type === 'analytics') {
-        const period = searchParams.get('period');
-        const isLastWeek = period === 'lastweek';
-        return NextResponse.json({
-          data: isLastWeek ? [
-            { visits: 10 },
-            { visits: 15 },
-            { visits: 8 },
-            { visits: 20 },
-            { visits: 12 },
-            { visits: 18 },
-            { visits: 22 }
-          ] : [
-            { visits: 15 },
-            { visits: 25 },
-            { visits: 12 },
-            { visits: 45 },
-            { visits: 20 },
-            { visits: 35 },
-            { visits: 58 }
-          ],
-          uniqueVisitors: isLastWeek ? 85 : 176,
-          topPaths: [
-            { path: "/", visits: isLastWeek ? 60 : 120 },
-            { path: "/blog", visits: isLastWeek ? 20 : 45 },
-            { path: "/projects", visits: isLastWeek ? 15 : 35 }
-          ]
-        });
+        return NextResponse.json({ error: "Unable to fetch the right visits from Vercel" }, { status: 400 });
       }
 
       if (type === 'projects') {
@@ -215,31 +189,7 @@ export async function GET(req: Request) {
         return NextResponse.json(await res.json());
       }
       
-      // FALLBACK: If Vercel analytics fails or is unauthorized/forbidden, return high-fidelity simulated analytics
-      const simulatedData = [];
-      const numDays = days - toDays;
-      for (let i = 0; i < numDays; i++) {
-        const dateMs = Date.now() - (numDays - i) * 86400000;
-        const dateObj = new Date(dateMs);
-        const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
-        const base = isWeekend ? 15 : 45;
-        const visits = Math.max(5, Math.floor(base + Math.random() * 25 - 10));
-        simulatedData.push({
-          time: dateMs,
-          visits: visits,
-          views: visits * 2,
-        });
-      }
-      
-      return NextResponse.json({
-        data: simulatedData,
-        uniqueVisitors: simulatedData.reduce((acc, d) => acc + d.visits, 0),
-        topPaths: [
-          { path: "/", visits: Math.floor(simulatedData.reduce((acc, d) => acc + d.visits, 0) * 0.6) },
-          { path: "/projects", visits: Math.floor(simulatedData.reduce((acc, d) => acc + d.visits, 0) * 0.25) },
-          { path: "/blog", visits: Math.floor(simulatedData.reduce((acc, d) => acc + d.visits, 0) * 0.15) }
-        ]
-      });
+      return NextResponse.json({ error: `Vercel API returned status ${res.status}` }, { status: res.status });
     }
 
     if (type === 'projects') {
