@@ -27,7 +27,7 @@ export async function POST(req: Request) {
     } catch (agentError: any) {
       if (agentError.code === 'ECONNREFUSED' || agentError.message.includes('fetch failed')) {
         return NextResponse.json(
-          { error: "Agent not running — start it with npm run agent" }, 
+          { error: "Agent not running — start it with npx -y github:CoderKavyaG/wakeup" }, 
           { status: 503 }
         );
       }

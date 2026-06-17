@@ -321,9 +321,9 @@ export function MachineControlWidget() {
           </p>
           <div className="flex flex-col gap-2 w-full max-w-[260px] text-left">
             <div className="flex items-center justify-between px-3 py-2 rounded bg-black/40 border border-white/5 font-mono text-[10px] text-amber-400/90 group relative">
-              <span className="truncate">npm run agent</span>
+              <span className="truncate">npx -y github:CoderKavyaG/wakeup</span>
               <button 
-                onClick={() => navigator.clipboard.writeText("npm run agent")} 
+                onClick={() => navigator.clipboard.writeText("npx -y github:CoderKavyaG/wakeup")} 
                 className="text-white/30 hover:text-white transition-colors shrink-0 ml-2 cursor-pointer"
                 title="Copy Command"
               >
@@ -331,7 +331,7 @@ export function MachineControlWidget() {
               </button>
             </div>
             <div className="text-[9px] text-white/30 italic text-center font-mono">
-              Running inside your project root folder
+              Run this in any terminal to start the agent
             </div>
           </div>
           <Button 
