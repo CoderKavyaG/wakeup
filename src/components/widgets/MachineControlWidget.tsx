@@ -52,6 +52,7 @@ export function MachineControlWidget() {
   const [agentOffline, setAgentOffline] = useState(false);
   const [isElectron, setIsElectron] = useState<boolean | null>(null);
   const [activePlatformTab, setActivePlatformTab] = useState<"win" | "unix">("win");
+  const [runMode, setRunMode] = useState<"standard" | "background">("standard");
 
 
   // Live Stats State
@@ -329,7 +330,8 @@ export function MachineControlWidget() {
             To link your local processes, folders, ports, and scripts, run this one-liner in your terminal to start the secure loopback agent:
           </p>
 
-          <div className="flex gap-1.5 mb-3">
+          {/* OS Platform Tabs */}
+          <div className="flex gap-1.5 mb-2">
             <button 
               onClick={() => setActivePlatformTab("win")}
               className={`text-[9px] font-mono px-2 py-0.5 rounded border transition-colors cursor-pointer ${
@@ -352,19 +354,54 @@ export function MachineControlWidget() {
             </button>
           </div>
 
+          {/* Run Mode (Foreground vs Background) Tabs */}
+          <div className="flex gap-1.5 mb-3">
+            <button 
+              onClick={() => setRunMode("standard")}
+              className={`text-[8px] uppercase tracking-wider px-2 py-0.5 rounded border transition-colors cursor-pointer ${
+                runMode === "standard" 
+                  ? "bg-amber-500/10 text-amber-400 border-amber-500/20 font-semibold" 
+                  : "bg-transparent text-white/30 border-white/5 hover:text-white"
+              }`}
+            >
+              Interactive (runs in terminal)
+            </button>
+            <button 
+              onClick={() => setRunMode("background")}
+              className={`text-[8px] uppercase tracking-wider px-2 py-0.5 rounded border transition-colors cursor-pointer ${
+                runMode === "background" 
+                  ? "bg-purple-500/10 text-purple-400 border-purple-500/20 font-semibold" 
+                  : "bg-transparent text-white/30 border-white/5 hover:text-white"
+              }`}
+            >
+              Persistent (runs in background)
+            </button>
+          </div>
+
           <div className="flex flex-col gap-2 w-full max-w-[280px] text-left">
             <div className="flex items-center justify-between px-3 py-2 rounded bg-black/40 border border-white/5 font-mono text-[9px] text-amber-400/90 group relative">
               <span className="truncate">
                 {activePlatformTab === "win" 
-                  ? "irm https://raw.githubusercontent.com/CoderKavyaG/wakeup/main/devos-agent/install.ps1 | iex" 
-                  : "curl -fsSL https://raw.githubusercontent.com/CoderKavyaG/wakeup/main/devos-agent/install.sh | bash"
+                  ? (runMode === "standard" 
+                      ? "irm https://raw.githubusercontent.com/CoderKavyaG/wakeup/main/devos-agent/install.ps1 | iex" 
+                      : "powershell -WindowStyle Hidden -Command \"irm https://raw.githubusercontent.com/CoderKavyaG/wakeup/main/devos-agent/install.ps1 | iex\"")
+                  : (runMode === "standard" 
+                      ? "curl -fsSL https://raw.githubusercontent.com/CoderKavyaG/wakeup/main/devos-agent/install.sh | bash" 
+                      : "nohup bash -c \"curl -fsSL https://raw.githubusercontent.com/CoderKavyaG/wakeup/main/devos-agent/install.sh | bash\" > /dev/null 2>&1 &")
                 }
               </span>
               <button 
                 onClick={() => {
-                  const cmd = activePlatformTab === "win" 
-                    ? "irm https://raw.githubusercontent.com/CoderKavyaG/wakeup/main/devos-agent/install.ps1 | iex" 
-                    : "curl -fsSL https://raw.githubusercontent.com/CoderKavyaG/wakeup/main/devos-agent/install.sh | bash";
+                  let cmd = "";
+                  if (activePlatformTab === "win") {
+                    cmd = runMode === "standard" 
+                      ? "irm https://raw.githubusercontent.com/CoderKavyaG/wakeup/main/devos-agent/install.ps1 | iex" 
+                      : "powershell -WindowStyle Hidden -Command \"irm https://raw.githubusercontent.com/CoderKavyaG/wakeup/main/devos-agent/install.ps1 | iex\"";
+                  } else {
+                    cmd = runMode === "standard" 
+                      ? "curl -fsSL https://raw.githubusercontent.com/CoderKavyaG/wakeup/main/devos-agent/install.sh | bash" 
+                      : "nohup bash -c \"curl -fsSL https://raw.githubusercontent.com/CoderKavyaG/wakeup/main/devos-agent/install.sh | bash\" > /dev/null 2>&1 &";
+                  }
                   navigator.clipboard.writeText(cmd);
                 }} 
                 className="text-white/30 hover:text-white transition-colors shrink-0 ml-2 cursor-pointer"
@@ -374,9 +411,33 @@ export function MachineControlWidget() {
               </button>
             </div>
             <div className="text-[9px] text-white/30 italic text-center font-mono">
-              Downloads and runs the lightweight agent in seconds
+              {runMode === "background" 
+                ? "Will run in the background and survive terminal exit. (Must restart on system boot)" 
+                : "Will shut down if you close the terminal window."}
             </div>
           </div>
+
+          {/* Browser SSL Security Advisory Card */}
+          <div className="mt-4 p-3 bg-amber-500/5 border border-amber-500/15 rounded-lg text-left text-[10px] text-amber-400/80 space-y-1.5 max-w-[280px] leading-relaxed">
+            <span className="font-bold uppercase tracking-wider font-mono flex items-center gap-1">
+              ⚠️ Browser Security Action Required
+            </span>
+            <p>
+              Since DevOS is a secure HTTPS app, browsers block connections to your local machine until you authorize the agent's self-signed certificate:
+            </p>
+            <ol className="list-decimal list-inside space-y-1 pl-1 font-sans font-medium text-amber-300">
+              <li>
+                Click here: <a href="https://local.wakeup.com:3131/ports" target="_blank" rel="noopener noreferrer" className="underline hover:text-amber-200 font-bold">Authorize SSL Certificate</a>
+              </li>
+              <li>
+                Click <strong>"Advanced"</strong> &➔ <strong>"Proceed to local.wakeup.com (unsafe)"</strong>.
+              </li>
+              <li>
+                Return here and click <strong>Retry Connection</strong> below.
+              </li>
+            </ol>
+          </div>
+
           <Button 
             size="sm" 
             className="mt-4 h-7 text-xs bg-white text-black hover:bg-white/90 px-4 cursor-pointer"
