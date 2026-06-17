@@ -50,6 +50,8 @@ export function MachineControlWidget() {
   const [portsLoading, setPortsLoading] = useState(false);
   
   const [agentOffline, setAgentOffline] = useState(false);
+  const [isElectron, setIsElectron] = useState<boolean | null>(null);
+
 
   // Live Stats State
   const [stats, setStats] = useState({ cpu: 0, ram: 0 });
@@ -73,6 +75,7 @@ export function MachineControlWidget() {
 
   // Load saved workspace on mount
   useEffect(() => {
+    setIsElectron(typeof window !== "undefined" && !!(window as any).electronAPI?.isElectron);
     let saved = localStorage.getItem("DEVOS_WORKSPACE");
     if (!saved) {
       saved = "C:\\Users\\Kavya\\Projects\\wakeup";
@@ -290,9 +293,63 @@ export function MachineControlWidget() {
       setTimeout(fetchPorts, 1000);
     } catch (e) {}
   };
+  if (agentOffline) {
+    return (
+      <div id="machine-control-widget" className="flex flex-col h-full text-foreground bg-[#0f0f11] rounded-xl overflow-hidden divide-y divide-border/40 border border-red-500/10 transition-all duration-300 shadow-[0_0_15px_rgba(239,68,68,0.05)] font-sans">
+        {/* ── HEADER ── */}
+        <div className="px-4 py-3 shrink-0 flex items-center justify-between bg-[#0f0f11]">
+          <div className="flex items-center gap-2">
+            <Server className="w-4 h-4 text-primary" />
+            <h3 className="text-sm font-semibold tracking-tight">Machine Control</h3>
+          </div>
+          <button 
+            onClick={handleStartAgent} 
+            className="text-[9px] uppercase border border-red-500/30 text-red-400 bg-red-500/10 hover:bg-red-500/20 px-2 py-0.5 rounded-full flex items-center gap-1.5 transition-colors font-bold shadow-[0_0_10px_rgba(239,68,68,0.2)] cursor-pointer"
+          >
+            <Power className="w-3 h-3 animate-pulse" /> Start Agent
+          </button>
+        </div>
+
+        {/* ── OFFLINE INSTRUCTIONS ── */}
+        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center bg-[#0d0d10]">
+          <div className="w-10 h-10 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 mb-3 shrink-0">
+            <Terminal className="w-4.5 h-4.5" />
+          </div>
+          <h4 className="text-xs font-semibold tracking-tight text-white mb-1.5 font-mono uppercase">Local Agent Offline</h4>
+          <p className="text-[11px] text-white/50 max-w-[280px] leading-relaxed mb-4">
+            To link your local processes, folders, ports, and scripts, start the DevOS secure loopback agent on your machine:
+          </p>
+          <div className="flex flex-col gap-2 w-full max-w-[260px] text-left">
+            <div className="flex items-center justify-between px-3 py-2 rounded bg-black/40 border border-white/5 font-mono text-[10px] text-amber-400/90 group relative">
+              <span className="truncate">npm run agent</span>
+              <button 
+                onClick={() => navigator.clipboard.writeText("npm run agent")} 
+                className="text-white/30 hover:text-white transition-colors shrink-0 ml-2 cursor-pointer"
+                title="Copy Command"
+              >
+                <ClipboardCopy className="w-3 h-3" />
+              </button>
+            </div>
+            <div className="text-[9px] text-white/30 italic text-center font-mono">
+              Running inside your project root folder
+            </div>
+          </div>
+          <Button 
+            size="sm" 
+            className="mt-4 h-7 text-xs bg-white text-black hover:bg-white/90 px-4 cursor-pointer"
+            onClick={fetchPorts}
+            disabled={portsLoading}
+          >
+            <RefreshCw className={`w-3 h-3 mr-1.5 ${portsLoading ? 'animate-spin' : ''}`} />
+            Retry Connection
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div id="machine-control-widget" className={`flex flex-col h-full text-foreground bg-[#0f0f11] rounded-xl overflow-hidden divide-y divide-border/40 transition-all duration-1000 ${agentOffline ? "shadow-[0_0_15px_rgba(239,68,68,0.15)] border border-red-500/20" : "shadow-[0_0_15px_rgba(34,197,94,0.08)] border border-green-500/20"}`}>
+    <div id="machine-control-widget" className="flex flex-col h-full text-foreground bg-[#0f0f11] rounded-xl overflow-hidden divide-y divide-border/40 transition-all duration-1000 shadow-[0_0_15px_rgba(34,197,94,0.08)] border border-green-500/20">
       
       {/* ── HEADER ── */}
       <div className="px-4 py-3 shrink-0 flex items-center justify-between bg-[#0f0f11]">
@@ -300,16 +357,10 @@ export function MachineControlWidget() {
           <Server className="w-4 h-4 text-primary" />
           <h3 className="text-sm font-semibold tracking-tight">Machine Control</h3>
         </div>
-        {agentOffline ? (
-          <button onClick={handleStartAgent} className="text-[9px] uppercase border border-red-500/30 text-red-400 bg-red-500/10 hover:bg-red-500/20 px-2 py-0.5 rounded-full flex items-center gap-1.5 transition-colors font-bold shadow-[0_0_10px_rgba(239,68,68,0.2)]">
-            <Power className="w-3 h-3" /> Start Agent
-          </button>
-        ) : (
-          <Badge variant="outline" className="text-[9px] uppercase border-green-500/20 text-green-500 bg-green-500/10 flex items-center gap-1.5 shadow-[0_0_10px_rgba(34,197,94,0.1)]">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-            Agent Connected
-          </Badge>
-        )}
+        <Badge variant="outline" className="text-[9px] uppercase border-green-500/20 text-green-500 bg-green-500/10 flex items-center gap-1.5 shadow-[0_0_10px_rgba(34,197,94,0.1)]">
+          <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+          Agent Connected
+        </Badge>
       </div>
 
       {/* ── STATS BAR ── */}
