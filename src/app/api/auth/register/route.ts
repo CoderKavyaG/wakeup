@@ -12,10 +12,13 @@ export async function POST(request: Request) {
     }
 
     // Check if any user exists in the system
+    // For SaaS version, we comment this check out to allow public registration
+    /*
     const userCount = await prisma.user.count();
     if (userCount > 0) {
       return NextResponse.json({ error: "Registration is locked. DevOS already has an owner." }, { status: 403 });
     }
+    */
 
     // Hash the password with bcrypt (12 rounds)
     const hashedPassword = await bcrypt.hash(password, 12);
