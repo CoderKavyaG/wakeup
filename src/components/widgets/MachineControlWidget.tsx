@@ -51,6 +51,7 @@ export function MachineControlWidget() {
   
   const [agentOffline, setAgentOffline] = useState(false);
   const [isElectron, setIsElectron] = useState<boolean | null>(null);
+  const [activePlatformTab, setActivePlatformTab] = useState<"win" | "unix">("win");
 
 
   // Live Stats State
@@ -76,6 +77,14 @@ export function MachineControlWidget() {
   // Load saved workspace on mount
   useEffect(() => {
     setIsElectron(typeof window !== "undefined" && !!(window as any).electronAPI?.isElectron);
+    if (typeof window !== "undefined") {
+      const ua = navigator.userAgent.toLowerCase();
+      if (ua.includes("win")) {
+        setActivePlatformTab("win");
+      } else {
+        setActivePlatformTab("unix");
+      }
+    }
     let saved = localStorage.getItem("DEVOS_WORKSPACE");
     if (!saved) {
       saved = "C:\\Users\\Kavya\\Projects\\wakeup";
@@ -316,14 +325,48 @@ export function MachineControlWidget() {
             <Terminal className="w-4.5 h-4.5" />
           </div>
           <h4 className="text-xs font-semibold tracking-tight text-white mb-1.5 font-mono uppercase">Local Agent Offline</h4>
-          <p className="text-[11px] text-white/50 max-w-[280px] leading-relaxed mb-4">
-            To link your local processes, folders, ports, and scripts, start the DevOS secure loopback agent on your machine:
+          <p className="text-[11px] text-white/50 max-w-[280px] leading-relaxed mb-3">
+            To link your local processes, folders, ports, and scripts, run this one-liner in your terminal to start the secure loopback agent:
           </p>
-          <div className="flex flex-col gap-2 w-full max-w-[260px] text-left">
-            <div className="flex items-center justify-between px-3 py-2 rounded bg-black/40 border border-white/5 font-mono text-[10px] text-amber-400/90 group relative">
-              <span className="truncate">npx -y github:CoderKavyaG/wakeup</span>
+
+          <div className="flex gap-1.5 mb-3">
+            <button 
+              onClick={() => setActivePlatformTab("win")}
+              className={`text-[9px] font-mono px-2 py-0.5 rounded border transition-colors cursor-pointer ${
+                activePlatformTab === "win" 
+                  ? "bg-primary/15 text-primary border-primary/20 font-bold" 
+                  : "bg-transparent text-white/40 border-white/5 hover:text-white"
+              }`}
+            >
+              Windows (PowerShell)
+            </button>
+            <button 
+              onClick={() => setActivePlatformTab("unix")}
+              className={`text-[9px] font-mono px-2 py-0.5 rounded border transition-colors cursor-pointer ${
+                activePlatformTab === "unix" 
+                  ? "bg-primary/15 text-primary border-primary/20 font-bold" 
+                  : "bg-transparent text-white/40 border-white/5 hover:text-white"
+              }`}
+            >
+              macOS / Linux
+            </button>
+          </div>
+
+          <div className="flex flex-col gap-2 w-full max-w-[280px] text-left">
+            <div className="flex items-center justify-between px-3 py-2 rounded bg-black/40 border border-white/5 font-mono text-[9px] text-amber-400/90 group relative">
+              <span className="truncate">
+                {activePlatformTab === "win" 
+                  ? "irm https://raw.githubusercontent.com/CoderKavyaG/wakeup/main/devos-agent/install.ps1 | iex" 
+                  : "curl -fsSL https://raw.githubusercontent.com/CoderKavyaG/wakeup/main/devos-agent/install.sh | bash"
+                }
+              </span>
               <button 
-                onClick={() => navigator.clipboard.writeText("npx -y github:CoderKavyaG/wakeup")} 
+                onClick={() => {
+                  const cmd = activePlatformTab === "win" 
+                    ? "irm https://raw.githubusercontent.com/CoderKavyaG/wakeup/main/devos-agent/install.ps1 | iex" 
+                    : "curl -fsSL https://raw.githubusercontent.com/CoderKavyaG/wakeup/main/devos-agent/install.sh | bash";
+                  navigator.clipboard.writeText(cmd);
+                }} 
                 className="text-white/30 hover:text-white transition-colors shrink-0 ml-2 cursor-pointer"
                 title="Copy Command"
               >
@@ -331,7 +374,7 @@ export function MachineControlWidget() {
               </button>
             </div>
             <div className="text-[9px] text-white/30 italic text-center font-mono">
-              Run this in any terminal to start the agent
+              Downloads and runs the lightweight agent in seconds
             </div>
           </div>
           <Button 
