@@ -207,9 +207,9 @@ export async function GET() {
         }
 
         // Fetch analytics for matched projects
-        const matchedProjects = projects.filter(p => p.vercelProjectId);
+        const matchedProjects = projects.filter((p: any) => p.vercelProjectId);
         if (matchedProjects.length > 0) {
-          const analyticsPromises = matchedProjects.map(async (p) => {
+          const analyticsPromises = matchedProjects.map(async (p: any) => {
             try {
               if (user.vercelToken?.startsWith("mock_")) {
                 return {
