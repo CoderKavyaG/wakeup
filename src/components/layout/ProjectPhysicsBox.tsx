@@ -31,6 +31,8 @@ interface ProjectPhysicsBoxProps {
   curatedIdea: string[];
   onMoveProjectPhase: (projectId: string, newPhase: string) => void;
   onHideProject: (projectId: string, phase: string) => void;
+  onDragOverTrashChange?: (isOver: boolean) => void;
+  onDropInTrash?: (projectId: string) => void;
 }
 
 export default function ProjectPhysicsBox({
@@ -43,6 +45,8 @@ export default function ProjectPhysicsBox({
   curatedIdea,
   onMoveProjectPhase,
   onHideProject,
+  onDragOverTrashChange,
+  onDropInTrash,
 }: ProjectPhysicsBoxProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -60,6 +64,7 @@ export default function ProjectPhysicsBox({
     draggedId: string | null;
     hoveredId: string | null;
     isOverClose: boolean;
+    isOverTrash: boolean;
     mouse: { x: number; y: number };
     dragOffset: { x: number; y: number };
     prevDragMouse: { x: number; y: number };
@@ -69,6 +74,7 @@ export default function ProjectPhysicsBox({
     draggedId: null,
     hoveredId: null,
     isOverClose: false,
+    isOverTrash: false,
     mouse: { x: -1000, y: -1000 },
     dragOffset: { x: 0, y: 0 },
     prevDragMouse: { x: 0, y: 0 },
@@ -413,7 +419,7 @@ export default function ProjectPhysicsBox({
       // 4. UPDATE TOOLTIP POSITION AND CONTENT
       const tooltip = tooltipRef.current;
       if (tooltip) {
-        if (state.hoveredId && !state.isOverClose) {
+        if (state.hoveredId && !state.isOverClose && !state.isOverTrash) {
           const bubble = state.bubbles.find((b) => b.id === state.hoveredId);
           const proj = projectsRef.current.find((p) => p.id === state.hoveredId);
           if (bubble && proj) {
@@ -477,6 +483,26 @@ export default function ProjectPhysicsBox({
 
     const canvas = canvasRef.current;
 
+    let isOverTrash = false;
+    if (state.draggedId) {
+      const dustbinEl = document.getElementById("dashboard-dustbin");
+      if (dustbinEl) {
+        const dbRect = dustbinEl.getBoundingClientRect();
+        isOverTrash = 
+          e.clientX >= dbRect.left &&
+          e.clientX <= dbRect.right &&
+          e.clientY >= dbRect.top &&
+          e.clientY <= dbRect.bottom;
+      }
+    }
+
+    if (isOverTrash !== state.isOverTrash) {
+      state.isOverTrash = isOverTrash;
+      if (onDragOverTrashChange) {
+        onDragOverTrashChange(isOverTrash);
+      }
+    }
+
     if (state.draggedId) {
       const bubble = state.bubbles.find((b) => b.id === state.draggedId);
       if (bubble) {
@@ -484,7 +510,7 @@ export default function ProjectPhysicsBox({
         bubble.y = pos.y - state.dragOffset.y;
       }
       if (canvas) {
-        canvas.style.cursor = "grabbing";
+        canvas.style.cursor = isOverTrash ? "alias" : "grabbing";
       }
       return;
     }
@@ -562,25 +588,35 @@ export default function ProjectPhysicsBox({
     if (bubble) {
       bubble.isDragging = false;
       
-      // Calculate dropped column zone
-      const width = state.dimensions.width;
-      const gap = 16;
-      const colWidth = Math.max(100, (width - 2 * gap) / 3);
-      
-      // Find closest column index
-      let targetColIdx = Math.floor(bubble.x / (colWidth + gap));
-      targetColIdx = Math.max(0, Math.min(2, targetColIdx));
+      if (state.isOverTrash) {
+        if (onDropInTrash) {
+          onDropInTrash(state.draggedId);
+        }
+      } else {
+        // Calculate dropped column zone
+        const width = state.dimensions.width;
+        const gap = 16;
+        const colWidth = Math.max(100, (width - 2 * gap) / 3);
+        
+        // Find closest column index
+        let targetColIdx = Math.floor(bubble.x / (colWidth + gap));
+        targetColIdx = Math.max(0, Math.min(2, targetColIdx));
 
-      const currentColIdx = PHASES.findIndex((ph) => ph.id === bubble.phase);
-      const targetPhaseId = PHASES[targetColIdx].id;
+        const currentColIdx = PHASES.findIndex((ph) => ph.id === bubble.phase);
+        const targetPhaseId = PHASES[targetColIdx].id;
 
-      if (targetColIdx !== currentColIdx) {
-        // Drop trigger column shift!
-        onMoveProjectPhase(bubble.id, targetPhaseId);
+        if (targetColIdx !== currentColIdx) {
+          // Drop trigger column shift!
+          onMoveProjectPhase(bubble.id, targetPhaseId);
+        }
       }
     }
 
     state.draggedId = null;
+    if (state.isOverTrash) {
+      state.isOverTrash = false;
+      if (onDragOverTrashChange) onDragOverTrashChange(false);
+    }
   };
 
   // Double click to open project

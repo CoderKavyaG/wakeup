@@ -2,17 +2,29 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 
-const parseGithubUrl = (url: string) => {
-  const regex = /github\.com\/([^\/]+)\/([^\/]+)/i;
-  const match = url.match(regex);
-  if (match) {
-    const owner = match[1];
-    let repo = match[2];
-    if (repo.endsWith(".git")) repo = repo.slice(0, -4);
-    return { owner, repo };
+export const dynamic = "force-dynamic";
+
+function normalizeGithubUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  let clean = url.trim().toLowerCase();
+  clean = clean.replace(/^(https?:\/\/)?(www\.)?github\.com\//, "");
+  if (clean.endsWith(".git")) clean = clean.slice(0, -4);
+  if (clean.endsWith("/")) clean = clean.slice(0, -1);
+  return clean;
+}
+
+function getFaviconUrl(urlString: string): string | null {
+  try {
+    let cleanUrl = urlString.trim();
+    if (!cleanUrl.startsWith("http://") && !cleanUrl.startsWith("https://")) {
+      cleanUrl = "https://" + cleanUrl;
+    }
+    const url = new URL(cleanUrl);
+    return `https://icons.duckduckgo.com/ip3/${url.hostname}.ico`;
+  } catch {
+    return null;
   }
-  return null;
-};
+}
 
 export async function POST(request: Request) {
   try {
@@ -21,104 +33,60 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
     const userId = session.user.id;
+    const { repos } = await request.json();
 
-    const { projectId } = await request.json();
-
-    if (!projectId) {
-      return NextResponse.json({ error: "Missing project ID." }, { status: 400 });
+    if (!Array.isArray(repos) || repos.length === 0) {
+      return NextResponse.json({ success: true, count: 0 });
     }
 
-    const project = await prisma.project.findFirst({
-      where: { id: projectId, userId }
+    // Load existing projects for this user
+    const existingProjects = await prisma.project.findMany({
+      where: { userId }
     });
 
-    if (!project) {
-      return NextResponse.json({ error: "Project not found or unauthorized." }, { status: 404 });
-    }
+    const syncedProjects = [];
 
-    if (!project.githubUrl) {
-      // No GitHub URL to sync, just update the sync timestamp as a local refresh
-      const updatedProject = await prisma.project.update({
-        where: { id: projectId },
-        data: { lastSyncedAt: new Date() }
+    for (const repo of repos) {
+      const repoUrl = repo.html_url || repo.githubUrl;
+      if (!repoUrl || !repo.name) continue;
+
+      const targetNormalized = normalizeGithubUrl(repoUrl);
+      
+      // Check if project exists by name or githubUrl
+      const isDuplicate = existingProjects.some(p => {
+        const matchesName = p.name.toLowerCase() === repo.name.toLowerCase();
+        const matchesGithub = p.githubUrl && normalizeGithubUrl(p.githubUrl) === targetNormalized;
+        return matchesName || matchesGithub;
       });
-      return NextResponse.json(updatedProject);
-    }
 
-    const githubDetails = parseGithubUrl(project.githubUrl);
-    if (!githubDetails) {
-      // Invalid GitHub URL format, update local sync timestamp
-      const updatedProject = await prisma.project.update({
-        where: { id: projectId },
-        data: { lastSyncedAt: new Date() }
+      if (isDuplicate) continue;
+
+      const favicon = getFaviconUrl(repoUrl);
+
+      const p = await prisma.project.create({
+        data: {
+          name: repo.name,
+          description: repo.description || "Synced GitHub repository",
+          status: "active",
+          githubUrl: repoUrl,
+          tags: [repo.language].filter(Boolean),
+          projectHealth: 100.0,
+          momentumScore: 0.0,
+          completionPercentage: 75.0,
+          userId,
+          workspace: "main",
+          type: "code",
+          priority: "medium",
+          phase: "idea",
+          ogImageUrl: favicon
+        }
       });
-      return NextResponse.json(updatedProject);
+      syncedProjects.push(p);
     }
 
-    const { owner, repo } = githubDetails;
-
-    // Fetch from GitHub REST API
-    const headers: HeadersInit = {};
-    if (process.env.GITHUB_TOKEN) {
-      headers["Authorization"] = `token ${process.env.GITHUB_TOKEN}`;
-    }
-
-    // 1. Fetch main repo details
-    const repoRes = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers });
-    if (!repoRes.ok) {
-      throw new Error(`Failed to fetch repo ${owner}/${repo} from GitHub. Status: ${repoRes.status}`);
-    }
-    const repoData = await repoRes.json();
-
-    // 2. Fetch README
-    let readmeSnippet = project.summary || "";
-    try {
-      const readmeRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/readme`, { headers });
-      if (readmeRes.ok) {
-        const readmeData = await readmeRes.json();
-        const base64Content = readmeData.content;
-        const decodedContent = Buffer.from(base64Content, "base64").toString("utf-8");
-        readmeSnippet = decodedContent.substring(0, 500) + (decodedContent.length > 500 ? "..." : "");
-      }
-    } catch (e) {
-      console.warn("Could not sync README for project:", repo, e);
-    }
-
-    // 3. Fetch Languages
-    const languages: string[] = [];
-    try {
-      const langRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/languages`, { headers });
-      if (langRes.ok) {
-        const langData = await langRes.json();
-        languages.push(...Object.keys(langData));
-      }
-    } catch (e) {
-      console.warn("Could not sync languages for project:", repo, e);
-    }
-
-    // 4. Determine stale status (updated more than 30 days ago)
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const lastCommitDate = new Date(repoData.pushed_at || repoData.updated_at);
-    const isStale = lastCommitDate < thirtyDaysAgo;
-    const status = isStale ? "stale" : (project.status === "stale" ? "active" : project.status);
-
-    // 5. Update local database record
-    const updatedProject = await prisma.project.update({
-      where: { id: projectId },
-      data: {
-        description: repoData.description || project.description,
-        techStack: languages.length > 0 ? languages : project.techStack,
-        summary: readmeSnippet || project.summary,
-        momentumScore: repoData.stargazers_count > 0 ? repoData.stargazers_count * 10 : project.momentumScore,
-        status: status,
-        lastSyncedAt: new Date(),
-      }
-    });
-
-    return NextResponse.json(updatedProject);
+    return NextResponse.json({ success: true, count: syncedProjects.length, projects: syncedProjects });
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'An error occurred';
+    const errorMessage = error instanceof Error ? error.message : "An error occurred";
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

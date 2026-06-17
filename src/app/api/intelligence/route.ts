@@ -3,16 +3,7 @@ import { generateText } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
-
-const openrouter = createOpenAI({
-  baseURL: "https://openrouter.ai/api/v1",
-  apiKey: process.env.OPENROUTER_API_KEY,
-});
-
-const groq = createOpenAI({
-  baseURL: "https://api.groq.com/openai/v1",
-  apiKey: process.env.GROQ_API_KEY,
-});
+import { decrypt } from "@/lib/encryption";
 
 export const dynamic = "force-dynamic";
 
@@ -92,18 +83,37 @@ export async function POST(request: Request) {
     }
 
     // 2.3 AI daily brief
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { groqApiKey: true, openrouterApiKey: true }
+    });
+
+    const decryptedGroq = user?.groqApiKey ? decrypt(user.groqApiKey) : "";
+    const decryptedOpenrouter = user?.openrouterApiKey ? decrypt(user.openrouterApiKey) : "";
+
     let modelInstance = null;
-    if (process.env.GROQ_API_KEY) {
-      modelInstance = groq("llama-3.3-70b-versatile");
-    } else if (process.env.OPENROUTER_API_KEY) {
-      modelInstance = openrouter("google/gemma-4-26b-a4b-it:free");
+    if (decryptedGroq) {
+      const groqClient = createOpenAI({
+        baseURL: "https://api.groq.com/openai/v1",
+        apiKey: decryptedGroq,
+      });
+      modelInstance = groqClient("llama-3.3-70b-versatile");
+    } else if (decryptedOpenrouter) {
+      const openrouterClient = createOpenAI({
+        baseURL: "https://openrouter.ai/api/v1",
+        apiKey: decryptedOpenrouter,
+      });
+      modelInstance = openrouterClient("google/gemma-4-26b-a4b-it:free");
     }
 
-    const systemPrompt = `You are the AI brain of DevOS — Kavya's personal developer operating system.
-Kavya is a student developer based in India, building multiple projects simultaneously.
-You have live access to her workspace data. Be specific, direct, and actionable.
-Write ONE sentence telling Kavya what to focus on today. Name a project or task explicitly.
+    const userName = session.user.name?.split(" ")[0] || "Developer";
+
+    const systemPrompt = `You are the AI brain of DevOS — ${userName}'s personal developer operating system.
+${userName} is a developer building multiple projects simultaneously.
+You have live access to their workspace data. Be specific, direct, and actionable.
+Write ONE sentence telling ${userName} what to focus on today. Name a project or task explicitly.
 Keep your response short, direct, and under 25 words. No greetings or headers.`;
+
 
     let brief = "Focus on completing your highest priority tasks today.";
 

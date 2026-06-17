@@ -27,6 +27,7 @@ interface BootstrapState {
   error: string | null;
   derived: DerivedSignals | null;
   vercel: VercelData | null;
+  ai: { hasGroqApiKey: boolean; hasOpenrouterApiKey: boolean } | null;
   userId: string | null;
   telegramLinked: boolean;
   lastBootstrapped: number | null;
@@ -41,6 +42,7 @@ export const useBootstrapStore = create<BootstrapState>((set, get) => ({
   error: null,
   derived: null,
   vercel: null,
+  ai: null,
   userId: null,
   telegramLinked: false,
   lastBootstrapped: null,
@@ -75,6 +77,7 @@ export const useBootstrapStore = create<BootstrapState>((set, get) => ({
         loading: false,
         derived: data.derived ?? null,
         vercel: data.vercel ?? null,
+        ai: data.ai ?? null,
         userId: data.userId ?? null,
         telegramLinked: !!data.telegramLinked,
         lastBootstrapped: Date.now(),

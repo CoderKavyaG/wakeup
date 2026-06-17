@@ -1,33 +1,48 @@
 import { NextResponse } from "next/server";
 import { generateText } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
-
-const openrouter = createOpenAI({
-  baseURL: "https://openrouter.ai/api/v1",
-  apiKey: process.env.OPENROUTER_API_KEY || "",
-});
-
-const groq = createOpenAI({
-  baseURL: "https://api.groq.com/openai/v1",
-  apiKey: process.env.GROQ_API_KEY || "",
-});
+import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
+import { decrypt } from "@/lib/encryption";
 
 export async function POST(req: Request) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+    const userId = session.user.id;
+
     const { scanned } = await req.json();
     if (!scanned) {
       return NextResponse.json({ error: "Missing scanned project details" }, { status: 400 });
     }
 
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { groqApiKey: true, openrouterApiKey: true }
+    });
+
+    const decryptedGroq = user?.groqApiKey ? decrypt(user.groqApiKey) : "";
+    const decryptedOpenrouter = user?.openrouterApiKey ? decrypt(user.openrouterApiKey) : "";
+
     let modelInstance = null;
-    if (process.env.GROQ_API_KEY) {
-      modelInstance = groq("llama-3.3-70b-versatile");
-    } else if (process.env.OPENROUTER_API_KEY) {
-      modelInstance = openrouter("openai/gpt-4o-mini");
+    if (decryptedGroq) {
+      const groqClient = createOpenAI({
+        baseURL: "https://api.groq.com/openai/v1",
+        apiKey: decryptedGroq,
+      });
+      modelInstance = groqClient("llama-3.3-70b-versatile");
+    } else if (decryptedOpenrouter) {
+      const openrouterClient = createOpenAI({
+        baseURL: "https://openrouter.ai/api/v1",
+        apiKey: decryptedOpenrouter,
+      });
+      modelInstance = openrouterClient("openai/gpt-4o-mini");
     }
 
     if (!modelInstance) {
-      return NextResponse.json({ error: "No AI provider configured" }, { status: 500 });
+      return NextResponse.json({ error: "Please configure your Groq or OpenRouter API keys in Settings." }, { status: 500 });
     }
 
     const { name, description, tags, githubUrl, lastCommitMessage, deployHints, folderPath, rootFiles } = scanned;

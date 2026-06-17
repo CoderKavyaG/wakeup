@@ -23,6 +23,21 @@ app.use(express.json());
 
 const PORT = 3131;
 
+const https = require('https');
+const certsPath = path.join(__dirname, 'certs');
+let serverOptions = {};
+try {
+  serverOptions = {
+    key: fs.readFileSync(path.join(certsPath, 'local.key')),
+    cert: fs.readFileSync(path.join(certsPath, 'local.crt'))
+  };
+} catch (e) {
+  console.error("❌ Failed to load SSL certificates. Make sure local.key and local.crt exist in devos-agent/certs/.", e);
+  process.exit(1);
+}
+
+const server = https.createServer(serverOptions, app);
+
 // GET /ports - returns array of listening ports
 app.get('/ports', (req, res) => {
   const isWin = os.platform() === 'win32';
@@ -564,7 +579,7 @@ app.post('/register-workspace', (req, res) => {
 const { WebSocketServer } = require('ws');
 const { spawn } = require('child_process');
 
-const wss = new WebSocketServer({ port: 3132 });
+const wss = new WebSocketServer({ server });
 
 wss.on('connection', (ws, req) => {
   const params = new URL(req.url, 'http://localhost').searchParams;
@@ -685,8 +700,8 @@ app.post('/generate-context', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`DevOS Agent running on port ${PORT}`);
+server.listen(PORT, () => {
+  console.log(`⚡ DevOS Agent secure loopback running on https://local.wakeup.com:${PORT}`);
 });
 
 const CRON_MS = 60 * 60 * 1000;

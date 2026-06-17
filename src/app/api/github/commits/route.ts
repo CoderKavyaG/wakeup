@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
+import { decrypt } from "@/lib/encryption";
 
 const parseGithubUrl = (url: string) => {
   const regex = /github\.com\/([^/]+)\/([^/]+)/i;
@@ -8,6 +9,8 @@ const parseGithubUrl = (url: string) => {
   if (match) {
     let repo = match[2];
     if (repo.endsWith('.git')) repo = repo.slice(0, -4);
+    // strip query strings / fragments
+    repo = repo.split('?')[0].split('#')[0];
     return { owner: match[1], repo };
   }
   return null;
@@ -24,11 +27,19 @@ export async function GET(request: Request) {
     const userId = session.user.id;
 
     const { searchParams } = new URL(request.url);
-    const username = searchParams.get("username") || "CoderKavyaG";
-    const days = parseInt(searchParams.get("days") || "7", 10);
+    const days = parseInt(searchParams.get("days") || "30", 10);
     const projectId = searchParams.get("projectId"); 
     
-    let token = request.headers.get("Authorization")?.replace("Bearer ", "").replace("token ", "") || process.env.GITHUB_TOKEN;
+    // Retrieve and decrypt the user's database-stored GitHub token
+    let token = process.env.GITHUB_TOKEN;
+    const dbUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { githubToken: true }
+    });
+    if (dbUser?.githubToken) {
+      token = decrypt(dbUser.githubToken);
+    }
+
     const headers: HeadersInit = {
       "Accept": "application/vnd.github.v3+json",
     };
@@ -49,7 +60,17 @@ export async function GET(request: Request) {
       where: whereClause
     });
 
-    const allCommits = [];
+    // First, try to serve from DB cache
+    const dbCommits = await prisma.commit.findMany({
+      where: {
+        projectId: projectId ? projectId : { in: projects.map(p => p.id) },
+        date: { gte: sinceDate }
+      },
+      orderBy: { date: "desc" },
+      take: 50
+    });
+
+    const allCommits: any[] = [];
 
     for (const project of projects) {
       const details = parseGithubUrl(project.githubUrl!);
@@ -58,17 +79,47 @@ export async function GET(request: Request) {
       const { owner, repo } = details;
       
       try {
-        const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/commits?since=${sinceIso}&per_page=20`, { headers });
-        if (!res.ok) continue;
+        const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/commits?since=${sinceIso}&per_page=30`, { headers });
+        if (!res.ok) {
+          // fallback to db
+          let cached = dbCommits.filter(c => c.projectId === project.id);
+          if (cached.length === 0) {
+            const fallbackCommit = await prisma.commit.findFirst({
+              where: { projectId: project.id },
+              orderBy: { date: "desc" }
+            });
+            if (fallbackCommit) cached = [fallbackCommit];
+          }
+          allCommits.push(...cached.map(c => ({
+            sha: c.sha,
+            message: c.message,
+            date: c.date,
+            url: c.url,
+            repoName: c.repoName,
+            projectId: c.projectId
+          })));
+          continue;
+        }
 
-        const commitsData = await res.json();
+        let commitsData = await res.json();
         if (!Array.isArray(commitsData)) continue;
+
+        // If no commits in last 30 days, fetch the single last commit from GitHub
+        if (commitsData.length === 0) {
+          const fallbackRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/commits?per_page=1`, { headers });
+          if (fallbackRes.ok) {
+            const fallbackData = await fallbackRes.json();
+            if (Array.isArray(fallbackData) && fallbackData.length > 0) {
+              commitsData = fallbackData;
+            }
+          }
+        }
         
         for (const c of commitsData) {
           const commitObj = {
             repoName: repo,
             sha: c.sha,
-            message: c.commit?.message || "",
+            message: c.commit?.message?.split('\n')[0] || "",
             date: new Date(c.commit?.author?.date || c.commit?.committer?.date || new Date()),
             url: c.html_url,
             projectId: project.id
@@ -77,22 +128,52 @@ export async function GET(request: Request) {
           allCommits.push(commitObj);
           
           // Upsert to DB
-          await prisma.commit.upsert({
-            where: { sha: commitObj.sha },
-            update: {
-              projectId: commitObj.projectId,
-              message: commitObj.message,
-            },
-            create: commitObj
-          });
+          try {
+            await prisma.commit.upsert({
+              where: { sha: commitObj.sha },
+              update: { projectId: commitObj.projectId, message: commitObj.message },
+              create: commitObj
+            });
+          } catch (e) {
+            // ignore upsert errors
+          }
         }
       } catch (err) {
         console.error(`Failed to fetch commits for ${repo}`, err);
+        // fallback to db
+        let cached = dbCommits.filter(c => c.projectId === project.id);
+        if (cached.length === 0) {
+          const fallbackCommit = await prisma.commit.findFirst({
+            where: { projectId: project.id },
+            orderBy: { date: "desc" }
+          });
+          if (fallbackCommit) cached = [fallbackCommit];
+        }
+        allCommits.push(...cached.map(c => ({
+          sha: c.sha,
+          message: c.message,
+          date: c.date,
+          url: c.url,
+          repoName: c.repoName,
+          projectId: c.projectId
+        })));
       }
     }
 
+    // If no live commits fetched at all, return db cache
+    if (allCommits.length === 0 && dbCommits.length > 0) {
+      return NextResponse.json(dbCommits.map(c => ({
+        sha: c.sha,
+        message: c.message,
+        date: c.date,
+        url: c.url,
+        repoName: c.repoName,
+        projectId: c.projectId
+      })));
+    }
+
     // Sort by date descending
-    allCommits.sort((a, b) => b.date.getTime() - a.date.getTime());
+    allCommits.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     return NextResponse.json(allCommits);
 

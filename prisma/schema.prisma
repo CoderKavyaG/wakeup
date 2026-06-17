@@ -181,11 +181,14 @@ model User {
   id            String    @id @default(cuid())
   name          String?
   email         String    @unique
-  password      String    // bcrypt hashed (no longer optional)
+  password      String?   // bcrypt hashed (optional for Google OAuth)
   googleId      String?   @unique
   role          String    @default("user") // "user", "admin"
   avatar        String?
   vercelToken   String?   // Vercel API Integration Token
+  githubToken   String?   // Encrypted GitHub Personal Access Token
+  groqApiKey    String?   // Encrypted Groq API Key
+  openrouterApiKey String? // Encrypted OpenRouter API Key
   createdAt     DateTime  @default(now())
 
   // Relations

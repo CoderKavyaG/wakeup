@@ -1,0 +1,26 @@
+{
+  "regions": ["bom1"],
+  "crons": [
+    {
+      "path": "/api/intelligence",
+      "schedule": "0 */6 * * *"
+    }
+  ],
+  "functions": {
+    "src/app/api/cockpit/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/api/github/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/bootstrap/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/api/intelligence/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/projects/generate-context/route.ts": {
+      "maxDuration": 60
+    }
+  }
+}

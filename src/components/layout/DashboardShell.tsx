@@ -14,6 +14,7 @@ import { useBootstrapStore } from "@/store/useBootstrapStore";
 import { useSession, signOut } from "next-auth/react";
 import { useProjectOSStore } from "@/store/useProjectOSStore";
 import { ProjectOS } from "./ProjectOS";
+import { OnboardingKeysModal } from "./OnboardingKeysModal";
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
@@ -24,6 +25,13 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const { isQuickLinksOpen, toggleQuickLinks } = useUrlStore();
   const loaded = useBootstrapStore((s) => s.loaded);
   const isProjectOSOpen = useProjectOSStore((s) => s.isOpen);
+  const ai = useBootstrapStore((s) => s.ai);
+
+  const showKeysModal = loaded && ai && !ai.hasGroqApiKey && !ai.hasOpenrouterApiKey;
+
+  if (mounted && showKeysModal) {
+    return <OnboardingKeysModal />;
+  }
 
   // Calculate user initial
   const userInitial = session?.user?.name

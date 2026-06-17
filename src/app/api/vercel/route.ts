@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
+import { encrypt, decrypt } from "@/lib/encryption";
 
 const VERCEL_API = 'https://api.vercel.com';
 
@@ -23,12 +24,13 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Vercel integration not configured" }, { status: 400 });
   }
 
-  const headers = { Authorization: `Bearer ${user.vercelToken}` };
+  const decryptedToken = decrypt(user.vercelToken);
+  const headers = { Authorization: `Bearer ${decryptedToken}` };
   const { searchParams } = new URL(req.url);
   const type = searchParams.get('type');
 
   try {
-    if (user.vercelToken.startsWith("mock_")) {
+    if (decryptedToken.startsWith("mock_")) {
       if (type === 'deployments') {
         const vercelProjectId = searchParams.get('vercelProjectId') || searchParams.get('projectId');
         let deploymentsList = [
@@ -255,7 +257,7 @@ export async function POST(req: Request) {
 
     await prisma.user.update({
       where: { id: userId },
-      data: { vercelToken: token }
+      data: { vercelToken: encrypt(token) }
     });
 
     return NextResponse.json({ success: true });

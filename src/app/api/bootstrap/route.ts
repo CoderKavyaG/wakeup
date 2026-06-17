@@ -86,7 +86,7 @@ export async function GET() {
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { vercelToken: true }
+      select: { vercelToken: true, groqApiKey: true, openrouterApiKey: true }
     });
 
     if (user?.vercelToken) {
@@ -268,6 +268,10 @@ export async function GET() {
       urls,
       layoutState: finalLayoutState,
       vercel: vercelData,
+      ai: {
+        hasGroqApiKey: !!user?.groqApiKey,
+        hasOpenrouterApiKey: !!user?.openrouterApiKey,
+      },
       derived: {
         staleProjects: staleProjects.map((p) => p.id),
         overdueTasks: overdueTasks.map((t) => t.id),

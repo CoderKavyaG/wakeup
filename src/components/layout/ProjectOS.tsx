@@ -3274,6 +3274,12 @@ export function ProjectOS() {
   const [curatedIds, setCuratedIds] = useState<string[]>([]);
   const [selectedDefaultPhase, setSelectedDefaultPhase] = useState<"launched" | "in_development" | "sketching" | "idea" | undefined>(undefined);
 
+  // Deletion / Trash confirmation states
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deleteConfirmName, setDeleteConfirmName] = useState<string>("");
+  const [isDraggingOverTrash, setIsDraggingOverTrash] = useState(false);
+  const [isHtmlDragOver, setIsHtmlDragOver] = useState(false);
+
   const selectedProject = projects.find(p => p.id === selectedProjectId) || null;
 
   const handleHideProject = (projectId: string, phase: string) => {
@@ -3286,6 +3292,34 @@ export function ProjectOS() {
         localStorage.setItem(key, JSON.stringify(list));
         loadCurationLists();
       } catch { }
+    }
+  };
+
+  const handleDeleteConfirm = async (id: string) => {
+    try {
+      await deleteProject(id);
+      
+      // Clean up curated lists from localStorage
+      ["launched", "in_development", "sketching", "idea"].forEach(phaseId => {
+        const key = `devos_curated_${phaseId}`;
+        const stored = localStorage.getItem(key);
+        if (stored) {
+          try {
+            let list = JSON.parse(stored) as string[];
+            if (list.includes(id)) {
+              list = list.filter(item => item !== id);
+              localStorage.setItem(key, JSON.stringify(list));
+            }
+          } catch {}
+        }
+      });
+      loadCurationLists();
+      
+      if (selectedProjectId === id) {
+        selectProject(null);
+      }
+    } catch (err: any) {
+      alert(`Failed to delete: ${err.message}`);
     }
   };
 
@@ -3683,23 +3717,10 @@ export function ProjectOS() {
                               </span>
                             )}
                             <span
-                              onClick={async (e) => {
+                              onClick={(e) => {
                                 e.stopPropagation();
-                                if (confirm(`Are you sure you want to permanently delete the project "${p.name}"?`)) {
-                                  try {
-                                    await deleteProject(p.id);
-                                    if (selectedProjectId === p.id) {
-                                      const remaining = projects.filter(proj => proj.id !== p.id);
-                                      if (remaining.length > 0) {
-                                        selectProject(remaining[0].id);
-                                      } else {
-                                        selectProject("");
-                                      }
-                                    }
-                                  } catch (err: any) {
-                                    alert(`Failed to delete project: ${err.message}`);
-                                  }
-                                }
+                                setDeleteConfirmId(p.id);
+                                setDeleteConfirmName(p.name);
                               }}
                               className="text-white/35 hover:text-red-400 p-0.5 hover:bg-white/5 rounded transition-all cursor-pointer opacity-0 group-hover/item:opacity-100 shrink-0 ml-1"
                               title="Delete Project"
@@ -3748,23 +3769,10 @@ export function ProjectOS() {
                               </span>
                             )}
                             <span
-                              onClick={async (e) => {
+                              onClick={(e) => {
                                 e.stopPropagation();
-                                if (confirm(`Are you sure you want to permanently delete the project "${p.name}"?`)) {
-                                  try {
-                                    await deleteProject(p.id);
-                                    if (selectedProjectId === p.id) {
-                                      const remaining = projects.filter(proj => proj.id !== p.id);
-                                      if (remaining.length > 0) {
-                                        selectProject(remaining[0].id);
-                                      } else {
-                                        selectProject("");
-                                      }
-                                    }
-                                  } catch (err: any) {
-                                    alert(`Failed to delete project: ${err.message}`);
-                                  }
-                                }
+                                setDeleteConfirmId(p.id);
+                                setDeleteConfirmName(p.name);
                               }}
                               className="text-white/35 hover:text-red-400 p-0.5 hover:bg-white/5 rounded transition-all cursor-pointer opacity-0 group-hover/item:opacity-100 shrink-0 ml-1"
                               title="Delete Project"
@@ -3880,6 +3888,35 @@ export function ProjectOS() {
                   <p className="text-[11px] text-white/45 mt-0.5">Global projects registry board mapped by active build phases</p>
                 </div>
 
+                {/* Sleek unified Drag and Drop Dustbin */}
+                <div
+                  id="dashboard-dustbin"
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setIsHtmlDragOver(true);
+                  }}
+                  onDragLeave={() => setIsHtmlDragOver(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setIsHtmlDragOver(false);
+                    const id = e.dataTransfer.getData("text/plain");
+                    const itemName = e.dataTransfer.getData("itemName");
+                    if (id) {
+                      setDeleteConfirmId(id);
+                      setDeleteConfirmName(itemName || "this project/idea");
+                    }
+                  }}
+                  className={`h-9 px-4 rounded-xl border flex items-center gap-2 text-xs transition-all select-none
+                    ${isDraggingOverTrash || isHtmlDragOver 
+                      ? 'bg-red-500/15 border-red-500/40 text-red-200 scale-105 shadow-[0_0_15px_rgba(239,68,68,0.15)] animate-pulse' 
+                      : 'border-red-500/10 bg-red-950/[0.02] text-red-400/60 hover:bg-red-950/5 hover:border-red-500/20'
+                    }`}
+                >
+                  <Trash2 className={`w-3.5 h-3.5 transition-transform ${isDraggingOverTrash || isHtmlDragOver ? 'scale-110 rotate-6' : ''}`} />
+                  <span className="font-semibold">
+                    {isDraggingOverTrash || isHtmlDragOver ? 'Release to Delete' : 'Dustbin (Drag here)'}
+                  </span>
+                </div>
               </div>
 
               {/* Physics Board Wrapper */}
@@ -3967,9 +4004,15 @@ export function ProjectOS() {
                               {filteredList.map(p => (
                                 <div
                                   key={p.id}
+                                  draggable
+                                  onDragStart={(e) => {
+                                    e.dataTransfer.setData("text/plain", p.id);
+                                    e.dataTransfer.setData("itemType", "project");
+                                    e.dataTransfer.setData("itemName", p.name);
+                                  }}
                                   onDoubleClick={() => selectProject(p.id)}
-                                  className="group relative p-3 bg-white/[0.02] border border-white/[0.05] hover:bg-white/[0.04] hover:border-white/10 rounded-xl cursor-pointer transition-all flex items-start gap-2.5"
-                                  title="Double click to open idea thread"
+                                  className="group relative p-3 bg-white/[0.02] border border-white/[0.05] hover:bg-white/[0.04] hover:border-white/10 rounded-xl cursor-grab active:cursor-grabbing transition-all flex items-start gap-2.5"
+                                  title="Drag to Dustbin to delete or double click to open thread"
                                 >
                                   <span className="w-1.5 h-1.5 rounded-full bg-purple-400 mt-1.5 flex-shrink-0" />
                                   <div className="flex-1 min-w-0">
@@ -3987,9 +4030,8 @@ export function ProjectOS() {
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      if (confirm(`Delete idea "${p.name}"?`)) {
-                                        deleteProject(p.id);
-                                      }
+                                      setDeleteConfirmId(p.id);
+                                      setDeleteConfirmName(p.name);
                                     }}
                                     className="opacity-0 group-hover:opacity-100 p-1 hover:bg-white/10 rounded text-white/40 hover:text-red-400 transition-all cursor-pointer"
                                   >
@@ -4025,6 +4067,12 @@ export function ProjectOS() {
                   curatedIdea={curatedIdea}
                   onMoveProjectPhase={handleMoveProjectPhase}
                   onHideProject={handleHideProject}
+                  onDragOverTrashChange={setIsDraggingOverTrash}
+                  onDropInTrash={(id) => {
+                    const proj = projects.find(p => p.id === id);
+                    setDeleteConfirmId(id);
+                    setDeleteConfirmName(proj?.name || "this project");
+                  }}
                 />
               </div>
 
@@ -4163,6 +4211,44 @@ export function ProjectOS() {
           onClose={() => setEditModalOpen(false)}
           projectToEdit={selectedProject}
         />
+
+        {/* Delete Confirmation Modal */}
+        {deleteConfirmId && (
+          <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm select-none">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="w-full max-w-sm bg-[#121217] border border-red-500/20 rounded-xl overflow-hidden shadow-2xl p-5 space-y-4"
+            >
+              <div className="flex items-center gap-3 text-red-400">
+                <AlertCircle className="w-5 h-5 shrink-0" />
+                <h3 className="text-sm font-semibold text-white">Delete Confirmation</h3>
+              </div>
+              
+              <p className="text-xs text-white/60 leading-relaxed">
+                Are you sure you want to permanently delete <strong className="text-white font-semibold font-mono">"{deleteConfirmName}"</strong>? This will remove all its ideas, tasks, and connection metadata.
+              </p>
+              
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  onClick={() => {
+                    setDeleteConfirmId(null);
+                    setDeleteConfirmName("");
+                  }}
+                  className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-white/[0.05] border border-white/10 text-white/70 hover:bg-white/[0.08] hover:text-white transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleDeleteConfirm(deleteConfirmId)}
+                  className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-red-500 text-white hover:bg-red-600 transition-all cursor-pointer shadow-[0_0_15px_rgba(239,68,68,0.2)]"
+                >
+                  Delete
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
 
         {/* Command Palette */}
         <ProjectOSCommandPalette

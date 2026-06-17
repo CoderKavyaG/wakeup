@@ -66,7 +66,8 @@ export async function POST(req: NextRequest) {
     }
 
     // STEP 2: AI classification
-    const classification = await classifyCapture(text);
+    const classification = await classifyCapture(text, userId);
+
 
     // STEP 3: Save based on type
     let savedAs = "";
@@ -125,12 +126,39 @@ export async function POST(req: NextRequest) {
   }
 }
 
-async function classifyCapture(text: string) {
+async function classifyCapture(text: string, userId?: string) {
   try {
+    // Try user's own encrypted Groq key first, then fall back to server-side key
+    let groqKey = process.env.GROQ_API_KEY || "";
+    if (userId) {
+      try {
+        const { decrypt } = await import("@/lib/encryption");
+        const { prisma } = await import("@/lib/prisma");
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { groqApiKey: true }
+        });
+        if (user?.groqApiKey) {
+          groqKey = decrypt(user.groqApiKey);
+        }
+      } catch (e) {}
+    }
+
+    if (!groqKey) {
+      // No key at all — fall back to simple keyword classification
+      const lower = text.toLowerCase();
+      const isTask = /^(fix|build|add|create|update|refactor|deploy|write|check|review|test|push|send|call|email|make|finish|complete)\b/.test(lower);
+      const isIdea = /\b(idea|concept|what if|could we|should we|maybe|consider)\b/.test(lower);
+      return {
+        type: isTask ? "task" : isIdea ? "idea" : "note",
+        cleanContent: text
+      };
+    }
+
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+        Authorization: `Bearer ${groqKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -164,6 +192,7 @@ Rules: task = actionable ("fix X", "build Y", "add Z"), idea = new feature/conce
     return { type: "note", cleanContent: text };
   }
 }
+
 
 async function sendTelegramMessage(chatId: number, text: string) {
   try {

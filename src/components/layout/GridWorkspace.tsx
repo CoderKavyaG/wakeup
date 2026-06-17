@@ -9,7 +9,7 @@ import { ProjectsWidget } from "../widgets/ProjectsWidget";
 import { GithubWidget } from "../widgets/GithubWidget";
 import { FocusPanelWidget } from "../widgets/FocusPanelWidget";
 import { MachineControlWidget } from "../widgets/MachineControlWidget";
-import { TerminalWidget } from "../widgets/TerminalWidget";
+// import { TerminalWidget } from "../widgets/TerminalWidget";
 import { WidgetShell } from "./WidgetShell";
 import { FolderOpen, GitBranch, Crosshair, Terminal } from "lucide-react";
 
@@ -51,7 +51,7 @@ export function GridWorkspace() {
       case "machine":
         return <MachineControlWidget />;
       case "terminal":
-        return <TerminalWidget initialCwd={widget.metadata?.initialCwd} />;
+        return <p className="text-muted-foreground text-sm p-4 font-mono">Terminal widget is temporarily disabled.</p>;
       default:
         return <p className="text-muted-foreground text-sm">Unknown widget: {widget.type}</p>;
     }

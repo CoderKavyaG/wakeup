@@ -1,16 +1,8 @@
 import { streamText, createTextStreamResponse } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { auth } from "@/auth";
-
-const openrouter = createOpenAI({
-  baseURL: "https://openrouter.ai/api/v1",
-  apiKey: process.env.OPENROUTER_API_KEY,
-});
-
-const groq = createOpenAI({
-  baseURL: "https://api.groq.com/openai/v1",
-  apiKey: process.env.GROQ_API_KEY,
-});
+import { prisma } from "@/lib/prisma";
+import { decrypt } from "@/lib/encryption";
 
 export const dynamic = "force-dynamic";
 
@@ -26,16 +18,32 @@ export async function POST(req: Request) {
       return Response.json({ error: "platform and commitSummary are required" }, { status: 400 });
     }
 
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { groqApiKey: true, openrouterApiKey: true }
+    });
+
+    const decryptedGroq = user?.groqApiKey ? decrypt(user.groqApiKey) : "";
+    const decryptedOpenrouter = user?.openrouterApiKey ? decrypt(user.openrouterApiKey) : "";
+
     let modelInstance = null;
-    if (process.env.GROQ_API_KEY) {
-      modelInstance = groq("llama-3.3-70b-versatile");
-    } else if (process.env.OPENROUTER_API_KEY) {
-      modelInstance = openrouter("google/gemma-4-26b-a4b-it:free");
+    if (decryptedGroq) {
+      const groqClient = createOpenAI({
+        baseURL: "https://api.groq.com/openai/v1",
+        apiKey: decryptedGroq,
+      });
+      modelInstance = groqClient("llama-3.3-70b-versatile");
+    } else if (decryptedOpenrouter) {
+      const openrouterClient = createOpenAI({
+        baseURL: "https://openrouter.ai/api/v1",
+        apiKey: decryptedOpenrouter,
+      });
+      modelInstance = openrouterClient("google/gemma-4-26b-a4b-it:free");
     }
 
     if (!modelInstance) {
       return Response.json(
-        { error: "Please configure your GROQ_API_KEY or OPENROUTER_API_KEY." },
+        { error: "Please configure your Groq or OpenRouter API keys in Settings." },
         { status: 500 }
       );
     }

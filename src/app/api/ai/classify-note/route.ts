@@ -3,11 +3,7 @@ import { generateText } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
-
-const openrouter = createOpenAI({
-  baseURL: "https://openrouter.ai/api/v1",
-  apiKey: process.env.OPENROUTER_API_KEY || "",
-});
+import { decrypt } from "@/lib/encryption";
 
 export async function POST(request: Request) {
   try {
@@ -32,8 +28,35 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Content is required" }, { status: 400 });
     }
 
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { groqApiKey: true, openrouterApiKey: true }
+    });
+
+    const decryptedGroq = user?.groqApiKey ? decrypt(user.groqApiKey) : "";
+    const decryptedOpenrouter = user?.openrouterApiKey ? decrypt(user.openrouterApiKey) : "";
+
+    let modelInstance = null;
+    if (decryptedGroq) {
+      const groqClient = createOpenAI({
+        baseURL: "https://api.groq.com/openai/v1",
+        apiKey: decryptedGroq,
+      });
+      modelInstance = groqClient("llama-3.3-70b-versatile");
+    } else if (decryptedOpenrouter) {
+      const openrouterClient = createOpenAI({
+        baseURL: "https://openrouter.ai/api/v1",
+        apiKey: decryptedOpenrouter,
+      });
+      modelInstance = openrouterClient("openai/gpt-4o-mini");
+    }
+
+    if (!modelInstance) {
+      return NextResponse.json({ error: "Please configure your Groq or OpenRouter API keys in Settings." }, { status: 500 });
+    }
+
     const { text: result } = await generateText({
-      model: openrouter("openai/gpt-4o-mini"),
+      model: modelInstance,
       prompt: `Classify this developer note for the project '${projectName || 'General'}': '${content}'. Reply with ONLY one word: feedback, bug, idea, or note`,
     });
 

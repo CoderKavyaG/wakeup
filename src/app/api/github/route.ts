@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
+import { decrypt } from "@/lib/encryption";
 
 const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes cache TTL
 
@@ -15,8 +16,29 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const username = searchParams.get("username") || "coderkavyag";
     
-    // Attempt to read token from header or env
-    let token = request.headers.get("Authorization")?.replace("Bearer ", "").replace("token ", "") || process.env.GITHUB_TOKEN;
+    // 0. Try to read GitHub token from the database (encrypted) for this user
+    //    Fall back to the request Authorization header (used only during initial token-save flow)
+    //    and finally to the GITHUB_TOKEN env var.
+    let token: string | null | undefined = process.env.GITHUB_TOKEN;
+
+    // Check Authorization header override first (used when saving a new token)
+    const headerToken = request.headers.get("Authorization")?.replace("Bearer ", "").replace("token ", "");
+    if (headerToken) {
+      token = headerToken;
+    } else {
+      // Read encrypted token from the database
+      try {
+        const userRecord = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { githubToken: true }
+        });
+        if (userRecord?.githubToken) {
+          token = decrypt(userRecord.githubToken);
+        }
+      } catch (e) {
+        console.error("Failed to read github token from db:", e);
+      }
+    }
     
     // 1. Check cache first
     const cacheId = `github-cache-${username}-${userId}`;

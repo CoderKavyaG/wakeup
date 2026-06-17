@@ -38,6 +38,7 @@ import {
   Eye, FolderOpen, GitCommit, Settings, Copy
 } from "lucide-react";
 import { timeAgo } from "@/lib/utils";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 const normalizeGithubUrl = (url: string | null | undefined): string => {
   if (!url) return "";
@@ -92,24 +93,53 @@ export function ProjectsWidget() {
   const [githubTokenInput, setGithubTokenInput] = useState("");
   const [vercelTokenInput, setVercelTokenInput] = useState("");
   const [savingSettings, setSavingSettings] = useState(false);
+  const [hasGithubToken, setHasGithubToken] = useState(false);
 
-  const openSettingsDialog = () => {
+  const openSettingsDialog = async () => {
     setGithubUsernameInput(localStorage.getItem("GITHUB_USERNAME") || "coderkavyag");
-    setGithubTokenInput(localStorage.getItem("GITHUB_TOKEN") || "");
+    
+    try {
+      const res = await fetch("/api/auth/token");
+      if (res.ok) {
+        const data = await res.json();
+        setHasGithubToken(data.hasGithubToken);
+        setGithubTokenInput(data.hasGithubToken ? "configured" : "");
+      } else {
+        setGithubTokenInput("");
+      }
+    } catch {
+      setGithubTokenInput("");
+    }
+    
     setVercelTokenInput(vercel?.hasToken ? "configured" : "");
     setIsSettingsOpen(true);
   };
 
   const handleSaveSettings = async () => {
     setSavingSettings(true);
+    const isNewGithubToken = githubTokenInput.trim() && githubTokenInput.trim() !== "configured";
     try {
       localStorage.setItem("GITHUB_USERNAME", githubUsernameInput.trim());
-      if (githubTokenInput.trim()) {
-        localStorage.setItem("GITHUB_TOKEN", githubTokenInput.trim());
-      } else {
-        localStorage.removeItem("GITHUB_TOKEN");
+      
+      // Save/encrypt or delete GitHub token via secure API
+      if (isNewGithubToken) {
+        const tokenRes = await fetch("/api/auth/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ githubToken: githubTokenInput.trim() })
+        });
+        if (!tokenRes.ok) throw new Error("Failed to save GitHub token");
+        setHasGithubToken(true);
+      } else if (!githubTokenInput.trim() && hasGithubToken) {
+        const tokenRes = await fetch("/api/auth/token?type=github", {
+          method: "DELETE"
+        });
+        if (!tokenRes.ok) throw new Error("Failed to delete GitHub token");
+        setHasGithubToken(false);
+        setGithubRepos([]);
       }
 
+      // Save/encrypt or delete Vercel token via Bootstrap Store actions
       if (vercelTokenInput.trim() && vercelTokenInput.trim() !== "configured") {
         await setVercelToken(vercelTokenInput.trim());
       } else if (!vercelTokenInput.trim() && vercel?.hasToken) {
@@ -120,10 +150,66 @@ export function ProjectsWidget() {
       await bootstrap(true);
       
       setIsSettingsOpen(false);
+
+      // After saving a new GitHub token, fetch repos and auto-sync all
+      if (isNewGithubToken) {
+        const username = githubUsernameInput.trim();
+        const token = githubTokenInput.trim();
+        const headers: HeadersInit = { Authorization: `Bearer ${token}` };
+        try {
+          const res = await fetch(`/api/github?username=${encodeURIComponent(username)}`, { headers });
+          if (res.ok) {
+            const data = await res.json();
+            const repos = data.repos || [];
+            setGithubRepos(repos);
+            // Pass current projects snapshot so dedup works
+            const currentProjects = useProjectStore.getState().projects;
+            autoSyncAllRepos(repos, currentProjects);
+          }
+        } catch (e) {
+          console.error("Failed to fetch repos after token save", e);
+        }
+      }
     } catch (err: any) {
       alert(`Failed to save integration settings: ${err.message}`);
     } finally {
       setSavingSettings(false);
+    }
+  };
+
+  // Auto-sync all unsynced GitHub repos silently, one by one
+  const autoSyncAllRepos = async (repos: any[], existingProjects: typeof projects) => {
+    const toSync = repos.filter(repo => {
+      const normalizedUrl = normalizeGithubUrl(repo.html_url);
+      return !existingProjects.some(p => p.githubUrl && normalizeGithubUrl(p.githubUrl) === normalizedUrl);
+    });
+    if (toSync.length === 0) return;
+
+    setAutoSyncing(true);
+    try {
+      // Fire all imports concurrently but cap at 5 at a time to avoid flooding
+      const BATCH = 5;
+      for (let i = 0; i < toSync.length; i += BATCH) {
+        const batch = toSync.slice(i, i + BATCH);
+        await Promise.allSettled(
+          batch.map(repo =>
+            addProject({
+              name: repo.name,
+              description: repo.description || "",
+              status: "active",
+              githubUrl: repo.html_url,
+              tags: [repo.language].filter(Boolean),
+              phase: "idea"
+            })
+          )
+        );
+      }
+      setAutoSyncDone(true);
+      setTimeout(() => setAutoSyncDone(false), 3000);
+    } catch (err) {
+      console.error("Auto-sync error:", err);
+    } finally {
+      setAutoSyncing(false);
     }
   };
 
@@ -212,6 +298,9 @@ export function ProjectsWidget() {
   const [activeListTab, setActiveListTab] = useState<"github" | "local">("github");
   const [hasSynced, setHasSynced] = useState(false);
 
+  // Delete confirmation state (AlertDialog instead of confirm())
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
   const handlePickFolder = async (action: "import" | "link") => {
     setIsPickingFolder(true);
     try {
@@ -267,6 +356,9 @@ export function ProjectsWidget() {
   const [githubStats, setGithubStats] = useState<Record<string, { lastCommit: string, issues: number, stars: number, lastCommitMsg: string | null }>>({});
   const [staleWarningCount, setStaleWarningCount] = useState(0);
   const [showStaleOnly, setShowStaleOnly] = useState(false);
+  const [githubRepos, setGithubRepos] = useState<any[]>([]);
+  const [autoSyncing, setAutoSyncing] = useState(false);
+  const [autoSyncDone, setAutoSyncDone] = useState(false);
 
   const [localHealthStats, setLocalHealthStats] = useState<Record<string, number>>({});
 
@@ -554,9 +646,6 @@ export function ProjectsWidget() {
     }
   }, [selectedProject?.id]);
 
-  // Auto-Sync GitHub Repos on Mount disabled to prevent auto-seeding
-
-
   useEffect(() => {
     const handleFilterStale = () => {
       setShowStaleOnly(true);
@@ -613,18 +702,14 @@ export function ProjectsWidget() {
     fetchLocalStats();
   }, [projects, tasks]);
 
-  // Fetch GitHub stats on mount
+  // Fetch GitHub stats + auto-sync all repos on mount (if token exists)
   useEffect(() => {
     const fetchStats = async () => {
       try {
         const savedUsername = localStorage.getItem("GITHUB_USERNAME") || "coderkavyag";
-        const savedToken = localStorage.getItem("GITHUB_TOKEN");
-        const headers: HeadersInit = {};
-        if (savedToken) {
-          headers["Authorization"] = `Bearer ${savedToken}`;
-        }
-        
-        const res = await fetch(`/api/github?username=${encodeURIComponent(savedUsername)}`, { headers });
+        // Use server-side token via /api/auth/token (not localStorage)
+        // We just call the github API route which reads the encrypted token server-side
+        const res = await fetch(`/api/github?username=${encodeURIComponent(savedUsername)}`);
         if (res.ok) {
           const data = await res.json();
           const stats: Record<string, any> = {};
@@ -640,12 +725,9 @@ export function ProjectsWidget() {
                 lastCommitMsg: repo.last_commit_message || null
               };
 
-              // Check staleness (older than 90 days)
               const updated = new Date(repo.updated_at);
               const daysAgo = (Date.now() - updated.getTime()) / (1000 * 3600 * 24);
-              if (daysAgo > 90) {
-                staleCount++;
-              }
+              if (daysAgo > 90) staleCount++;
             });
           }
 
@@ -657,6 +739,8 @@ export function ProjectsWidget() {
             }
           });
 
+          const repos = data.repos || [];
+          setGithubRepos(repos);
           setGithubStats(stats);
           setStaleWarningCount(staleCount);
           
@@ -680,28 +764,60 @@ export function ProjectsWidget() {
               }
             }
           });
+
+          // ── AUTO-SYNC: Import any repos not yet in the workspace ──
+          // Only auto-sync if user has a token and we got real repos back
+          if (repos.length > 0 && hasGithubToken) {
+            const currentProjects = useProjectStore.getState().projects;
+            autoSyncAllRepos(repos, currentProjects);
+          }
         }
       } catch (err) {
         console.error("Failed to fetch github stats", err);
       }
     };
-    fetchStats();
+    // Only fetch when we know the token status is resolved
+    if (loaded) fetchStats();
+  }, [loaded, hasGithubToken]);
+
+  // Load token config and usernames on mount
+  useEffect(() => {
+    const loadConfig = async () => {
+      setGithubUsernameInput(localStorage.getItem("GITHUB_USERNAME") || "coderkavyag");
+      try {
+        const res = await fetch("/api/auth/token");
+        if (res.ok) {
+          const data = await res.json();
+          setHasGithubToken(data.hasGithubToken);
+          setGithubTokenInput(data.hasGithubToken ? "configured" : "");
+        }
+      } catch (err) {
+        console.error("Failed to load token config on mount", err);
+      }
+    };
+    loadConfig();
   }, []);
+
+  // Sync Vercel / GitHub configured states when store properties change
+  useEffect(() => {
+    setVercelTokenInput(vercel?.hasToken ? "configured" : "");
+  }, [vercel?.hasToken]);
+
+  useEffect(() => {
+    setGithubTokenInput(hasGithubToken ? "configured" : "");
+  }, [hasGithubToken]);
 
   // Auto-prompt Integrations settings just once if missing
   useEffect(() => {
     if (!loaded) return;
-    const hasGithub = localStorage.getItem("GITHUB_USERNAME") && localStorage.getItem("GITHUB_TOKEN");
-    const hasVercel = vercel?.hasToken;
-    
-    if (!hasGithub || !hasVercel) {
+    if (!hasGithubToken && !vercel?.hasToken) {
       const prompted = localStorage.getItem("devos_integrations_prompted");
       if (!prompted) {
         localStorage.setItem("devos_integrations_prompted", "true");
         openSettingsDialog();
       }
     }
-  }, [loaded, vercel?.hasToken]);
+  }, [loaded, hasGithubToken, vercel?.hasToken]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -762,6 +878,11 @@ export function ProjectsWidget() {
     return 0; // Default local to 0
   };
 
+  const unsyncedRepos = githubRepos.filter(repo => {
+    const normalizedUrl = normalizeGithubUrl(repo.html_url);
+    return !projects.some(p => p.githubUrl && normalizeGithubUrl(p.githubUrl) === normalizedUrl);
+  });
+
   return (
     <div id="projects-widget" className="flex h-full w-full overflow-hidden text-foreground bg-[#0f0f11] rounded-xl">
       {/* ── COLLAPSED VIEW (Always visible) ── */}
@@ -818,8 +939,96 @@ export function ProjectsWidget() {
           >
              {activeListTab === "github" && (
               <>
-              {projects.filter(p => p.githubUrl).length === 0 && (
-                <div className="text-center py-6 text-xs text-muted-foreground">No GitHub repositories synced yet.</div>
+              {!hasGithubToken ? (
+                <div className="p-3.5 bg-white/[0.02] border border-white/10 rounded-xl space-y-3 shadow-xl relative overflow-hidden my-2 mx-1 select-none">
+                  <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-amber-500/30 to-transparent" />
+                  <div className="space-y-1">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-amber-400 font-mono flex items-center gap-1.5">
+                      <GitBranch className="w-3.5 h-3.5" />
+                      GitHub Integration
+                    </h4>
+                    <p className="text-[10px] text-white/50 leading-relaxed font-sans">
+                      Connect your GitHub account to sync repositories, track open issues, and automate commits.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="space-y-1">
+                      <label className="text-[9px] uppercase font-bold tracking-wider text-white/60 font-mono">GitHub Username</label>
+                      <Input
+                        value={githubUsernameInput}
+                        onChange={e => setGithubUsernameInput(e.target.value)}
+                        className="h-8 bg-black/40 border-white/10 text-xs focus-visible:ring-amber-500/30 text-white placeholder-white/20"
+                        placeholder="e.g. coderkavyag"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[9px] uppercase font-bold tracking-wider text-white/60 font-mono flex items-center gap-1">
+                          Personal Access Token
+                        </label>
+                        <a
+                          href="https://github.com/settings/tokens/new?scopes=repo,read:org&description=DevOS%20Token"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-amber-400 hover:text-amber-300 transition-colors text-[9px] uppercase font-mono tracking-wider font-bold hover:underline"
+                        >
+                          Generate
+                        </a>
+                      </div>
+                      <div className="relative flex items-center">
+                        <Input
+                          type="password"
+                          value={githubTokenInput}
+                          onChange={e => setGithubTokenInput(e.target.value)}
+                          className="h-8 bg-black/40 border-white/10 text-xs focus-visible:ring-amber-500/30 text-white placeholder-white/20 w-full pr-7"
+                          placeholder={hasGithubToken ? "configured" : "ghp_..."}
+                        />
+                        <div className="absolute right-2 flex items-center">
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <HelpCircle className="w-3.5 h-3.5 text-white/30 hover:text-white cursor-help transition-colors" />
+                            </TooltipTrigger>
+                            <TooltipContent className="bg-[#0f0f11] border border-white/10 text-xs text-white max-w-xs p-2.5 rounded-lg shadow-xl leading-normal font-sans" side="top" align="end">
+                              Make sure you select <b>repo</b> scopes so DevOS can read your commits and project info.
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <Button
+                    onClick={handleSaveSettings}
+                    disabled={savingSettings}
+                    className="w-full h-8 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold uppercase tracking-wider transition-all shadow-md active:scale-[0.99] cursor-pointer"
+                  >
+                    {savingSettings ? "Connecting..." : "Connect GitHub"}
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  {projects.filter(p => p.githubUrl).length === 0 && (
+                    <div className="text-center py-4 text-xs text-muted-foreground">
+                      No GitHub repositories synced to your workspace yet.
+                    </div>
+                  )}
+
+                  {/* Auto-sync status indicator */}
+                  {autoSyncing && (
+                    <div className="mt-3 flex items-center gap-2 px-2 py-2 bg-amber-500/5 border border-amber-500/15 rounded-lg">
+                      <span className="w-3 h-3 rounded-full border-2 border-amber-400 border-t-transparent animate-spin shrink-0" />
+                      <span className="text-[10px] text-amber-400/80 font-mono">Auto-syncing your GitHub repos...</span>
+                    </div>
+                  )}
+                  {autoSyncDone && !autoSyncing && (
+                    <div className="mt-3 flex items-center gap-2 px-2 py-2 bg-green-500/5 border border-green-500/15 rounded-lg">
+                      <CheckCircle2 className="w-3 h-3 text-green-400 shrink-0" />
+                      <span className="text-[10px] text-green-400/80 font-mono">All repos synced to workspace!</span>
+                    </div>
+                  )}
+                </>
               )}
               {projects.filter(p => p.githubUrl).sort((a, b) => {
                 const aCommit = githubStats[normalizeGithubUrl(a.githubUrl)]?.lastCommit;
@@ -929,14 +1138,9 @@ export function ProjectsWidget() {
                         variant="ghost" 
                         size="icon" 
                         className="w-6 h-6 shrink-0 hover:bg-red-500/10 text-white/50 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={async (e) => {
+                        onClick={(e) => {
                           e.stopPropagation();
-                          if (confirm(`Are you sure you want to delete project "${project.name}"?`)) {
-                            await deleteProject(project.id);
-                            if (selectedProject?.id === project.id) {
-                              setSelectedProject(null);
-                            }
-                          }
+                          setConfirmDeleteId(project.id);
                         }}
                         title="Delete Project"
                       >
@@ -962,6 +1166,64 @@ export function ProjectsWidget() {
                   <span className="text-xs font-medium">{isPickingFolder ? "Opening..." : "Import Local Project"}</span>
                 </Button>
               </div>
+              
+              {!vercel?.hasToken && (
+                <div className="p-3.5 bg-white/[0.02] border border-white/10 rounded-xl space-y-3 shadow-xl relative overflow-hidden my-2 mx-2 select-none">
+                  <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-blue-500/30 to-transparent" />
+                  <div className="space-y-1">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-blue-400 font-mono flex items-center gap-1.5">
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      Vercel Integration
+                    </h4>
+                    <p className="text-[10px] text-white/50 leading-relaxed font-sans">
+                      Connect your Vercel account to view deployments, track web analytics, and run health diagnostics.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[9px] uppercase font-bold tracking-wider text-white/60 font-mono">Vercel API Token</label>
+                        <a
+                          href="https://vercel.com/account/tokens"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-400 hover:text-blue-300 transition-colors text-[9px] uppercase font-mono tracking-wider font-bold hover:underline"
+                        >
+                          Generate
+                        </a>
+                      </div>
+                      <div className="relative flex items-center">
+                        <Input
+                          type="password"
+                          value={vercelTokenInput}
+                          onChange={e => setVercelTokenInput(e.target.value)}
+                          className="h-8 bg-black/40 border-white/10 text-xs focus-visible:ring-blue-500/30 text-white placeholder-white/20 w-full pr-7"
+                          placeholder={vercel?.hasToken ? "configured" : "ve_..."}
+                        />
+                        <div className="absolute right-2 flex items-center">
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <HelpCircle className="w-3.5 h-3.5 text-white/30 hover:text-white cursor-help transition-colors" />
+                            </TooltipTrigger>
+                            <TooltipContent className="bg-[#0f0f11] border border-white/10 text-xs text-white max-w-xs p-2.5 rounded-lg shadow-xl leading-normal font-sans" side="top" align="end">
+                              Generate a Vercel API token with access to all projects and appropriate scopes.
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <Button
+                    onClick={handleSaveSettings}
+                    disabled={savingSettings}
+                    className="w-full h-8 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold uppercase tracking-wider transition-all shadow-md active:scale-[0.99] cursor-pointer"
+                  >
+                    {savingSettings ? "Connecting..." : "Connect Vercel"}
+                  </Button>
+                </div>
+              )}
               {projects.filter(p => (p.folderPath || !p.githubUrl) && p.status !== "archived").filter(p => {
                 const daysAgo = (Date.now() - new Date(p.updatedAt).getTime()) / (1000 * 3600 * 24);
                 const isStale = daysAgo > 90;
@@ -1049,14 +1311,9 @@ export function ProjectsWidget() {
                         variant="ghost" 
                         size="icon" 
                         className="w-6 h-6 shrink-0 hover:bg-red-500/10 text-white/50 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={async (e) => {
+                        onClick={(e) => {
                           e.stopPropagation();
-                          if (confirm(`Are you sure you want to delete project "${project.name}"?`)) {
-                            await deleteProject(project.id);
-                            if (selectedProject?.id === project.id) {
-                              setSelectedProject(null);
-                            }
-                          }
+                          setConfirmDeleteId(project.id);
                         }}
                         title="Delete Project"
                       >
@@ -1074,432 +1331,316 @@ export function ProjectsWidget() {
 
       {selectedProject && currentProject && (
         <div className="w-2/3 flex flex-col h-full overflow-hidden pl-3">
-          <div className="flex items-center justify-between mb-3 shrink-0 bg-[#0f0f11] p-3 rounded-xl border border-white/10">
-            <div className="flex-1 min-w-0 pr-4 space-y-1">
-              <div className="flex items-center gap-3 flex-wrap">
-                <div className={`w-2.5 h-2.5 rounded-full shadow-sm ${
+          {/* ── Drawer Header ── */}
+          <div className="shrink-0 mb-3 bg-white/[0.02] border border-white/8 rounded-xl p-3 space-y-2">
+            {/* Row 1: Name + Status Dot + Actions */}
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <div className={`w-2 h-2 rounded-full mt-0.5 shrink-0 shadow-sm ${
                   currentProject.status === "active" ? "bg-green-400 shadow-green-400/50" :
                   currentProject.status === "planning" ? "bg-blue-400 shadow-blue-400/50" :
-                  currentProject.status === "completed" ? "bg-white/30 shadow-white/10" :
-                  currentProject.status === "stale" ? "bg-amber-400 shadow-amber-400/50" : "bg-zinc-400 shadow-zinc-500/50"
+                  currentProject.status === "completed" ? "bg-white/30" :
+                  currentProject.status === "stale" ? "bg-amber-400 shadow-amber-400/50" : "bg-zinc-500"
                 }`} />
-                <h3 className="text-base font-bold text-foreground truncate">{currentProject.name}</h3>
-                
+                <h3 className="text-sm font-bold text-white truncate">{currentProject.name}</h3>
                 {(() => {
                   const curatedPhase = getCuratedPhase(currentProject.id);
                   if (!curatedPhase) return null;
                   const phaseInfo = PHASE_MAP[curatedPhase as keyof typeof PHASE_MAP];
                   if (!phaseInfo) return null;
-                  return (
-                    <Badge variant="outline" className={`text-[9px] font-bold uppercase tracking-wider ${phaseInfo.color}`}>
-                      {phaseInfo.label}
-                    </Badge>
-                  );
+                  return <Badge variant="outline" className={`text-[8px] font-bold uppercase tracking-wider shrink-0 ${phaseInfo.color}`}>{phaseInfo.label}</Badge>;
                 })()}
               </div>
 
-              <p className="text-xs text-white/50 leading-relaxed truncate max-w-[400px]">
-                {currentProject.description || "No description provided."}
-              </p>
+              {/* Action icons */}
+              <div className="flex items-center gap-0.5 shrink-0">
+                {currentProject.githubUrl && (
+                  <a href={currentProject.githubUrl} target="_blank" rel="noopener noreferrer"
+                    className="w-7 h-7 flex items-center justify-center rounded-md text-white/40 hover:text-purple-400 hover:bg-purple-500/10 transition-colors"
+                    title="Open GitHub Repo">
+                    <GitBranch className="w-3.5 h-3.5" />
+                  </a>
+                )}
+                {currentProject.liveUrl && (
+                  <a href={currentProject.liveUrl} target="_blank" rel="noopener noreferrer"
+                    className="w-7 h-7 flex items-center justify-center rounded-md text-white/40 hover:text-green-400 hover:bg-green-500/10 transition-colors"
+                    title="Open Live Site">
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                )}
 
-              {currentProject.tags && currentProject.tags.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  {currentProject.tags.map((tag: string) => (
-                    <Badge key={tag} variant="secondary" className="text-[8px] py-0 px-1.5 uppercase bg-primary/10 text-primary border-primary/20">
-                      {tag}
-                    </Badge>
-                  ))}
-                </div>
-              )}
-            </div>
-            
-            <div className="flex items-center gap-1 shrink-0 self-start">
-              <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-                <DialogTrigger className="w-7 h-7 text-muted-foreground hover:text-foreground transition-colors inline-flex items-center justify-center rounded-md" onClick={() => {
-                  setFormData({
-                    name: selectedProject.name,
-                    description: selectedProject.description,
-                    folderPath: selectedProject.folderPath || "",
-                    status: selectedProject.status || "green"
-                  });
-                }}>
-                  <Pencil className="w-3.5 h-3.5" />
-                </DialogTrigger>
-                <DialogContent className="bg-[#0f0f11] border-white/10 text-foreground">
-                  <DialogHeader>
-                    <DialogTitle>Edit Project</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4 py-4">
-                    <div className="space-y-2">
-                      <label className="text-xs font-semibold text-muted-foreground">Title</label>
-                      <Input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="bg-transparent border-white/10" placeholder="Project name" />
-                    </div>
-                    {!selectedProject.githubUrl && (
+                <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+                  <DialogTrigger
+                    className="w-7 h-7 flex items-center justify-center rounded-md text-white/40 hover:text-white hover:bg-white/8 transition-colors"
+                    title="Edit Project"
+                    onClick={() => setFormData({
+                      name: selectedProject.name,
+                      description: selectedProject.description,
+                      folderPath: selectedProject.folderPath || "",
+                      status: selectedProject.status || "green"
+                    })}
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </DialogTrigger>
+                  <DialogContent className="bg-[#0f0f11] border-white/10 text-foreground">
+                    <DialogHeader><DialogTitle>Edit Project</DialogTitle></DialogHeader>
+                    <div className="space-y-4 py-4">
                       <div className="space-y-2">
-                        <label className="text-xs font-semibold text-muted-foreground">Color Indicator</label>
-                        <div className="flex gap-3">
-                          {['green', 'yellow', 'red'].map(color => (
-                            <button
-                              key={color}
-                              onClick={() => setFormData({...formData, status: color})}
-                              className={`w-5 h-5 rounded-full ${color === 'green' ? 'bg-green-500' : color === 'yellow' ? 'bg-yellow-500' : 'bg-red-500'} ${formData.status === color ? 'ring-2 ring-white ring-offset-2 ring-offset-[#0f0f11]' : 'opacity-50 hover:opacity-100'}`}
-                            />
-                          ))}
-                        </div>
+                        <label className="text-xs font-semibold text-muted-foreground">Title</label>
+                        <Input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="bg-transparent border-white/10" placeholder="Project name" />
                       </div>
-                    )}
-                    <div className="space-y-2">
-                      <label className="text-xs font-semibold text-muted-foreground">Description</label>
-                      <Input value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="bg-transparent border-white/10" placeholder="Brief description" />
+                      {!selectedProject.githubUrl && (
+                        <div className="space-y-2">
+                          <label className="text-xs font-semibold text-muted-foreground">Color Indicator</label>
+                          <div className="flex gap-3">
+                            {['green', 'yellow', 'red'].map(color => (
+                              <button key={color} onClick={() => setFormData({...formData, status: color})}
+                                className={`w-5 h-5 rounded-full ${color === 'green' ? 'bg-green-500' : color === 'yellow' ? 'bg-yellow-500' : 'bg-red-500'} ${formData.status === color ? 'ring-2 ring-white ring-offset-2 ring-offset-[#0f0f11]' : 'opacity-50 hover:opacity-100'}`} />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      <div className="space-y-2">
+                        <label className="text-xs font-semibold text-muted-foreground">Description</label>
+                        <Input value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="bg-transparent border-white/10" placeholder="Brief description" />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-semibold text-muted-foreground">Folder Path</label>
+                        <Input value={formData.folderPath} onChange={e => setFormData({...formData, folderPath: e.target.value})} className="bg-transparent border-white/10" placeholder="C:\Projects\..." />
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-semibold text-muted-foreground">Folder Path</label>
-                      <Input value={formData.folderPath} onChange={e => setFormData({...formData, folderPath: e.target.value})} className="bg-transparent border-white/10" placeholder="C:\Projects\..." />
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button variant="outline" onClick={() => setIsEditDialogOpen(false)} className="border-white/10 bg-transparent">Cancel</Button>
-                    <Button onClick={() => {
-                      if (formData.name.trim()) {
-                        updateProject(selectedProject.id, {
-                          name: formData.name.trim(),
-                          description: formData.description.trim(),
-                          folderPath: formData.folderPath.trim() || undefined,
-                          status: formData.status as any,
-                        });
-                        setSelectedProject({ 
-                          ...selectedProject, 
-                          name: formData.name.trim(),
-                          description: formData.description.trim(),
-                          folderPath: formData.folderPath.trim() || undefined,
-                          status: formData.status as any,
-                        });
-                        setIsEditDialogOpen(false);
-                      }
-                    }}>Save Changes</Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setIsEditDialogOpen(false)} className="border-white/10 bg-transparent">Cancel</Button>
+                      <Button onClick={() => {
+                        if (formData.name.trim()) {
+                          updateProject(selectedProject.id, { name: formData.name.trim(), description: formData.description.trim(), folderPath: formData.folderPath.trim() || undefined, status: formData.status as any });
+                          setSelectedProject({ ...selectedProject, name: formData.name.trim(), description: formData.description.trim(), folderPath: formData.folderPath.trim() || undefined, status: formData.status as any });
+                          setIsEditDialogOpen(false);
+                        }
+                      }}>Save Changes</Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
 
-              <AlertDialog>
-                <AlertDialogTrigger className="w-7 h-7 hover:bg-green-500/10 hover:text-green-500 text-muted-foreground transition-colors rounded-md inline-flex items-center justify-center" title="Mark issues resolved">
-                  <CheckCircle2 className="w-4 h-4" />
-                </AlertDialogTrigger>
-                <AlertDialogContent className="bg-[#0f0f11] border-white/10 text-foreground">
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Mark Issues Resolved?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This will mark all issues as resolved and set the project status to completed.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel className="bg-transparent border-white/10 hover:bg-white/5">Cancel</AlertDialogCancel>
-                    <AlertDialogAction 
-                      className="bg-green-500 hover:bg-green-600 text-white"
-                      onClick={() => {
-                        updateProject(selectedProject.id, { status: "completed", completionPercentage: 100 });
-                        setSelectedProject(null);
-                      }}
-                    >
-                      Resolve Issues
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+                <AlertDialog>
+                  <AlertDialogTrigger
+                    className="w-7 h-7 flex items-center justify-center rounded-md text-white/40 hover:text-green-400 hover:bg-green-500/10 transition-colors"
+                    title="Mark complete"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="bg-[#0f0f11] border-white/10 text-foreground">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Mark as Completed?</AlertDialogTitle>
+                      <AlertDialogDescription>This will set the project status to completed.</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel className="bg-transparent border-white/10 hover:bg-white/5">Cancel</AlertDialogCancel>
+                      <AlertDialogAction className="bg-green-500 hover:bg-green-600 text-white" onClick={() => { updateProject(selectedProject.id, { status: "completed", completionPercentage: 100 }); setSelectedProject(null); }}>
+                        Mark Complete
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
 
-              <Button size="icon" variant="ghost" className="w-7 h-7" onClick={() => setSelectedProject(null)}>
-                <X className="w-4 h-4 text-muted-foreground hover:text-foreground" />
-              </Button>
+                <button onClick={() => setSelectedProject(null)}
+                  className="w-7 h-7 flex items-center justify-center rounded-md text-white/40 hover:text-white hover:bg-white/8 transition-colors">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
+
+            {/* Row 2: Description */}
+            {currentProject.description && (
+              <p className="text-[11px] text-white/45 leading-relaxed pl-4 truncate">
+                {currentProject.description}
+              </p>
+            )}
+
+            {/* Row 3: Tags */}
+            {currentProject.tags && currentProject.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1 pl-4">
+                {currentProject.tags.slice(0, 5).map((tag: string) => (
+                  <Badge key={tag} variant="secondary" className="text-[8px] py-0 px-1.5 uppercase bg-primary/10 text-primary border-primary/20">{tag}</Badge>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Drawer Content */}
-          <ScrollArea className="flex-1 pr-2 custom-scrollbar">
-            <div className="space-y-4 pb-4">
-              
-              {/* GitHub and Live URL Actions */}
-              {(currentProject.githubUrl || currentProject.liveUrl) && (
-                <div className="grid grid-cols-2 gap-3">
-                  {currentProject.githubUrl && (
-                    <a 
-                      href={currentProject.githubUrl} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="flex items-center justify-between p-3 rounded-xl border border-white/5 bg-white/[0.01] hover:bg-white/[0.03] hover:border-white/10 transition-all text-xs font-semibold text-white/80 group animate-in fade-in slide-in-from-bottom-1 duration-200"
-                    >
-                      <span className="flex items-center gap-2">
-                        <GitBranch className="w-4 h-4 text-purple-400 group-hover:scale-110 transition-transform" />
-                        GitHub Repo
-                      </span>
-                      <ExternalLink className="w-3.5 h-3.5 text-white/30" />
-                    </a>
-                  )}
-                  {currentProject.liveUrl && (
-                    <a 
-                      href={currentProject.liveUrl} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="flex items-center justify-between p-3 rounded-xl border border-white/5 bg-white/[0.01] hover:bg-white/[0.03] hover:border-white/10 transition-all text-xs font-semibold text-white/80 group animate-in fade-in slide-in-from-bottom-1 duration-200"
-                    >
-                      <span className="flex items-center gap-2">
-                        <ExternalLink className="w-4 h-4 text-green-400 group-hover:scale-110 transition-transform" />
-                        Live Link
-                      </span>
-                      <ExternalLink className="w-3.5 h-3.5 text-white/30" />
-                    </a>
-                  )}
+          {/* ── Scrollable Drawer Body ── */}
+          <div
+            className="flex-1 overflow-y-auto space-y-3 pb-4 pr-1"
+            style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}
+          >
+            {/* ── Local Connection Card ── */}
+            <div className="rounded-xl border border-white/[0.06] bg-white/[0.01] p-3 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[9px] uppercase font-bold tracking-widest text-white/35">Local Folder</span>
+                <Badge variant="outline" className={`text-[8px] font-bold uppercase ${
+                  currentProject.folderPath
+                    ? "bg-green-500/10 text-green-400 border-green-500/20"
+                    : "bg-white/5 text-white/40 border-white/10"
+                }`}>
+                  {currentProject.folderPath ? "Linked" : "Not linked"}
+                </Badge>
+              </div>
+              {currentProject.folderPath ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 bg-black/30 border border-white/5 rounded-lg px-2.5 py-1.5">
+                    <FolderOpen className="w-3 h-3 text-sky-400 shrink-0" />
+                    <span className="text-[10px] font-mono text-white/60 truncate flex-1" title={currentProject.folderPath}>{currentProject.folderPath}</span>
+                    <button onClick={() => window.open(`vscode://file/${currentProject.folderPath}`)}
+                      className="text-[9px] font-bold text-sky-400 hover:text-sky-300 shrink-0 whitespace-nowrap">
+                      VS Code
+                    </button>
+                  </div>
+                  <Button size="sm" variant="outline"
+                    className="h-6 text-[9px] px-2.5 border-white/10 bg-transparent text-white/50 hover:text-white hover:bg-white/5 w-full"
+                    onClick={() => handlePickFolder("link")} disabled={isPickingFolder}>
+                    Change Folder Link
+                  </Button>
                 </div>
+              ) : (
+                <Button size="sm"
+                  onClick={() => handlePickFolder("link")} disabled={isPickingFolder}
+                  className="w-full h-7 text-[10px] font-bold bg-primary hover:bg-primary/90 text-primary-foreground">
+                  {isPickingFolder ? "Linking..." : "Link Local Folder"}
+                </Button>
               )}
+            </div>
 
-              {/* Local Folder Connection Card */}
-              <div className="p-3.5 rounded-xl border bg-white/[0.01] border-white/5 space-y-3">
+            {/* ── Recent Commits ── */}
+            {selectedProject.githubUrl && (
+              <div className="rounded-xl border border-white/[0.06] bg-white/[0.01] p-3 space-y-2.5">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-white/45">Local Connection</span>
-                  <Badge variant="outline" className={`text-[8px] font-bold uppercase ${
-                    currentProject.folderPath 
-                      ? "bg-green-500/10 text-green-400 border-green-500/20" 
-                      : "bg-red-500/10 text-red-400 border-red-500/20"
-                  }`}>
-                    {currentProject.folderPath ? "Connected" : "Unlinked"}
-                  </Badge>
+                  <span className="text-[9px] uppercase font-bold tracking-widest text-white/35">Recent Commits</span>
+                  {commitsLoading && (
+                    <span className="text-[9px] text-white/30 animate-pulse">Loading...</span>
+                  )}
                 </div>
-                
-                {currentProject.folderPath ? (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between gap-3 bg-black/40 border border-white/5 rounded-lg p-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <FolderOpen className="w-3.5 h-3.5 text-primary shrink-0" />
-                        <span className="text-[11px] font-mono text-white/70 truncate" title={currentProject.folderPath}>
-                          {currentProject.folderPath}
-                        </span>
-                      </div>
-                      <button 
-                        onClick={() => window.open(`vscode://file/${currentProject.folderPath}`)}
-                        className="text-[10px] font-bold text-sky-400 hover:text-sky-300 hover:underline shrink-0 cursor-pointer"
-                      >
-                        Open in VS Code
-                      </button>
-                    </div>
-                    <div className="flex items-center justify-between gap-2">
-                      <Button 
-                        size="sm"
-                        variant="outline"
-                        className="h-7 text-[10px] px-3 border-white/10 bg-transparent text-muted-foreground hover:text-foreground hover:bg-white/5"
-                        onClick={() => handlePickFolder("link")}
-                        disabled={isPickingFolder}
-                      >
-                        Change Link
-                      </Button>
-                      <Button 
-                        size="sm"
-                        className="h-7 text-[10px] px-3 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 hover:text-amber-300 border border-amber-500/20 transition-all font-semibold"
-                        onClick={handleGenerateContext}
-                        disabled={generatingContext}
-                      >
-                        {generatingContext ? "⚡ Generating..." : "⚡ Generate Context (CLAUDE.md)"}
-                      </Button>
-                    </div>
+
+                {!commitsLoading && projectCommits.length === 0 ? (
+                  <div className="text-center py-3">
+                    <span className="text-[11px] text-white/30">No commits found in last 14 days</span>
                   </div>
                 ) : (
-                  <div className="flex items-center justify-between gap-3 bg-black/20 border border-white/5 rounded-lg p-3">
-                    <div className="space-y-0.5">
-                      <p className="text-xs font-semibold text-white/80">Not linked to local folder</p>
-                      <p className="text-[10px] text-white/45 leading-normal">Connect local folder to enable VS Code launching & context generation</p>
-                    </div>
-                    <Button 
-                      size="sm"
-                      onClick={() => handlePickFolder("link")}
-                      disabled={isPickingFolder}
-                      className="h-7 text-[10px] font-bold px-3 bg-primary hover:bg-primary/90 text-primary-foreground shrink-0"
-                    >
-                      {isPickingFolder ? "Linking..." : "Link Folder"}
-                    </Button>
+                  <div
+                    className="space-y-1.5 max-h-[200px] overflow-y-auto pr-1"
+                    style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.06) transparent' }}
+                  >
+                    {projectCommits.slice(0, commitLimit).map((commit: any) => {
+                      const hoursAgo = Math.floor((Date.now() - new Date(commit.date).getTime()) / (1000 * 3600));
+                      const timeStr = hoursAgo < 1 ? 'just now' : hoursAgo < 24 ? `${hoursAgo}h ago` : `${Math.floor(hoursAgo / 24)}d ago`;
+                      return (
+                        <div key={commit.sha} className="flex items-start gap-2 group py-1 border-b border-white/[0.04] last:border-0">
+                          <div className="w-1.5 h-1.5 rounded-full bg-primary/50 shrink-0 mt-1.5" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[11px] text-white/75 leading-snug truncate">{commit.message}</p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-[9px] text-white/30">{timeStr}</span>
+                              {commit.url && (
+                                <a href={commit.url} target="_blank" rel="noreferrer"
+                                  className="text-[9px] font-mono text-primary/60 hover:text-primary transition-colors">
+                                  {typeof commit.sha === 'string' ? commit.sha.substring(0, 7) : commit.sha}
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {projectCommits.length > commitLimit && (
+                      <button onClick={() => setCommitLimit(prev => prev + 10)}
+                        className="w-full text-center text-[9px] text-white/30 hover:text-white/60 py-1 transition-colors">
+                        Load more ({projectCommits.length - commitLimit} remaining)
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
+            )}
 
-              {/* Unified Feedback Feed */}
-              <div className="pt-2 space-y-3">
-                <div className="flex items-center justify-between pb-1.5 border-b border-white/[0.04]">
-                  <span className="text-[10px] font-medium text-white/40 tracking-wider lowercase">brain dump</span>
-                </div>
-
-                <div className="space-y-3">
-                  {projectNotes.length === 0 ? (
-                    <div className="text-center py-6">
-                      <div className="text-xs text-white/30">No notes yet.</div>
-                      <div className="text-xs text-white/20 mt-1">
-                        Tag this project in Focus Panel using <span className="font-mono text-amber-400/60">@{selectedProject.name}</span>
+            {/* ── Brain Dump Notes ── */}
+            <div className="rounded-xl border border-white/[0.06] bg-white/[0.01] p-3 space-y-2.5">
+              <span className="text-[9px] uppercase font-bold tracking-widest text-white/35">Brain Dump</span>
+              <div className="space-y-2">
+                {projectNotes.length === 0 ? (
+                  <div className="py-4 text-center">
+                    <p className="text-[11px] text-white/25">No notes for this project yet.</p>
+                    <p className="text-[10px] text-white/20 mt-1">Use <span className="font-mono text-amber-400/50">@{selectedProject.name}</span> in Focus Panel</p>
+                  </div>
+                ) : (
+                  projectNotes.map(note => {
+                    const categoryStyle: Record<string, string> = {
+                      feedback: 'bg-orange-500/15 text-orange-300 border-orange-500/20',
+                      bug: 'bg-red-500/15 text-red-300 border-red-500/20',
+                      idea: 'bg-amber-500/15 text-amber-300 border-amber-500/20',
+                      note: 'bg-white/5 text-white/40 border-white/10'
+                    };
+                    const cat = note.category;
+                    const colorClass = cat && cat !== 'classifying...' ? (categoryStyle[cat.toLowerCase()] || categoryStyle.note) : categoryStyle.note;
+                    return (
+                      <div key={note.id} className="group p-2.5 rounded-lg border border-white/[0.05] bg-white/[0.01] hover:bg-white/[0.03] transition-colors space-y-1.5">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary" className={`text-[8px] py-0 px-1.5 uppercase shrink-0 ${(!cat || cat === 'classifying...') ? 'animate-pulse bg-white/5 text-white/30 border-white/10' : colorClass}`}>
+                            {(!cat || cat === 'classifying...') ? 'classifying...' : cat}
+                          </Badge>
+                          <span className="text-[9px] text-white/25 font-mono ml-auto">{timeAgo(note.createdAt)}</span>
+                          <button onClick={() => handleDeleteNote(note.id)}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity text-white/30 hover:text-red-400">
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                        <p className="text-[11px] text-white/65 leading-relaxed line-clamp-3">{note.content}</p>
+                        <div className="flex gap-1.5">
+                          <button onClick={() => handleDeleteNote(note.id)}
+                            className="text-[9px] px-2 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20 hover:bg-green-500/20 transition-colors flex items-center gap-1">
+                            <CheckCircle2 className="w-2.5 h-2.5" /> Resolve
+                          </button>
+                          {selectedProject.githubUrl && (
+                            <button onClick={() => createGitHubIssue(note)} disabled={isCreatingIssue === note.id}
+                              className="text-[9px] px-2 py-0.5 rounded bg-white/5 text-white/40 border border-white/10 hover:bg-blue-500/10 hover:text-blue-300 hover:border-blue-500/20 transition-colors flex items-center gap-1 disabled:opacity-50">
+                              {isCreatingIssue === note.id ? <><span className="w-2.5 h-2.5 rounded-full border border-current border-t-transparent animate-spin" /> Creating</> : <><GitBranch className="w-2.5 h-2.5" /> Issue</>}
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ) : (
-                    (() => {
-                      const categoryStyle = {
-                        feedback: 'bg-orange-500/15 text-orange-300 border-orange-500/20',
-                        bug: 'bg-red-500/15 text-red-300 border-red-500/20',
-                        idea: 'bg-amber-500/15 text-amber-300 border-amber-500/20',
-                        note: 'bg-white/5 text-white/40 border-white/10'
-                      };
-                      return projectNotes.map(note => {
-                        const cat = note.category;
-                        let colorClass = categoryStyle.note;
-                        if (cat && cat !== 'classifying...') {
-                          const validCat = cat.toLowerCase() as keyof typeof categoryStyle;
-                          colorClass = categoryStyle[validCat] || categoryStyle.note;
-                        }
-
-                        return (
-                          <div key={note.id} className="group p-3 border border-white/5 bg-transparent hover:bg-white/[0.04] transition-colors rounded-lg flex flex-col gap-2 relative">
-                            <div className="flex justify-between items-center gap-2">
-                              {(!cat || cat === 'classifying...') ? (
-                                <Badge variant="secondary" className="text-[8px] py-0 px-1.5 uppercase bg-white/5 text-muted-foreground border-white/10 animate-pulse shrink-0">
-                                  classifying...
-                                </Badge>
-                              ) : (
-                                <Badge variant="secondary" className={`text-[8px] py-0 px-1.5 uppercase shrink-0 ${colorClass}`}>
-                                  {cat}
-                                </Badge>
-                              )}
-                              
-                              <p className="text-[9px] text-muted-foreground font-mono ml-auto mr-1 truncate">
-                                {timeAgo(note.createdAt)}
-                              </p>
-
-                              <Button variant="ghost" size="icon" className="w-5 h-5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-400" onClick={() => handleDeleteNote(note.id)}>
-                                <Trash2 className="w-3 h-3" />
-                              </Button>
-                            </div>
-                            <p className="text-xs leading-relaxed text-foreground/90 whitespace-pre-wrap pr-1 line-clamp-4">{note.content}</p>
-                            <div className="flex justify-end gap-2 mt-1">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-6 text-[9px] px-2 bg-green-500/10 border-green-500/20 text-green-400 hover:bg-green-500/20"
-                                onClick={() => handleDeleteNote(note.id)}
-                              >
-                                <CheckCircle2 className="w-3 h-3 mr-1" /> Resolve
-                              </Button>
-                              {selectedProject.githubUrl && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  disabled={isCreatingIssue === note.id}
-                                  className="h-6 text-[9px] px-2 bg-transparent border-white/10 hover:bg-blue-500/10 hover:border-blue-500/20 hover:text-blue-300 transition-colors"
-                                  onClick={() => createGitHubIssue(note)}
-                                >
-                                  {isCreatingIssue === note.id ? (
-                                    <><span className="w-3 h-3 mr-1 rounded-full border-2 border-current border-t-transparent animate-spin inline-block" /> Creating...</>
-                                  ) : (
-                                    <><GitBranch className="w-3 h-3 mr-1" /> Open as Issue</>
-                                  )}
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      });
-                    })()
-                  )}
-                </div>
+                    );
+                  })
+                )}
               </div>
-
-              {/* Recent Commits Feed */}
-              {selectedProject.githubUrl && (
-                <div className="pt-4 border-t border-white/[0.04] space-y-3">
-                  <div className="flex items-center justify-between pb-1.5 border-b border-white/[0.04]">
-                    <span className="text-[10px] font-medium text-white/40 tracking-wider lowercase">recent commits</span>
-                  </div>
-
-                  <div className="px-1">
-                    {commitsLoading && projectCommits.length === 0 ? (
-                      <div className="text-center py-4">
-                        <span className="text-xs text-muted-foreground animate-pulse">Loading commits...</span>
-                      </div>
-                    ) : projectCommits.length === 0 ? (
-                      <div className="text-center py-4">
-                        <span className="text-xs text-muted-foreground">No recent commits found.</span>
-                      </div>
-                    ) : (
-                      <div className="space-y-3 relative before:absolute before:inset-0 before:ml-2 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-white/10 before:to-transparent">
-                        {projectCommits.slice(0, commitLimit).map((commit: any) => {
-                          const commitAgo = Math.floor((Date.now() - new Date(commit.date).getTime()) / (1000 * 60 * 60));
-                          const timeAgoString = commitAgo < 24 ? `${commitAgo}h ago` : `${Math.floor(commitAgo / 24)}d ago`;
-                          return (
-                            <div key={commit.sha} className="relative flex items-center justify-between group">
-                              <div className="flex items-center gap-3 w-full">
-                                <div className="flex items-center justify-center w-4 h-4 rounded-full bg-[#0f0f11] border border-white/20 z-10 shrink-0">
-                                  <div className="w-1.5 h-1.5 rounded-full bg-primary/60 group-hover:bg-primary transition-colors" />
-                                </div>
-                                <div className="flex-1 min-w-0 pr-2">
-                                  <p className="text-[11px] text-foreground truncate">{commit.message}</p>
-                                </div>
-                                <div className="flex items-center gap-2 shrink-0">
-                                  <span className="text-[9px] text-muted-foreground">{timeAgoString}</span>
-                                  <a 
-                                    href={commit.url} 
-                                    target="_blank" 
-                                    rel="noreferrer"
-                                    className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/5 hover:bg-white/10 text-primary/80 hover:text-primary transition-colors"
-                                  >
-                                    {commit.sha.substring(0, 7)}
-                                  </a>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                        
-                        {projectCommits.length > commitLimit && (
-                          <div className="pt-2 flex justify-center">
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              className="h-6 text-[10px] text-muted-foreground hover:text-foreground"
-                              onClick={() => setCommitLimit(prev => prev + 10)}
-                            >
-                              Load more
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-              
             </div>
-          </ScrollArea>
+          </div>
         </div>
       )}
 
-      {/* View Note Dialog */}
-      {viewNote && (
-        <Dialog open={!!viewNote} onOpenChange={(o) => !o && setViewNote(null)}>
-          <DialogContent className="bg-[#0f0f11] border-white/10 text-foreground max-w-lg max-h-[80vh] flex flex-col">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                Feedback Details
-                {viewNote.category && (
-                  <Badge variant="secondary" className="text-[10px] py-0 px-1.5 uppercase bg-primary/10 text-primary border-primary/20">
-                    {viewNote.category}
-                  </Badge>
-                )}
-              </DialogTitle>
-            </DialogHeader>
-            <ScrollArea className="flex-1 mt-4 text-sm whitespace-pre-wrap leading-relaxed custom-scrollbar max-h-[60vh] overflow-y-auto pr-3">
-              {viewNote.content}
-            </ScrollArea>
-            <DialogFooter className="mt-6 border-t border-white/10 pt-4">
-              <Button variant="outline" onClick={() => setViewNote(null)} className="border-white/10 bg-transparent">Close</Button>
-              {selectedProject?.githubUrl && (
-                <Button onClick={() => createGitHubIssue(viewNote.content)}>
-                  <GitBranch className="w-4 h-4 mr-2" /> Open as Issue
-                </Button>
-              )}
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
+      {/* ── Delete Confirmation AlertDialog ── */}
+      <AlertDialog open={!!confirmDeleteId} onOpenChange={(open) => { if (!open) setConfirmDeleteId(null); }}>
+        <AlertDialogContent className="bg-[#0f0f11] border-white/10 text-foreground">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Project?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the project and all its data. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-transparent border-white/10 hover:bg-white/5" onClick={() => setConfirmDeleteId(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-500 hover:bg-red-600 text-white"
+              onClick={async () => {
+                if (confirmDeleteId) {
+                  const idToDelete = confirmDeleteId;
+                  setConfirmDeleteId(null);
+                  await deleteProject(idToDelete);
+                  if (selectedProject?.id === idToDelete) setSelectedProject(null);
+                }
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Integrations Setup Dialog */}
       <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
