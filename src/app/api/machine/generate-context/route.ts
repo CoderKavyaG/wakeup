@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { agentFetch } from "@/lib/agentFetch";
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -11,10 +12,9 @@ export async function POST(req: Request) {
     const body = await req.json();
 
     try {
-      const agentRes = await fetch("http://localhost:3131/generate-context", {
+      const agentRes = await agentFetch("/generate-context", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body)
+        body
       });
       
       const data = await agentRes.json();
@@ -25,7 +25,7 @@ export async function POST(req: Request) {
 
       return NextResponse.json(data);
     } catch (agentError: any) {
-      if (agentError.code === 'ECONNREFUSED' || agentError.message?.includes('fetch failed')) {
+      if (agentError.code === 'ECONNREFREFUSED' || agentError.code === 'ECONNREFUSED' || agentError.message?.includes('fetch failed')) {
         return NextResponse.json(
           { error: "Agent not running — start it with npm run agent" }, 
           { status: 503 }
@@ -40,3 +40,4 @@ export async function POST(req: Request) {
     );
   }
 }
+

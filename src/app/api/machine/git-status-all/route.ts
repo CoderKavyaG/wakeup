@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { agentFetch } from "@/lib/agentFetch";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +11,7 @@ export async function GET(req: Request) {
   }
 
   try {
-    const res = await fetch("http://127.0.0.1:3131/git-status-all", { cache: "no-store" });
+    const res = await agentFetch("/git-status-all");
     if (!res.ok) throw new Error("Failed to fetch");
     const data = await res.json();
     return NextResponse.json(data);
@@ -18,3 +19,4 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Failed to fetch git status" }, { status: 500 });
   }
 }
+

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { agentFetch } from "@/lib/agentFetch";
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -11,10 +12,9 @@ export async function POST(req: Request) {
     const body = await req.json();
 
     try {
-      const agentRes = await fetch("http://localhost:3131/scan-project", {
+      const agentRes = await agentFetch("/scan-project", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body)
+        body
       });
       
       const data = await agentRes.json();
@@ -40,3 +40,4 @@ export async function POST(req: Request) {
     );
   }
 }
+

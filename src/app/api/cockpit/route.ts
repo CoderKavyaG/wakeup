@@ -2,16 +2,9 @@ import { streamText, createTextStreamResponse } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
+import { decrypt } from "@/lib/encryption";
+import { agentFetch } from "@/lib/agentFetch";
 
-const openrouter = createOpenAI({
-  baseURL: "https://openrouter.ai/api/v1",
-  apiKey: process.env.OPENROUTER_API_KEY,
-});
-
-const groq = createOpenAI({
-  baseURL: "https://api.groq.com/openai/v1",
-  apiKey: process.env.GROQ_API_KEY,
-});
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +21,14 @@ export async function POST(request: Request) {
     }
     const userId = session.user.id;
     const userName = session.user.name || "Kavya";
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { groqApiKey: true, openrouterApiKey: true }
+    });
+
+    const decryptedGroq = user?.groqApiKey ? decrypt(user.groqApiKey) : "";
+    const decryptedOpenrouter = user?.openrouterApiKey ? decrypt(user.openrouterApiKey) : "";
 
     const body: CockpitRequest = await request.json();
     const { query, screenshot } = body;
@@ -47,14 +48,22 @@ export async function POST(request: Request) {
       }
 
       let visionModel = null;
-      if (process.env.GROQ_API_KEY) {
-        visionModel = groq("llama-3.2-11b-vision-preview");
-      } else if (process.env.OPENROUTER_API_KEY) {
-        visionModel = openrouter("google/gemini-2.0-flash");
+      if (decryptedGroq) {
+        const groqClient = createOpenAI({
+          baseURL: "https://api.groq.com/openai/v1",
+          apiKey: decryptedGroq,
+        });
+        visionModel = groqClient("llama-3.2-11b-vision-preview");
+      } else if (decryptedOpenrouter) {
+        const openrouterClient = createOpenAI({
+          baseURL: "https://openrouter.ai/api/v1",
+          apiKey: decryptedOpenrouter,
+        });
+        visionModel = openrouterClient("google/gemini-2.0-flash");
       }
 
       if (!visionModel) {
-        return Response.json({ error: "Please configure your GROQ_API_KEY or OPENROUTER_API_KEY for vision support." }, { status: 500 });
+        return Response.json({ error: "Please configure your Groq or OpenRouter API keys in Settings for vision support." }, { status: 500 });
       }
 
       const imgUrl = screenshot.startsWith("data:") ? screenshot : `data:image/jpeg;base64,${screenshot}`;
@@ -89,7 +98,7 @@ export async function POST(request: Request) {
       let files = [];
       let agentError = "";
       try {
-        const agentRes = await fetch(`http://localhost:3131/read-files?topic=${encodeURIComponent(topic)}`);
+        const agentRes = await agentFetch(`/read-files?topic=${encodeURIComponent(topic)}`);
         if (agentRes.ok) {
           const data = await agentRes.json();
           files = data.files || [];
@@ -119,14 +128,22 @@ export async function POST(request: Request) {
       } catch (e) {}
 
       let modelInstance = null;
-      if (process.env.GROQ_API_KEY) {
-        modelInstance = groq("llama-3.3-70b-versatile");
-      } else if (process.env.OPENROUTER_API_KEY) {
-        modelInstance = openrouter("google/gemma-4-26b-a4b-it:free");
+      if (decryptedGroq) {
+        const groqClient = createOpenAI({
+          baseURL: "https://api.groq.com/openai/v1",
+          apiKey: decryptedGroq,
+        });
+        modelInstance = groqClient("llama-3.3-70b-versatile");
+      } else if (decryptedOpenrouter) {
+        const openrouterClient = createOpenAI({
+          baseURL: "https://openrouter.ai/api/v1",
+          apiKey: decryptedOpenrouter,
+        });
+        modelInstance = openrouterClient("google/gemma-4-26b-a4b-it:free");
       }
 
       if (!modelInstance) {
-        return Response.json({ error: "Please configure your GROQ_API_KEY or OPENROUTER_API_KEY in .env." }, { status: 500 });
+        return Response.json({ error: "Please configure your Groq or OpenRouter API keys in Settings." }, { status: 500 });
       }
 
       const filesContent = files.map((f: any) => `### FILE: ${f.path}\n\`\`\`typescript\n${f.content}\n\`\`\`${f.truncated ? "\n[... truncated ...]" : ""}`).join("\n\n");
@@ -213,14 +230,22 @@ Provide the audit review:`;
 
     // 4. CHOOSE MODEL AND VERIFY CONFIGURATION
     let modelInstance = null;
-    if (process.env.GROQ_API_KEY) {
-      modelInstance = groq("llama-3.3-70b-versatile");
-    } else if (process.env.OPENROUTER_API_KEY) {
-      modelInstance = openrouter("google/gemma-4-26b-a4b-it:free");
+    if (decryptedGroq) {
+      const groqClient = createOpenAI({
+        baseURL: "https://api.groq.com/openai/v1",
+        apiKey: decryptedGroq,
+      });
+      modelInstance = groqClient("llama-3.3-70b-versatile");
+    } else if (decryptedOpenrouter) {
+      const openrouterClient = createOpenAI({
+        baseURL: "https://openrouter.ai/api/v1",
+        apiKey: decryptedOpenrouter,
+      });
+      modelInstance = openrouterClient("google/gemma-4-26b-a4b-it:free");
     }
 
     if (!modelInstance) {
-      return Response.json({ error: "Please configure your OPENROUTER_API_KEY or GROQ_API_KEY in .env to enable AI answers." }, { status: 500 });
+      return Response.json({ error: "Please configure your Groq or OpenRouter API keys in Settings to enable AI responses." }, { status: 500 });
     }
 
     // 5. COMMIT SUMMARY GROUPED BY REPO

@@ -111,6 +111,16 @@ ipcMain.handle('capture-screenshot', async () => {
   return image.toJPEG(80).toString('base64');
 })
 
+app.on('certificate-error', (event, webContents, url, error, certificate, callback) => {
+  if (url.startsWith('https://local.wakeup.com:3131')) {
+    event.preventDefault();
+    callback(true);
+  } else {
+    callback(false);
+  }
+})
+
+
 const gotTheLock = app.requestSingleInstanceLock()
 
 if (!gotTheLock) {

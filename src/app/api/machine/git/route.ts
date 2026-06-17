@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { agentFetch } from "@/lib/agentFetch";
 
 export async function GET(request: Request) {
   const session = await auth();
@@ -15,7 +16,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Missing path parameter" }, { status: 400 });
     }
 
-    const res = await fetch(`http://127.0.0.1:3131/git?path=${encodeURIComponent(path)}`);
+    const res = await agentFetch(`/git?path=${encodeURIComponent(path)}`);
     if (!res.ok) throw new Error("Agent error");
     const data = await res.json();
     return NextResponse.json(data);
@@ -23,3 +24,4 @@ export async function GET(request: Request) {
     return NextResponse.json({ branch: "", commit: "" }, { status: 503 });
   }
 }
+

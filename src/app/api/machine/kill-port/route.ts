@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { agentFetch } from "@/lib/agentFetch";
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -11,10 +12,9 @@ export async function POST(request: Request) {
     const { port } = await request.json();
     if (!port) return NextResponse.json({ error: "Missing port" }, { status: 400 });
 
-    const res = await fetch("http://localhost:3131/kill-port", {
+    const res = await agentFetch("/kill-port", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ port })
+      body: { port }
     });
 
     if (!res.ok) throw new Error("Failed to kill port");
@@ -25,3 +25,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
+

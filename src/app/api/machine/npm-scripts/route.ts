@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { agentFetch } from "@/lib/agentFetch";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,7 @@ export async function GET(request: Request) {
     
     if (!path) return NextResponse.json({ error: "Missing path" }, { status: 400 });
 
-    const res = await fetch(`http://127.0.0.1:3131/npm-scripts?path=${encodeURIComponent(path)}`, { cache: "no-store" });
+    const res = await agentFetch(`/npm-scripts?path=${encodeURIComponent(path)}`);
     if (!res.ok) throw new Error("Failed to fetch");
     const data = await res.json();
     return NextResponse.json(data);
@@ -23,3 +24,4 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Failed to fetch npm scripts" }, { status: 500 });
   }
 }
+

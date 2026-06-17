@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-
-const AGENT_URL = "http://localhost:3131";
+import { agentFetch } from "@/lib/agentFetch";
 
 export async function GET(request: Request) {
   try {
@@ -15,11 +14,8 @@ export async function GET(request: Request) {
     
     const query = searchParams.toString() ? `?${searchParams.toString()}` : '';
     
-    const res = await fetch(`${AGENT_URL}/${action}${query}`, {
+    const res = await agentFetch(`/${action}${query}`, {
       method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-      },
     });
 
     if (!res.ok) {
@@ -44,12 +40,9 @@ export async function POST(request: Request) {
     const action = pathname.split('/').pop();
     const body = await request.json();
 
-    const res = await fetch(`${AGENT_URL}/${action}`, {
+    const res = await agentFetch(`/${action}`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
+      body,
     });
 
     if (!res.ok) {
@@ -63,3 +56,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "DevOS Agent is offline." }, { status: 503 });
   }
 }
+

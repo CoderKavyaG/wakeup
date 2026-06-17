@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { agentFetch } from "@/lib/agentFetch";
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -9,10 +10,9 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const res = await fetch("http://127.0.0.1:3131/register-workspace", {
+    const res = await agentFetch("/register-workspace", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body)
+      body
     });
     if (!res.ok) throw new Error("Failed to register workspace");
     const data = await res.json();
@@ -21,3 +21,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Failed to register workspace" }, { status: 500 });
   }
 }
+

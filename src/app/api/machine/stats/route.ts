@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { agentFetch } from "@/lib/agentFetch";
 
 export async function GET(req: Request) {
   const session = await auth();
@@ -8,7 +9,7 @@ export async function GET(req: Request) {
   }
 
   try {
-    const res = await fetch("http://127.0.0.1:3131/stats");
+    const res = await agentFetch("/stats");
     if (!res.ok) throw new Error("Agent error");
     const data = await res.json();
     return NextResponse.json(data);
@@ -16,3 +17,4 @@ export async function GET(req: Request) {
     return NextResponse.json({ cpu: 0, ram: 0 }, { status: 503 });
   }
 }
+
