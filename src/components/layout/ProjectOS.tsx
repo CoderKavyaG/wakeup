@@ -2754,29 +2754,72 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
     }
   };
 
-  // File System Access API — only available in Chromium browsers with the flag enabled.
-  // Brave may block it. We detect support at runtime and show/hide the Browse button.
-  const supportsDirectoryPicker = typeof window !== "undefined" && "showDirectoryPicker" in window;
-
+  // Browse folder — two strategies:
+  // 1. Chrome/Edge: use browser's showDirectoryPicker() API (gets folder name only, user confirms path)
+  // 2. Brave/Firefox/other: call agent's pick-and-scan-folder which runs the native Windows folder
+  //    picker dialog on the user's local machine via the DevOS agent (PowerShell FolderBrowserDialog).
+  //    This works because ClientBootstrap routes /api/machine/* directly to local.wakeup.com:3131.
   const handleBrowseFolder = async () => {
-    if (!supportsDirectoryPicker) return; // should not be reachable since button is hidden
+    // --- Strategy 1: Browser File System Access API (Chrome/Edge) ---
+    if (typeof window !== "undefined" && "showDirectoryPicker" in window) {
+      try {
+        const dirHandle = await (window as any).showDirectoryPicker({ mode: "read" });
+        const folderName = dirHandle.name;
+        const savedWorkspace = localStorage.getItem("DEVOS_WORKSPACE") || "";
+        let basePath = "C:\\Users\\Kavya\\Projects";
+        if (savedWorkspace) {
+          const sep = savedWorkspace.includes("\\") ? "\\" : "/";
+          const parts = savedWorkspace.split(sep);
+          parts.pop();
+          basePath = parts.join(sep);
+        }
+        setLocalPathInput(`${basePath}\\${folderName}`);
+        return;
+      } catch (err: any) {
+        if (err?.name === "AbortError") return; // user cancelled — do nothing
+        // If showDirectoryPicker is present but blocked (e.g. Brave shields), fall through to agent picker
+        console.warn("showDirectoryPicker failed, falling back to agent picker:", err);
+      }
+    }
+
+    // --- Strategy 2: Agent-side native folder picker (Brave / Firefox / blocked browsers) ---
+    // This calls picker.ps1 on the user's local machine via the DevOS agent.
+    setLocalScanning(true);
     try {
-      const dirHandle = await (window as any).showDirectoryPicker({ mode: "read" });
-      const folderName = dirHandle.name;
-      // Try to derive base path from previously saved workspace setting
-      const savedWorkspace = localStorage.getItem("DEVOS_WORKSPACE") || "";
-      let basePath = "C:\\Users\\Kavya\\Projects";
-      if (savedWorkspace) {
-        const sep = savedWorkspace.includes("\\") ? "\\" : "/";
-        const parts = savedWorkspace.split(sep);
-        parts.pop();
-        basePath = parts.join(sep);
+      const res = await fetch("/api/machine/pick-and-scan-folder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        if (err.error === "No folder selected") return; // user closed dialog
+        if (res.status === 503) {
+          alert("DevOS Agent is offline. Make sure you've run the install command in your terminal first:\n\nirm https://raw.githubusercontent.com/CoderKavyaG/wakeup/main/devos-agent/install.ps1 | iex");
+          return;
+        }
+        throw new Error(err.error || "Folder picker failed");
       }
-      setLocalPathInput(`${basePath}\\${folderName}`);
-    } catch (err: any) {
-      if (err?.name !== "AbortError") {
-        console.error("Directory picker error:", err);
-      }
+
+      const data = await res.json();
+      // Agent already scanned the folder — populate all fields and advance to confirm
+      if (data.name) setName(data.name);
+      if (data.description) setDescription(data.description);
+      setFolderPath(data.folderPath || "");
+      setLocalPathInput(data.folderPath || "");
+      if (data.githubUrl) setGithubUrl(data.githubUrl);
+      setType("code");
+      setLocalScanStep("confirm");
+
+      await fetch("/api/machine/register-workspace", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: data.folderPath })
+      }).catch(() => {});
+    } catch (e: any) {
+      alert(`Folder picker failed: ${e.message}`);
+    } finally {
+      setLocalScanning(false);
     }
   };
 
@@ -3161,9 +3204,7 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
                       <div>
                         <h3 className="text-xs font-semibold text-white">Import from Local Machine</h3>
                         <p className="text-[10px] text-white/40 mt-1 max-w-[300px] mx-auto leading-relaxed">
-                          {supportsDirectoryPicker
-                            ? "Click Browse to pick a folder, or paste the full path below."
-                            : "Paste the full path to your project folder below (e.g. C:\\Users\\Kavya\\Projects\\myapp)."}
+                          Paste the full path to your project folder, or click Browse to pick it from your computer.
                         </p>
                       </div>
 
@@ -3176,18 +3217,22 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
                           placeholder="e.g. C:\Users\Kavya\Projects\myapp"
                           className="flex-1 h-8 bg-black/50 border border-white/10 rounded-lg text-[11px] text-white font-mono px-3 focus:outline-none focus:border-purple-500/40 placeholder:text-white/20"
                           onKeyDown={e => { if (e.key === "Enter" && localPathInput.trim()) handleScanLocal(); }}
+                          disabled={localScanning}
                         />
-                        {supportsDirectoryPicker && (
-                          <button
-                            type="button"
-                            onClick={handleBrowseFolder}
-                            className="h-8 px-3 text-[10px] font-semibold rounded-lg bg-white/5 border border-white/10 text-white/60 hover:bg-white/10 hover:text-white transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5"
-                            title="Open native folder picker"
-                          >
+                        <button
+                          type="button"
+                          onClick={handleBrowseFolder}
+                          disabled={localScanning}
+                          className="h-8 px-3 text-[10px] font-semibold rounded-lg bg-white/5 border border-white/10 text-white/60 hover:bg-white/10 hover:text-white disabled:opacity-40 disabled:pointer-events-none transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5"
+                          title="Browse folder — opens native folder picker dialog on your computer"
+                        >
+                          {localScanning ? (
+                            <div className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                          ) : (
                             <FolderOpen className="w-3 h-3" />
-                            Browse
-                          </button>
-                        )}
+                          )}
+                          {localScanning ? "Opening..." : "Browse"}
+                        </button>
                       </div>
 
                       <button
