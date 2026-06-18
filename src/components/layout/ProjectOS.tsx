@@ -2754,30 +2754,29 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
     }
   };
 
-  // Try to use Chrome/Edge File System API to let user pick a folder in the browser.
-  // Note: browsers only expose the folder NAME, not the full OS path.
+  // File System Access API — only available in Chromium browsers with the flag enabled.
+  // Brave may block it. We detect support at runtime and show/hide the Browse button.
+  const supportsDirectoryPicker = typeof window !== "undefined" && "showDirectoryPicker" in window;
+
   const handleBrowseFolder = async () => {
-    if (typeof window !== "undefined" && "showDirectoryPicker" in window) {
-      try {
-        const dirHandle = await (window as any).showDirectoryPicker({ mode: "read" });
-        const folderName = dirHandle.name;
-        // Try to derive base path from previously saved workspace setting
-        const savedWorkspace = localStorage.getItem("DEVOS_WORKSPACE") || "";
-        let basePath = "C:\\Users\\Kavya\\Projects";
-        if (savedWorkspace) {
-          const sep = savedWorkspace.includes("\\") ? "\\" : "/";
-          const parts = savedWorkspace.split(sep);
-          parts.pop();
-          basePath = parts.join(sep);
-        }
-        setLocalPathInput(`${basePath}\\${folderName}`);
-      } catch (err: any) {
-        if (err?.name !== "AbortError") {
-          console.error("Directory picker error:", err);
-        }
+    if (!supportsDirectoryPicker) return; // should not be reachable since button is hidden
+    try {
+      const dirHandle = await (window as any).showDirectoryPicker({ mode: "read" });
+      const folderName = dirHandle.name;
+      // Try to derive base path from previously saved workspace setting
+      const savedWorkspace = localStorage.getItem("DEVOS_WORKSPACE") || "";
+      let basePath = "C:\\Users\\Kavya\\Projects";
+      if (savedWorkspace) {
+        const sep = savedWorkspace.includes("\\") ? "\\" : "/";
+        const parts = savedWorkspace.split(sep);
+        parts.pop();
+        basePath = parts.join(sep);
       }
-    } else {
-      alert("Your browser doesn't support the native folder picker (Chrome/Edge required). Please type the full path manually, e.g.:\nC:\\Users\\Kavya\\Projects\\myapp");
+      setLocalPathInput(`${basePath}\\${folderName}`);
+    } catch (err: any) {
+      if (err?.name !== "AbortError") {
+        console.error("Directory picker error:", err);
+      }
     }
   };
 
@@ -3162,7 +3161,9 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
                       <div>
                         <h3 className="text-xs font-semibold text-white">Import from Local Machine</h3>
                         <p className="text-[10px] text-white/40 mt-1 max-w-[300px] mx-auto leading-relaxed">
-                          Paste the full path to your project folder, or click Browse to pick it from your computer.
+                          {supportsDirectoryPicker
+                            ? "Click Browse to pick a folder, or paste the full path below."
+                            : "Paste the full path to your project folder below (e.g. C:\\Users\\Kavya\\Projects\\myapp)."}
                         </p>
                       </div>
 
@@ -3176,15 +3177,17 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
                           className="flex-1 h-8 bg-black/50 border border-white/10 rounded-lg text-[11px] text-white font-mono px-3 focus:outline-none focus:border-purple-500/40 placeholder:text-white/20"
                           onKeyDown={e => { if (e.key === "Enter" && localPathInput.trim()) handleScanLocal(); }}
                         />
-                        <button
-                          type="button"
-                          onClick={handleBrowseFolder}
-                          className="h-8 px-3 text-[10px] font-semibold rounded-lg bg-white/5 border border-white/10 text-white/60 hover:bg-white/10 hover:text-white transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5"
-                          title="Open native folder picker (Chrome/Edge)"
-                        >
-                          <FolderOpen className="w-3 h-3" />
-                          Browse
-                        </button>
+                        {supportsDirectoryPicker && (
+                          <button
+                            type="button"
+                            onClick={handleBrowseFolder}
+                            className="h-8 px-3 text-[10px] font-semibold rounded-lg bg-white/5 border border-white/10 text-white/60 hover:bg-white/10 hover:text-white transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5"
+                            title="Open native folder picker"
+                          >
+                            <FolderOpen className="w-3 h-3" />
+                            Browse
+                          </button>
+                        )}
                       </div>
 
                       <button
