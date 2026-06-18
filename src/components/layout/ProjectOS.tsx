@@ -2751,33 +2751,34 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
   };
 
   const handleScanLocal = async (isRetry = false) => {
+    const targetPath = folderPath.trim();
+    if (!targetPath) {
+      alert("Please enter your project folder path first.");
+      return;
+    }
     setLocalScanning(true);
     try {
-      const res = await fetch("/api/machine/pick-and-scan-folder", {
+      const res = await fetch("/api/machine/scan-project", {
         method: "POST",
-        headers: { "Content-Type": "application/json" }
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: targetPath })
       });
       
       const data = await res.json();
       if (!res.ok) {
-        if (data.error === "No folder selected") return;
-        
-        // If agent is offline and we haven't retried yet, auto start it
-        if (data.error === "DevOS Agent is offline." && !isRetry) {
-          // Trigger start agent
+        // If agent is offline and we haven't retried yet
+        if ((res.status === 503 || data.error?.includes("offline") || data.error?.includes("Agent")) && !isRetry) {
           await fetch("/api/machine/start-agent", { method: "POST" }).catch(() => {});
-          // Wait 1.5s
           await new Promise(resolve => setTimeout(resolve, 1500));
-          // Retry
           return handleScanLocal(true);
         }
-        throw new Error(data.error);
+        throw new Error(data.error || "Failed to scan project");
       }
       
-      // Auto-detect fields
+      // Auto-fill fields from scan results
       if (data.name) setName(data.name || "");
       if (data.description) setDescription(data.description || "");
-      setFolderPath(data.folderPath || "");
+      // Keep the folderPath the user typed — it's already set
       if (data.githubUrl) {
         setGithubUrl(data.githubUrl);
       }
@@ -2789,12 +2790,11 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
         await fetch("/api/machine/register-workspace", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ path: data.folderPath })
+          body: JSON.stringify({ path: targetPath })
         });
       } catch { }
     } catch (e: any) {
-      // If error message indicates agent is offline and not retried
-      if ((e.message?.includes("offline") || e.message?.includes("fetch")) && !isRetry) {
+      if ((e.message?.includes("offline") || e.message?.includes("fetch") || e.message?.includes("Agent")) && !isRetry) {
         await fetch("/api/machine/start-agent", { method: "POST" }).catch(() => {});
         await new Promise(resolve => setTimeout(resolve, 1500));
         return handleScanLocal(true);
@@ -3135,25 +3135,34 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
             {/* LOCAL SCAN TAB */}
             {!projectToEdit && activeFormTab === "local" && (
               <div className="space-y-4">
-                <div className="p-6 bg-black/20 border border-dashed border-white/5 rounded-xl text-center flex flex-col items-center justify-center gap-3">
-                  <FolderOpen className="w-8 h-8 text-purple-400/80" />
-                  <div>
-                    <h3 className="text-xs font-semibold text-white">Import from Local Machine</h3>
-                    <p className="text-[10px] text-white/40 mt-1 max-w-[280px] mx-auto">
-                      Scan any directory on your computer. DevOS Agent will auto-detect configurations and initialize local git integrations.
-                    </p>
+                <div className="p-5 bg-black/20 border border-dashed border-white/5 rounded-xl flex flex-col gap-3">
+                  <div className="flex items-center gap-2">
+                    <FolderOpen className="w-5 h-5 text-purple-400/80 shrink-0" />
+                    <div>
+                      <h3 className="text-xs font-semibold text-white">Import from Local Machine</h3>
+                      <p className="text-[10px] text-white/40 mt-0.5">
+                        Paste the full path to your project folder. The DevOS Agent will scan it and auto-detect your stack, Git, and scripts.
+                      </p>
+                    </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => handleScanLocal(false)}
-                    disabled={localScanning}
-                    className="mt-2 px-4 py-2 text-xs font-bold rounded-lg bg-purple-500 hover:bg-purple-600 text-white disabled:opacity-50 transition-all cursor-pointer flex items-center gap-1.5"
-                  >
-                    {localScanning ? (
-                      <>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={folderPath}
+                      onChange={e => setFolderPath(e.target.value)}
+                      placeholder={navigator?.platform?.toLowerCase().includes("win") ? "e.g. C:\\Users\\Kavya\\Projects\\myapp" : "e.g. /Users/you/projects/myapp"}
+                      className="flex-1 h-9 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-3 font-mono focus:outline-none focus:border-purple-500/40 placeholder:text-white/20"
+                      onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleScanLocal(false); } }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleScanLocal(false)}
+                      disabled={localScanning || !folderPath.trim()}
+                      className="px-3 h-9 text-xs font-bold rounded-lg bg-purple-500 hover:bg-purple-600 text-white disabled:opacity-40 transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
+                    >
+                      {localScanning ? (
                         <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        <span>Scanning Folder...</span>
                       </>
                     ) : (
                       <>
