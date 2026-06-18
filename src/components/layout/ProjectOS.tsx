@@ -2664,6 +2664,8 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
 
   // Local scan and Tab state
   const [localScanning, setLocalScanning] = useState(false);
+  const [localPathInput, setLocalPathInput] = useState("");
+  const [localScanStep, setLocalScanStep] = useState<"pick" | "confirm">("pick");
   const [activeFormTab, setActiveFormTab] = useState<"manual" | "github" | "local">("manual");
   const [githubRepos, setGithubRepos] = useState<any[]>([]);
   const [reposLoading, setReposLoading] = useState(false);
@@ -2705,6 +2707,8 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
         setStage("concept");
         setActiveFormTab("manual");
         setSelectedRepo(null);
+        setLocalPathInput("");
+        setLocalScanStep("pick");
       }
     }
   }, [isOpen, projectToEdit, defaultPhase]);
@@ -2750,12 +2754,36 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
     }
   };
 
-  const handleScanLocal = async (isRetry = false) => {
-    const targetPath = folderPath.trim();
-    if (!targetPath) {
-      alert("Please enter your project folder path first.");
-      return;
+  // Try to use Chrome/Edge File System API to let user pick a folder in the browser.
+  // Note: browsers only expose the folder NAME, not the full OS path.
+  const handleBrowseFolder = async () => {
+    if (typeof window !== "undefined" && "showDirectoryPicker" in window) {
+      try {
+        const dirHandle = await (window as any).showDirectoryPicker({ mode: "read" });
+        const folderName = dirHandle.name;
+        // Try to derive base path from previously saved workspace setting
+        const savedWorkspace = localStorage.getItem("DEVOS_WORKSPACE") || "";
+        let basePath = "C:\\Users\\Kavya\\Projects";
+        if (savedWorkspace) {
+          const sep = savedWorkspace.includes("\\") ? "\\" : "/";
+          const parts = savedWorkspace.split(sep);
+          parts.pop();
+          basePath = parts.join(sep);
+        }
+        setLocalPathInput(`${basePath}\\${folderName}`);
+      } catch (err: any) {
+        if (err?.name !== "AbortError") {
+          console.error("Directory picker error:", err);
+        }
+      }
+    } else {
+      alert("Your browser doesn't support the native folder picker (Chrome/Edge required). Please type the full path manually, e.g.:\nC:\\Users\\Kavya\\Projects\\myapp");
     }
+  };
+
+  const handleScanLocal = async () => {
+    const targetPath = localPathInput.trim();
+    if (!targetPath) return;
     setLocalScanning(true);
     try {
       const res = await fetch("/api/machine/scan-project", {
@@ -2766,40 +2794,30 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
       
       const data = await res.json();
       if (!res.ok) {
-        // If agent is offline and we haven't retried yet
-        if ((res.status === 503 || data.error?.includes("offline") || data.error?.includes("Agent")) && !isRetry) {
-          await fetch("/api/machine/start-agent", { method: "POST" }).catch(() => {});
-          await new Promise(resolve => setTimeout(resolve, 1500));
-          return handleScanLocal(true);
-        }
-        throw new Error(data.error || "Failed to scan project");
+        throw new Error(data.error || "Scan failed");
       }
       
-      // Auto-fill fields from scan results
-      if (data.name) setName(data.name || "");
-      if (data.description) setDescription(data.description || "");
-      // Keep the folderPath the user typed — it's already set
-      if (data.githubUrl) {
-        setGithubUrl(data.githubUrl);
-      }
-      // Scanned folder is an actual project, auto set type to code
+      // Auto-detect fields from scan
+      if (data.name) setName(data.name);
+      if (data.description) setDescription(data.description);
+      setFolderPath(data.folderPath || targetPath);
+      if (data.githubUrl) setGithubUrl(data.githubUrl);
       setType("code");
+      setLocalScanStep("confirm");
 
       // Auto-register workspace
-      try {
-        await fetch("/api/machine/register-workspace", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ path: targetPath })
-        });
-      } catch { }
+      await fetch("/api/machine/register-workspace", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: data.folderPath || targetPath })
+      }).catch(() => {});
     } catch (e: any) {
-      if ((e.message?.includes("offline") || e.message?.includes("fetch") || e.message?.includes("Agent")) && !isRetry) {
-        await fetch("/api/machine/start-agent", { method: "POST" }).catch(() => {});
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        return handleScanLocal(true);
+      const msg = e.message || "Unknown error";
+      if (msg.includes("offline") || msg.includes("503") || msg.includes("Agent")) {
+        alert("DevOS Agent is offline. Make sure you've run the install command in your terminal first.");
+      } else {
+        alert(`Scan failed: ${msg}`);
       }
-      alert(`Local scan failed: ${e.message}`);
     } finally {
       setLocalScanning(false);
     }
@@ -3006,11 +3024,11 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
                           />
                           <button
                             type="button"
-                            onClick={() => handleScanLocal(false)}
+                            onClick={handleBrowseFolder}
                             disabled={localScanning}
                             className="px-3 h-8 text-[11px] font-semibold rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/20 hover:text-amber-300 disabled:opacity-50 disabled:pointer-events-none transition-colors cursor-pointer"
                           >
-                            {localScanning ? "Choosing..." : "Choose Folder"}
+                            Browse
                           </button>
                         </div>
                       </div>
@@ -3135,43 +3153,65 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
             {/* LOCAL SCAN TAB */}
             {!projectToEdit && activeFormTab === "local" && (
               <div className="space-y-4">
-                <div className="p-5 bg-black/20 border border-dashed border-white/5 rounded-xl flex flex-col gap-3">
-                  <div className="flex items-center gap-2">
-                    <FolderOpen className="w-5 h-5 text-purple-400/80 shrink-0" />
-                    <div>
-                      <h3 className="text-xs font-semibold text-white">Import from Local Machine</h3>
-                      <p className="text-[10px] text-white/40 mt-0.5">
-                        Paste the full path to your project folder. The DevOS Agent will scan it and auto-detect your stack, Git, and scripts.
+
+                {/* Step 1: Path picker */}
+                {localScanStep === "pick" && (
+                  <div className="space-y-3">
+                    <div className="p-5 bg-black/20 border border-dashed border-purple-500/20 rounded-xl flex flex-col items-center gap-3 text-center">
+                      <FolderOpen className="w-7 h-7 text-purple-400/80" />
+                      <div>
+                        <h3 className="text-xs font-semibold text-white">Import from Local Machine</h3>
+                        <p className="text-[10px] text-white/40 mt-1 max-w-[300px] mx-auto leading-relaxed">
+                          Paste the full path to your project folder, or click Browse to pick it from your computer.
+                        </p>
+                      </div>
+
+                      {/* Path input row */}
+                      <div className="w-full max-w-sm flex gap-2">
+                        <input
+                          type="text"
+                          value={localPathInput}
+                          onChange={e => setLocalPathInput(e.target.value)}
+                          placeholder="e.g. C:\Users\Kavya\Projects\myapp"
+                          className="flex-1 h-8 bg-black/50 border border-white/10 rounded-lg text-[11px] text-white font-mono px-3 focus:outline-none focus:border-purple-500/40 placeholder:text-white/20"
+                          onKeyDown={e => { if (e.key === "Enter" && localPathInput.trim()) handleScanLocal(); }}
+                        />
+                        <button
+                          type="button"
+                          onClick={handleBrowseFolder}
+                          className="h-8 px-3 text-[10px] font-semibold rounded-lg bg-white/5 border border-white/10 text-white/60 hover:bg-white/10 hover:text-white transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5"
+                          title="Open native folder picker (Chrome/Edge)"
+                        >
+                          <FolderOpen className="w-3 h-3" />
+                          Browse
+                        </button>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleScanLocal}
+                        disabled={localScanning || !localPathInput.trim()}
+                        className="px-5 py-2 text-xs font-bold rounded-lg bg-purple-500 hover:bg-purple-600 text-white disabled:opacity-40 transition-all cursor-pointer flex items-center gap-1.5"
+                      >
+                        {localScanning ? (
+                          <>
+                            <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            <span>Scanning...</span>
+                          </>
+                        ) : (
+                          <>
+                            <FolderOpen className="w-3.5 h-3.5" />
+                            <span>Scan Folder</span>
+                          </>
+                        )}
+                      </button>
+
+                      <p className="text-[9px] text-white/20 font-mono">
+                        Tip: Make sure the DevOS agent is running in your terminal first.
                       </p>
                     </div>
                   </div>
-
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={folderPath}
-                      onChange={e => setFolderPath(e.target.value)}
-                      placeholder={navigator?.platform?.toLowerCase().includes("win") ? "e.g. C:\\Users\\Kavya\\Projects\\myapp" : "e.g. /Users/you/projects/myapp"}
-                      className="flex-1 h-9 bg-black/40 border border-white/10 rounded-lg text-xs text-white px-3 font-mono focus:outline-none focus:border-purple-500/40 placeholder:text-white/20"
-                      onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleScanLocal(false); } }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleScanLocal(false)}
-                      disabled={localScanning || !folderPath.trim()}
-                      className="px-3 h-9 text-xs font-bold rounded-lg bg-purple-500 hover:bg-purple-600 text-white disabled:opacity-40 transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
-                    >
-                      {localScanning ? (
-                        <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      </>
-                    ) : (
-                      <>
-                        <FolderOpen className="w-3.5 h-3.5" />
-                        <span>Choose & Scan Folder</span>
-                      </>
-                    )}
-                  </button>
-                </div>
+                )}
 
                 {folderPath && (
                   <div className="p-4 bg-white/[0.01] border border-white/5 rounded-xl space-y-4">
