@@ -62,9 +62,7 @@ const PHASES = [
 
 const TABS = [
   { id: 'controlroom', label: 'Control Room' },
-  { id: 'ideas', label: 'Ideas' },
   { id: 'media', label: 'Media' },
-  { id: 'tasks', label: 'Tasks' },
 ];
 
 function getProjectFaviconUrl(project: Project): string | null {
@@ -1437,6 +1435,7 @@ function IdeasTab({ project }: { project: Project }) {
                   <div className="bg-white/[0.04] border border-white/10 rounded-lg p-2">
                     <textarea
                       ref={addInputRef}
+                      autoFocus
                       value={newIdeaText}
                       onChange={e => setNewIdeaText(e.target.value)}
                       onKeyDown={e => {
@@ -1942,8 +1941,6 @@ function ControlRoomTab({ project }: { project: Project }) {
   const [npmScripts, setNpmScripts] = useState<Record<string, string>>({});
   const [scriptsLoading, setScriptsLoading] = useState(false);
   const [runningScript, setRunningScript] = useState<string | null>(null);
-  const [systemStats, setSystemStats] = useState<{ cpu: number; ram: number } | null>(null);
-  const [statsError, setStatsError] = useState<string | null>(null);
   const [visitsError, setVisitsError] = useState<string | null>(null);
 
   const fetchDeploymentsAndVisits = () => {
@@ -2048,32 +2045,7 @@ function ControlRoomTab({ project }: { project: Project }) {
     }
   }, [project.folderPath, project.id]);
 
-  // Fetch cpu/ram statistics periodically
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    const fetchStats = () => {
-      fetch("/api/machine/stats")
-        .then(async r => {
-          if (!r.ok) throw new Error("offline");
-          return r.json();
-        })
-        .then(data => {
-          if (data && typeof data.cpu === "number" && typeof data.ram === "number") {
-            setSystemStats({ cpu: data.cpu, ram: data.ram });
-            setStatsError(null);
-          }
-        })
-        .catch(() => {
-          setSystemStats(null);
-          setStatsError("Agent Offline");
-        });
-    };
 
-    fetchStats();
-    interval = setInterval(fetchStats, 3500);
-
-    return () => clearInterval(interval);
-  }, []);
 
   const runNpmScript = async (scriptName: string) => {
     if (!project.folderPath) return;
@@ -2154,328 +2126,298 @@ function ControlRoomTab({ project }: { project: Project }) {
   const mapVercelProject = async (vercelProjId: string) => {
     try {
       const vp = vercel?.projects?.find((p: any) => p.id === vercelProjId);
+      let alias = "";
       if (vp) {
-        await updateProject(project.id, { vercelProjectId: vercelProjId });
+        const rawAlias = vp.targets?.production?.alias?.[0] || vp.alias?.[0] || vp.latestDeployments?.[0]?.url;
+        if (rawAlias) {
+          alias = rawAlias.startsWith("http") ? rawAlias : `https://${rawAlias}`;
+        }
       }
+
+      if (!alias && vercelProjId) {
+        if (vercelProjId === "prj_wakeup") alias = "https://wakeup.vercel.app";
+        if (vercelProjId === "prj_gridlock") alias = "https://gridlock.vercel.app";
+      }
+
+      const updates: Partial<Project> = { vercelProjectId: vercelProjId };
+      if (alias) {
+        updates.liveUrl = alias;
+      }
+
+      await updateProject(project.id, updates);
     } catch (e) { }
   };
 
   return (
-    <div className="p-5 grid grid-cols-1 lg:grid-cols-12 gap-5 max-w-7xl mx-auto animate-in fade-in duration-300 min-h-0 select-none">
-      {/* Left 8-col deck */}
-      <div className="lg:col-span-8 space-y-5 flex flex-col min-h-0">
+    <div className="p-5 grid grid-cols-1 lg:grid-cols-12 gap-5 max-w-7xl mx-auto h-full min-h-0 select-none animate-in fade-in duration-300">
+      {/* Left Column (col-span-3) - Config & Integrations */}
+      <div className="lg:col-span-3 flex flex-col space-y-4 h-full overflow-y-auto custom-scrollbar pr-0.5 min-h-0">
         
-        {/* Tile 1: Repository Info & Git Status Card */}
-        <div className="bg-[#121217]/40 border border-white/[0.06] backdrop-blur-sm p-5 rounded-2xl flex flex-col space-y-3 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <FolderOpen className="w-4 h-4 text-amber-400" />
-              <h4 className="text-[11px] uppercase font-mono tracking-widest text-white/40 font-bold">Project Command Deck</h4>
+        {/* Workspace Connection Hub (when empty) */}
+        {!project.folderPath && !project.vercelProjectId && (
+          <div className="bg-white/[0.02] border border-white/[0.05] p-5 rounded-2xl space-y-3.5 shadow-sm">
+            <div className="flex items-center gap-1.5 text-amber-400">
+              <AlertCircle className="w-4 h-4" />
+              <h4 className="text-[10px] uppercase font-mono tracking-widest font-bold">Workspace Connection</h4>
             </div>
-            {project.folderPath && (
-              <span className="text-[9px] font-mono text-white/30 truncate max-w-[280px]">
-                {project.folderPath}
-              </span>
-            )}
+            <p className="text-[11px] text-white/50 leading-relaxed">
+              This project is currently local-only. Configure your workspace directories or deploy on Vercel to unlock stats, automated commits, and deployment tracking.
+            </p>
+            <div className="space-y-2 pt-1">
+              <button
+                onClick={() => {
+                  alert("Click the Gear icon ⚙️ in the top header to configure local workspace path or GitHub repositories.");
+                }}
+                className="w-full py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-all text-xs font-semibold border border-white/10 cursor-pointer text-center"
+              >
+                Configure Settings
+              </button>
+            </div>
           </div>
+        )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
-            <div className="p-3 bg-white/[0.01] border border-white/[0.03] rounded-xl flex items-center gap-3">
-              <GitBranch className="w-4 h-4 text-amber-500 shrink-0" />
-              <div className="min-w-0">
-                <span className="text-[9px] font-bold text-white/30 uppercase tracking-wider block font-mono">Git Branch</span>
-                {gitLoading ? (
-                  <span className="text-xs text-white/40 font-mono animate-pulse">Reading branch...</span>
-                ) : gitInfo?.branch ? (
-                  <span className="text-xs font-mono font-bold text-white/85 truncate block">{gitInfo.branch}</span>
-                ) : (
-                  <span className="text-xs text-white/20 italic">No git initialization detected</span>
-                )}
+        {/* Command Deck Card */}
+        {project.folderPath && (
+          <div className="bg-[#121217]/40 border border-white/[0.06] backdrop-blur-sm p-4 rounded-2xl flex flex-col space-y-3 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <FolderOpen className="w-4 h-4 text-amber-400" />
+                <h4 className="text-[10px] uppercase font-mono tracking-widest text-white/40 font-bold">Command Deck</h4>
               </div>
             </div>
 
-            <div className="p-3 bg-white/[0.01] border border-white/[0.03] rounded-xl flex items-center gap-3">
-              <Code2 className="w-4 h-4 text-amber-500 shrink-0" />
-              <div className="min-w-0">
-                <span className="text-[9px] font-bold text-white/30 uppercase tracking-wider block font-mono">Last Commit</span>
-                {gitLoading ? (
-                  <span className="text-xs text-white/40 font-mono animate-pulse">Reading log...</span>
-                ) : gitInfo?.commit ? (
-                  <span className="text-xs font-mono text-white/70 truncate block" title={gitInfo.commit}>{gitInfo.commit}</span>
-                ) : (
-                  <span className="text-xs text-white/20 italic">No commit history</span>
-                )}
+            <div className="flex flex-col gap-2.5">
+              <div className="p-2.5 bg-white/[0.01] border border-white/[0.03] rounded-xl flex items-center gap-2">
+                <GitBranch className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <span className="text-[8px] font-bold text-white/30 uppercase tracking-wider block font-mono">Branch</span>
+                  {gitLoading ? (
+                    <span className="text-[10px] text-white/40 font-mono animate-pulse">Reading...</span>
+                  ) : gitInfo?.branch ? (
+                    <span className="text-[11px] font-mono font-bold text-white/85 truncate block">{gitInfo.branch}</span>
+                  ) : (
+                    <span className="text-[10px] text-white/20 italic">No git branch</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="p-2.5 bg-white/[0.01] border border-white/[0.03] rounded-xl flex items-center gap-2">
+                <Code2 className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <span className="text-[8px] font-bold text-white/30 uppercase tracking-wider block font-mono">Commit</span>
+                  {gitLoading ? (
+                    <span className="text-[10px] text-white/40 font-mono animate-pulse">Reading...</span>
+                  ) : gitInfo?.commit ? (
+                    <span className="text-[11px] font-mono text-white/70 truncate block" title={gitInfo.commit}>{gitInfo.commit}</span>
+                  ) : (
+                    <span className="text-[10px] text-white/20 italic">No commit history</span>
+                  )}
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
 
-        {/* Tile 2 & 3 Grid: Vercel & System Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          
-          {/* Vercel Metrics Card */}
-          <div className="bg-[#121217]/40 border border-white/[0.06] backdrop-blur-sm p-5 rounded-2xl flex flex-col space-y-4 shadow-sm">
+        {/* Vercel Analytics & Recent Builds Card */}
+        {vercel?.hasToken && project.vercelProjectId && (
+          <div className="bg-[#121217]/40 border border-white/[0.06] backdrop-blur-sm p-4 rounded-2xl flex flex-col space-y-3.5 shadow-sm">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
                 <Globe className="w-3.5 h-3.5 text-amber-400" />
-                <h4 className="text-[11px] uppercase font-mono tracking-widest text-white/40 font-bold">Vercel Analytics</h4>
+                <h4 className="text-[10px] uppercase font-mono tracking-widest text-white/40 font-bold">Vercel Analytics</h4>
               </div>
-              {project.vercelProjectId && (
-                <span className="text-[8px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-mono font-bold uppercase tracking-wider">
-                  connected
-                </span>
-              )}
             </div>
 
-            {!vercel?.hasToken ? (
-              <div className="flex-1 flex flex-col justify-center space-y-2 py-4 select-none">
-                <p className="text-[11px] text-white/50 leading-normal">
-                  Vercel integration is not configured.
-                </p>
-                <p className="text-[10px] text-white/30 leading-normal">
-                  Add your Vercel API token in Settings to fetch visitor traffic metrics and track deployments.
-                </p>
-              </div>
-            ) : !project.vercelProjectId ? (
-              <div className="flex-1 flex flex-col justify-center space-y-3 py-4">
-                <p className="text-[11px] text-white/50 leading-normal">
-                  Connect a Vercel project to load visitor traffic metrics and trigger production deployments.
-                </p>
-                <select
-                  onChange={e => mapVercelProject(e.target.value)}
-                  className="w-full h-8 bg-white/[0.02] border border-white/[0.08] rounded-xl text-xs text-white px-3 focus:outline-none focus:border-amber-500/40 cursor-pointer font-semibold transition-all"
-                >
-                  <option value="" className="bg-[#0f0f11]">Select Vercel Project...</option>
-                  {vercel?.projects?.map((vp: any) => (
-                    <option key={vp.id} value={vp.id} className="bg-[#0f0f11]">{vp.name}</option>
-                  ))}
-                </select>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-3.5 rounded-xl bg-white/[0.01] border border-white/[0.03] relative min-h-[58px]">
-                  <div>
-                    <span className="text-[9px] font-bold uppercase text-white/30 tracking-wider">Weekly Traffic</span>
-                    {visitsError ? (
-                      <p className="text-[10px] text-amber-500/80 font-mono mt-1 font-semibold leading-snug">{visitsError}</p>
-                    ) : (
-                      <p className="text-lg font-bold font-mono text-white mt-0.5">{totalVisits} visits</p>
-                    )}
-                  </div>
-                  {!visitsError && (
-                    <div className="h-10 flex items-end gap-1 select-none relative">
-                      {weeklyVisits.map((v, idx) => {
-                        const daysAgo = 6 - idx;
-                        let dayLabel = `${daysAgo}d ago`;
-                        if (daysAgo === 0) dayLabel = "Today";
-                        else if (daysAgo === 1) dayLabel = "Yesterday";
-
-                        return (
-                          <div
-                            key={idx}
-                            onMouseEnter={() => setHoveredBarIndex(idx)}
-                            onMouseLeave={() => setHoveredBarIndex(null)}
-                            style={{ height: `${Math.max(15, Math.round((v / maxVisits) * 100))}%` }}
-                            className="w-2.5 bg-gradient-to-t from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 rounded-t transition-all duration-300 cursor-pointer relative"
-                          >
-                            {hoveredBarIndex === idx && (
-                              <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50 bg-[#121217] border border-white/10 px-2 py-1 rounded shadow-xl pointer-events-none text-center min-w-[70px]">
-                                <div className="text-[9px] font-bold text-white/90 whitespace-nowrap">{dayLabel}</div>
-                                <div className="text-[10px] font-mono font-bold text-amber-400 whitespace-nowrap">{v} visits</div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-1.5">
-                  <span className="text-[9px] font-bold uppercase text-white/30 tracking-wider block font-mono">Recent Builds</span>
-                  {deploymentsLoading ? (
-                    <p className="text-[10px] text-white/30 animate-pulse font-mono py-1">Fetching deployments...</p>
-                  ) : deployments.length === 0 ? (
-                    <p className="text-[10px] text-white/20 italic py-1">No builds found.</p>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.01] border border-white/[0.03] relative min-h-[50px]">
+                <div>
+                  <span className="text-[8px] font-bold uppercase text-white/30 tracking-wider">Weekly Traffic</span>
+                  {visitsError ? (
+                    <p className="text-[9px] text-amber-500/80 font-mono mt-0.5 font-semibold leading-snug">{visitsError}</p>
                   ) : (
-                    <div className="space-y-1.5 max-h-[120px] overflow-y-auto pr-0.5 custom-scrollbar">
-                      {deployments.slice(0, 3).map((dep: any) => {
-                        const isReady = dep.state === "READY";
-                        const isError = dep.state === "ERROR" || dep.state === "FAILED";
-                        return (
-                          <div key={dep.uid} className="flex items-center justify-between p-2 rounded-xl bg-white/[0.01] border border-white/[0.03] text-[11px] text-white/60 hover:bg-white/[0.02] transition-colors">
-                            <span className="truncate flex-1 pr-3 font-mono text-white/85">{dep.meta?.githubCommitMessage || dep.name || "Deploy"}</span>
-                            <span className={`text-[8px] font-mono font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
-                              isReady ? "bg-green-500/10 text-green-400 border border-green-500/20" :
-                              isError ? "bg-red-500/10 text-red-400 border border-red-500/20" :
-                              "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                            }`}>
-                              {dep.state.toLowerCase()}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
+                    <p className="text-sm font-bold font-mono text-white mt-0.5">{totalVisits} visits</p>
                   )}
                 </div>
-              </div>
-            )}
-          </div>
+                {!visitsError && weeklyVisits.length > 0 && (
+                  <div className="h-8 flex items-end gap-0.5 select-none relative">
+                    {weeklyVisits.map((v, idx) => {
+                      const daysAgo = 6 - idx;
+                      let dayLabel = `${daysAgo}d ago`;
+                      if (daysAgo === 0) dayLabel = "Today";
+                      else if (daysAgo === 1) dayLabel = "Yesterday";
 
-          {/* System Performance Card */}
-          <div className="bg-[#121217]/40 border border-white/[0.06] backdrop-blur-sm p-5 rounded-2xl flex flex-col space-y-4 shadow-sm">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <Activity className="w-3.5 h-3.5 text-amber-400" />
-                <h4 className="text-[11px] uppercase font-mono tracking-widest text-white/40 font-bold">System Performance</h4>
-              </div>
-              {statsError && (
-                <span className="text-[8px] px-2 py-0.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/20 font-mono font-bold uppercase tracking-wider animate-pulse">
-                  {statsError}
-                </span>
-              )}
-            </div>
-
-            <div className="flex-1 flex flex-col justify-center space-y-5 py-2">
-              <div className="space-y-1.5">
-                <div className="flex justify-between items-center text-[10px] uppercase tracking-wider font-mono">
-                  <span className="text-white/40">CPU Load</span>
-                  <span className="text-white font-bold">{systemStats ? `${systemStats.cpu}%` : "—"}</span>
-                </div>
-                <div className="h-2 w-full bg-white/[0.02] border border-white/[0.06] rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-gradient-to-r from-amber-500 to-yellow-400 transition-all duration-1000"
-                    style={{ width: systemStats ? `${systemStats.cpu}%` : "0%" }}
-                  />
-                </div>
+                      return (
+                        <div
+                          key={idx}
+                          onMouseEnter={() => setHoveredBarIndex(idx)}
+                          onMouseLeave={() => setHoveredBarIndex(null)}
+                          style={{ height: `${Math.max(15, Math.round((v / maxVisits) * 100))}%` }}
+                          className="w-2 bg-gradient-to-t from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 rounded-t transition-all duration-300 cursor-pointer relative"
+                        >
+                          {hoveredBarIndex === idx && (
+                            <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50 bg-[#121217] border border-white/10 px-2 py-1 rounded shadow-xl pointer-events-none text-center min-w-[70px]">
+                              <div className="text-[9px] font-bold text-white/90 whitespace-nowrap">{dayLabel}</div>
+                              <div className="text-[10px] font-mono font-bold text-amber-400 whitespace-nowrap">{v} visits</div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               <div className="space-y-1.5">
-                <div className="flex justify-between items-center text-[10px] uppercase tracking-wider font-mono">
-                  <span className="text-white/40">RAM Utilization</span>
-                  <span className="text-white font-bold">{systemStats ? `${systemStats.ram}%` : "—"}</span>
-                </div>
-                <div className="h-2 w-full bg-white/[0.02] border border-white/[0.06] rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-gradient-to-r from-amber-500 to-yellow-400 transition-all duration-1000"
-                    style={{ width: systemStats ? `${systemStats.ram}%` : "0%" }}
-                  />
-                </div>
+                <span className="text-[8px] font-bold uppercase text-white/30 tracking-wider block font-mono">Recent Builds</span>
+                {deploymentsLoading ? (
+                  <p className="text-[9px] text-white/30 animate-pulse font-mono py-0.5">Fetching...</p>
+                ) : deployments.length === 0 ? (
+                  <p className="text-[9px] text-white/20 italic py-0.5">No builds found.</p>
+                ) : (
+                  <div className="space-y-1 max-h-[85px] overflow-y-auto pr-0.5 custom-scrollbar">
+                    {deployments.slice(0, 2).map((dep: any) => {
+                      const isReady = dep.state === "READY";
+                      const isError = dep.state === "ERROR" || dep.state === "FAILED";
+                      return (
+                        <div key={dep.uid} className="flex items-center justify-between p-1.5 rounded-lg bg-white/[0.01] border border-white/[0.03] text-[10px] text-white/60 hover:bg-white/[0.02] transition-colors">
+                          <span className="truncate flex-1 pr-2 font-mono text-white/80">{dep.meta?.githubCommitMessage || dep.name || "Deploy"}</span>
+                          <span className={`text-[7px] font-mono font-bold uppercase tracking-wider px-1.5 py-0.2 rounded ${
+                            isReady ? "bg-green-500/10 text-green-400 border border-green-500/20" :
+                            isError ? "bg-red-500/10 text-red-400 border border-red-500/20" :
+                            "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                          }`}>
+                            {dep.state.toLowerCase()}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-
-              <p className="text-[9px] text-white/20 italic font-mono text-center">
-                Refreshed live every 3.5 seconds
-              </p>
             </div>
           </div>
-        </div>
+        )}
 
-        {/* Tile 4: Quick Scripts Dashboard */}
-        <div className="bg-[#121217]/40 border border-white/[0.06] backdrop-blur-sm p-5 rounded-2xl flex flex-col space-y-3 shadow-sm">
-          <div className="flex items-center gap-1.5">
-            <Terminal className="w-3.5 h-3.5 text-amber-400" />
-            <h4 className="text-[11px] uppercase font-mono tracking-widest text-white/40 font-bold">NPM Scripts Dashboard</h4>
+        {/* Vercel Unlinked Connection Selection Card */}
+        {vercel?.hasToken && !project.vercelProjectId && (
+          <div className="bg-[#121217]/40 border border-white/[0.06] backdrop-blur-sm p-4 rounded-2xl flex flex-col space-y-3 shadow-sm">
+            <div className="flex items-center gap-1.5">
+              <Globe className="w-3.5 h-3.5 text-amber-400" />
+              <h4 className="text-[10px] uppercase font-mono tracking-widest text-white/40 font-bold">Vercel Connection</h4>
+            </div>
+            <p className="text-[10px] text-white/50 leading-normal">
+              Connect a Vercel project to load traffic metrics.
+            </p>
+            <select
+              onChange={e => mapVercelProject(e.target.value)}
+              className="w-full h-8 bg-white/[0.02] border border-white/[0.08] rounded-xl text-xs text-white px-2 focus:outline-none focus:border-amber-500/40 cursor-pointer font-semibold transition-all"
+            >
+              <option value="" className="bg-[#0f0f11]">Select Project...</option>
+              {vercel?.projects?.map((vp: any) => (
+                <option key={vp.id} value={vp.id} className="bg-[#0f0f11]">{vp.name}</option>
+              ))}
+            </select>
           </div>
+        )}
 
-          {!project.folderPath ? (
-            <p className="text-[10px] text-white/20 italic py-2">Select a local directory path to read and run npm scripts.</p>
-          ) : scriptsLoading ? (
-            <p className="text-[10px] text-white/30 animate-pulse font-mono py-2">Loading scripts from package.json...</p>
-          ) : Object.keys(npmScripts).length === 0 ? (
-            <p className="text-[10px] text-white/20 italic py-2">No scripts found in package.json.</p>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 pt-1">
-              {Object.keys(npmScripts).map(scriptName => {
-                return (
+        {/* NPM Scripts Card */}
+        {project.folderPath && Object.keys(npmScripts).length > 0 && (
+          <div className="bg-[#121217]/40 border border-white/[0.06] backdrop-blur-sm p-4 rounded-2xl flex flex-col space-y-3 shadow-sm">
+            <div className="flex items-center gap-1.5">
+              <Terminal className="w-3.5 h-3.5 text-amber-400" />
+              <h4 className="text-[10px] uppercase font-mono tracking-widest text-white/40 font-bold">NPM Scripts</h4>
+            </div>
+
+            {scriptsLoading ? (
+              <p className="text-[10px] text-white/30 animate-pulse font-mono py-1">Loading...</p>
+            ) : (
+              <div className="grid grid-cols-2 gap-1.5 pt-0.5">
+                {Object.keys(npmScripts).slice(0, 6).map(scriptName => (
                   <button
                     key={scriptName}
                     onClick={() => runNpmScript(scriptName)}
-                    className="px-3 py-1.5 rounded-xl text-[11px] font-mono text-left bg-white/[0.01] border border-white/[0.04] text-white/75 hover:bg-amber-500/5 hover:border-amber-500/20 hover:text-amber-400 transition-all cursor-pointer flex items-center justify-between"
+                    className="px-2 py-1.5 rounded-lg text-[9px] font-mono text-left bg-white/[0.01] border border-white/[0.04] text-white/70 hover:bg-amber-500/5 hover:border-amber-500/20 hover:text-amber-400 transition-all cursor-pointer flex items-center justify-between"
                   >
                     <span className="truncate mr-1">{scriptName}</span>
-                    <Play className="w-2.5 h-2.5 text-amber-500/50 shrink-0" />
+                    <Play className="w-2 h-2 text-amber-500/50 shrink-0" />
                   </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
-        {/* Tile 5: Combined Infrastructure Links Registry */}
-        <div className="bg-[#121217]/40 border border-white/[0.06] backdrop-blur-sm p-5 rounded-2xl flex flex-col space-y-3 shadow-sm">
-          <div className="flex items-center justify-between border-b border-white/[0.04] pb-2">
+        {/* Infrastructure Registry Card */}
+        <div className="bg-[#121217]/40 border border-white/[0.06] backdrop-blur-sm p-4 rounded-2xl flex flex-col space-y-3 shadow-sm">
+          <div className="flex items-center justify-between border-b border-white/[0.04] pb-1.5">
             <div className="flex items-center gap-1.5">
               <Activity className="w-3.5 h-3.5 text-amber-400" />
-              <h4 className="text-[11px] uppercase font-mono tracking-widest text-white/40 font-bold">Infrastructure Registry</h4>
+              <h4 className="text-[10px] uppercase font-mono tracking-widest text-white/40 font-bold">Infrastructure Registry</h4>
             </div>
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-6 text-[9px] bg-transparent border-white/10 text-white/50 hover:bg-white/5 cursor-pointer px-2 rounded-md font-bold uppercase tracking-wider"
+            <div className="flex items-center gap-1.5">
+              <button
+                className="text-[9px] px-1.5 py-0.5 rounded bg-transparent border border-white/10 hover:bg-white/5 text-white/50 cursor-pointer font-bold uppercase tracking-wider"
                 onClick={pingLinks}
                 disabled={pingingLinks}
               >
-                {pingingLinks ? "Pinging..." : "Ping All"}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className={`h-6 text-[9px] cursor-pointer px-2 rounded-md font-bold uppercase tracking-wider ${showAddLinkForm ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-transparent border-white/10 text-white/50 hover:bg-white/5'}`}
+                {pingingLinks ? "..." : "Ping"}
+              </button>
+              <button
+                className={`text-[9px] px-1.5 py-0.5 rounded cursor-pointer font-bold uppercase tracking-wider ${showAddLinkForm ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-transparent border-white/10 text-white/50 hover:bg-white/5'}`}
                 onClick={() => setShowAddLinkForm(!showAddLinkForm)}
               >
-                {showAddLinkForm ? "Cancel" : "+ Add Link"}
-              </Button>
+                {showAddLinkForm ? "✕" : "+"}
+              </button>
             </div>
           </div>
 
           {/* Collapsible Add Form */}
           {showAddLinkForm && (
-            <div className="p-3.5 bg-white/[0.01] border border-white/[0.04] rounded-xl space-y-3 text-xs animate-in slide-in-from-top-2 duration-200">
-              <div className="grid grid-cols-2 gap-3">
+            <div className="p-2.5 bg-white/[0.01] border border-white/[0.04] rounded-xl space-y-2.5 text-[11px] animate-in slide-in-from-top-1 duration-150">
+              <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
-                  <span className="text-[9px] text-white/30 font-bold uppercase tracking-wider font-mono">Link Label</span>
+                  <span className="text-[8px] text-white/30 font-bold uppercase tracking-wider font-mono">Label</span>
                   <Input
                     value={newLinkLabel}
                     onChange={e => setNewLinkLabel(e.target.value)}
-                    placeholder="Neon DB Console"
-                    className="h-8 bg-[#07070a] border border-white/[0.08] focus:border-amber-500/40 text-xs text-white rounded-lg px-2.5 focus:ring-0 placeholder:text-white/20"
+                    placeholder="Database"
+                    className="h-7 bg-[#07070a] border border-white/[0.08] text-[10px] text-white rounded-lg px-2 placeholder:text-white/20"
                   />
                 </div>
                 <div className="space-y-1">
-                  <span className="text-[9px] text-white/30 font-bold uppercase tracking-wider font-mono">Type</span>
+                  <span className="text-[8px] text-white/30 font-bold uppercase tracking-wider font-mono">Type</span>
                   <select
                     value={newLinkType}
                     onChange={e => setNewLinkType(e.target.value)}
-                    className="w-full h-8 bg-[#07070a] border border-white/[0.08] focus:border-amber-500/40 rounded-lg text-xs text-white px-2.5 cursor-pointer outline-none font-medium"
+                    className="w-full h-7 bg-[#07070a] border border-white/[0.08] rounded-lg text-[10px] text-white px-1.5 cursor-pointer outline-none"
                   >
-                    <option value="frontend" className="bg-[#0f0f11]">Frontend</option>
-                    <option value="backend" className="bg-[#0f0f11]">Backend</option>
-                    <option value="database" className="bg-[#0f0f11]">Database</option>
-                    <option value="storage" className="bg-[#0f0f11]">Storage</option>
-                    <option value="monitoring" className="bg-[#0f0f11]">Monitoring</option>
-                    <option value="logs" className="bg-[#0f0f11]">Logs</option>
-                    <option value="other" className="bg-[#0f0f11]">Other</option>
+                    <option value="frontend">Frontend</option>
+                    <option value="backend">Backend</option>
+                    <option value="database">Database</option>
+                    <option value="storage">Storage</option>
+                    <option value="monitoring">Monitoring</option>
+                    <option value="logs">Logs</option>
+                    <option value="other">Other</option>
                   </select>
                 </div>
               </div>
               
               <div className="space-y-1">
-                <span className="text-[9px] text-white/30 font-bold uppercase tracking-wider font-mono">Target URL</span>
-                <div className="flex gap-2">
+                <span className="text-[8px] text-white/30 font-bold uppercase tracking-wider font-mono">URL</span>
+                <div className="flex gap-1.5">
                   <Input
                     value={newLinkUrl}
                     onChange={e => setNewLinkUrl(e.target.value)}
-                    placeholder="https://console.neon.tech/..."
-                    className="h-8 bg-[#07070a] border border-white/[0.08] focus:border-amber-500/40 text-xs text-white rounded-lg flex-1 px-2.5 focus:ring-0 placeholder:text-white/20"
+                    placeholder="https://..."
+                    className="h-7 bg-[#07070a] border border-white/[0.08] text-[10px] text-white rounded-lg flex-1 px-2 placeholder:text-white/20"
                   />
                   <Button
                     size="sm"
                     onClick={submitNewLink}
                     disabled={creatingLink || !newLinkUrl || !newLinkLabel}
-                    className={`h-8 text-xs font-bold rounded-lg px-3.5 border-0 ${justAdded ? 'bg-green-500 hover:bg-green-600 text-white' : 'bg-white text-black hover:bg-white/90'}`}
+                    className="h-7 text-[10px] font-bold rounded-lg px-2 bg-white text-black hover:bg-white/90"
                   >
-                    {creatingLink ? "Saving..." : justAdded ? "Saved!" : "Save"}
+                    {creatingLink ? "..." : "Save"}
                   </Button>
                 </div>
               </div>
@@ -2484,52 +2426,42 @@ function ControlRoomTab({ project }: { project: Project }) {
 
           {/* Link Registry Items */}
           {linksLoading ? (
-            <p className="text-[10px] text-white/30 text-center py-4 font-mono">Loading links registry...</p>
+            <p className="text-[9px] text-white/30 text-center py-2 font-mono">Loading...</p>
           ) : projectLinks.length === 0 ? (
-            <p className="text-[10px] text-white/20 text-center py-4 italic">No environment or infrastructure links added yet.</p>
+            <p className="text-[9px] text-white/20 text-center py-2 italic">No registry links added.</p>
           ) : (
-            <div className="grid grid-cols-1 gap-2 max-h-[190px] overflow-y-auto pr-1 custom-scrollbar">
+            <div className="space-y-1.5 max-h-[140px] overflow-y-auto pr-0.5 custom-scrollbar">
               {projectLinks.map((link) => (
-                <div key={link.id} className="p-2.5 rounded-xl bg-white/[0.01] border border-white/[0.04] flex items-center justify-between gap-3 group hover:border-white/10 hover:bg-white/[0.02] transition-all">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className="relative flex h-1.5 w-1.5 shrink-0">
-                      {(!link.lastPinged || link.lastStatus === null) ? (
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white/20 opacity-75"></span>
-                      ) : (link.lastStatus >= 200 && link.lastStatus < 300) ? (
-                        <span className="animate-pulse absolute inline-flex h-full w-full rounded-full bg-green-400/40 opacity-75"></span>
-                      ) : (
-                        <span className="animate-pulse absolute inline-flex h-full w-full rounded-full bg-red-400/40 opacity-75"></span>
-                      )}
-                      <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${!link.lastPinged || link.lastStatus === null ? 'bg-white/30' :
-                          (link.lastStatus >= 200 && link.lastStatus < 300) ? 'bg-green-400' : 'bg-red-400'
-                        }`}></span>
-                    </span>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <p className="text-xs font-semibold text-white/85 truncate leading-none">{link.label}</p>
-                        <span className="text-[8px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-white/[0.04] text-white/30 border border-white/5 font-mono">
+                <div key={link.id} className="p-2 rounded-lg bg-white/[0.01] border border-white/[0.04] flex items-center justify-between gap-2 group hover:border-white/10 hover:bg-white/[0.02] transition-all">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <span className={`h-1.5 w-1.5 rounded-full ${!link.lastPinged || link.lastStatus === null ? 'bg-white/30' :
+                        (link.lastStatus >= 200 && link.lastStatus < 300) ? 'bg-green-400' : 'bg-red-400'
+                      } shrink-0`}></span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1">
+                        <p className="text-[11px] font-semibold text-white/80 truncate leading-none">{link.label}</p>
+                        <span className="text-[7px] uppercase tracking-wider px-1 py-0.2 rounded bg-white/[0.03] text-white/30 border border-white/5 font-mono">
                           {link.type}
                         </span>
                       </div>
-                      <span className="text-[10px] font-mono text-white/35 truncate block mt-0.5">{link.url.replace(/^https?:\/\//, '')}</span>
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                     <a
                       href={link.url}
                       target="_blank"
-                      className="w-6 h-6 text-white/40 hover:text-white hover:bg-white/5 inline-flex items-center justify-center rounded border border-white/5"
+                      className="w-5 h-5 text-white/40 hover:text-white hover:bg-white/5 inline-flex items-center justify-center rounded border border-white/5"
                     >
-                      <ExternalLink className="w-3 h-3" />
+                      <ExternalLink className="w-2.5 h-2.5" />
                     </a>
                     <Button
                       size="icon"
                       variant="ghost"
-                      className="w-6 h-6 text-white/40 hover:text-red-400 hover:bg-red-500/10 rounded border border-transparent"
+                      className="w-5 h-5 text-white/40 hover:text-red-400 hover:bg-red-500/10 rounded"
                       onClick={() => deleteLink(link.id)}
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 className="w-2.5 h-2.5" />
                     </Button>
                   </div>
                 </div>
@@ -2537,17 +2469,23 @@ function ControlRoomTab({ project }: { project: Project }) {
             </div>
           )}
         </div>
+
       </div>
 
-      {/* Right 4-col checklist deck */}
-      <div className="lg:col-span-4 bg-[#121217]/40 border border-white/[0.06] backdrop-blur-sm p-5 rounded-2xl flex flex-col space-y-4 overflow-hidden">
+      {/* Center Column: Project Tasks (col-span-4) */}
+      <div className="lg:col-span-4 bg-[#121217]/40 border border-white/[0.06] backdrop-blur-sm p-4 rounded-2xl flex flex-col space-y-4 overflow-hidden h-full min-h-0">
         <div className="flex items-center gap-1.5 border-b border-white/[0.04] pb-2 flex-shrink-0 select-none">
           <CheckSquare className="w-4 h-4 text-amber-400" />
           <h4 className="text-xs uppercase font-mono tracking-widest text-white/40 font-bold">Project Tasks</h4>
         </div>
-        <div className="flex-1 overflow-y-auto custom-scrollbar pr-0.5">
+        <div className="flex-1 overflow-y-auto custom-scrollbar pr-0.5 animate-in fade-in duration-200">
           <ProjectTasksTab project={project} isNested={true} />
         </div>
+      </div>
+
+      {/* Right Column: Ideas Kanban Board (col-span-5) */}
+      <div className="lg:col-span-5 bg-[#121217]/40 border border-white/[0.06] backdrop-blur-sm rounded-2xl flex flex-col overflow-hidden h-full min-h-0">
+        <IdeasTab project={project} />
       </div>
     </div>
   );
@@ -4077,16 +4015,14 @@ export function ProjectOS() {
                 </div>
               )}
 
-              {/* Tab content — ideas fills, others scroll */}
-              <div className={`flex-1 min-h-0 ${selectedProjectResolvedPhase === "idea" ? "overflow-hidden" : (activeTab === 'ideas' || activeTab === 'tasks' ? 'overflow-hidden' : 'overflow-y-auto custom-scrollbar')}`}>
+              {/* Tab content — ideas/controlroom fills, others scroll */}
+              <div className={`flex-1 min-h-0 ${selectedProjectResolvedPhase === "idea" ? "overflow-hidden" : (activeTab === 'controlroom' ? 'overflow-hidden' : 'overflow-y-auto custom-scrollbar')}`}>
                 {selectedProjectResolvedPhase === "idea" ? (
                   <IdeaCanvasView project={selectedProject} />
                 ) : (
                   <>
-                    {activeTab === 'ideas' && <IdeasTab project={selectedProject} />}
                     {activeTab === 'media' && <MediaVaultTab project={selectedProject} />}
                     {activeTab === 'controlroom' && <ControlRoomTab project={selectedProject} />}
-                    {activeTab === 'tasks' && <ProjectTasksTab project={selectedProject} />}
                   </>
                 )}
               </div>
