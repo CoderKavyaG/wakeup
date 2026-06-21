@@ -152,6 +152,14 @@ model GithubCache {
   user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+model VercelCache {
+  id        String   @id
+  data      Json
+  updatedAt DateTime @updatedAt
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
 // ==========================================
 // THEDAILYDEV SIBLING MODELS (SAFEKEEPING)
 // ==========================================
@@ -199,6 +207,7 @@ model User {
   layouts       LayoutState[]
   insights      AIInsight[]
   githubCaches  GithubCache[]
+  vercelCaches  VercelCache[]
   savedTrends   SavedTrend[]
   socialDrafts  SocialDraft[]
   ideas           Idea[]
