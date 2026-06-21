@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
+import { decrypt } from "@/lib/encryption";
 
 export async function POST(request: Request) {
   try {
@@ -7,6 +9,7 @@ export async function POST(request: Request) {
     if (!session?.user?.id) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
+    const userId = session.user.id;
 
     const { repo, title, body } = await request.json();
 
@@ -14,8 +17,26 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
+    let token: string | null | undefined = process.env.GITHUB_TOKEN;
+
     const authHeader = request.headers.get("Authorization");
-    const token = authHeader ? authHeader.replace("Bearer ", "") : process.env.GITHUB_TOKEN;
+    const headerToken = authHeader ? authHeader.replace("Bearer ", "").replace("token ", "") : null;
+    if (headerToken) {
+      token = headerToken;
+    } else {
+      try {
+        const userRecord = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { githubToken: true }
+        });
+        if (userRecord?.githubToken) {
+          token = decrypt(userRecord.githubToken);
+        }
+      } catch (e) {
+        console.error("Failed to read github token from db:", e);
+      }
+    }
+
     if (!token) {
       return NextResponse.json({ error: "No GITHUB_TOKEN configured in environment or passed in request" }, { status: 500 });
     }

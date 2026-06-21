@@ -1586,10 +1586,6 @@ export function ProjectsWidget() {
                             {(!cat || cat === 'classifying...') ? 'classifying...' : cat}
                           </Badge>
                           <span className="text-[9px] text-white/25 font-mono ml-auto">{timeAgo(note.createdAt)}</span>
-                          <button onClick={() => handleDeleteNote(note.id)}
-                            className="opacity-0 group-hover:opacity-100 transition-opacity text-white/30 hover:text-red-400">
-                            <Trash2 className="w-3 h-3" />
-                          </button>
                         </div>
                         <p className="text-[11px] text-white/65 leading-relaxed line-clamp-3">{note.content}</p>
                         <div className="flex gap-1.5">
