@@ -1652,6 +1652,13 @@ function MediaVaultTab({ project }: { project: Project }) {
         <span className="text-[10px] text-white/20 font-mono shrink-0">{media.length} items</span>
       </div>
 
+      <div className="mb-4 p-2.5 rounded-lg bg-amber-500/5 border border-amber-500/10 flex items-center gap-2 text-[10px] text-amber-400/80 leading-normal select-none">
+        <AlertCircle className="w-3.5 h-3.5 shrink-0 text-amber-500" />
+        <span>
+          Images are stored locally in your project's upload directory (<code>public/uploads</code>). Moving or deleting these files on disk will break the links in DevOS.
+        </span>
+      </div>
+
       {/* Filter pills */}
       <div className="flex gap-1.5 mb-5">
         {MEDIA_FILTERS.map(t => (
@@ -2643,7 +2650,7 @@ interface ProjectFormModalProps {
 }
 
 function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSaveSuccess }: ProjectFormModalProps) {
-  const { addProject, updateProject } = useProjectStore();
+  const { projects, addProject, updateProject } = useProjectStore();
 
   // Form state
   const [name, setName] = useState("");
@@ -2774,6 +2781,7 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
           basePath = parts.join(sep);
         }
         setLocalPathInput(`${basePath}\\${folderName}`);
+        setFolderPath(`${basePath}\\${folderName}`);
         return;
       } catch (err: any) {
         if (err?.name === "AbortError") return; // user cancelled — do nothing
@@ -3109,28 +3117,41 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
                     <div className="grid grid-cols-1 gap-1.5 max-h-[30vh] overflow-y-auto pr-1">
                       {filteredRepos.map(repo => {
                         const isSelected = selectedRepo?.id === repo.id;
+                        const isAlreadyAdded = projects.some(p => 
+                          (p.githubUrl && (p.githubUrl.toLowerCase() === repo.html_url.toLowerCase() || p.githubUrl.toLowerCase() === `${repo.html_url}.git`.toLowerCase())) ||
+                          p.name.toLowerCase() === repo.name.toLowerCase()
+                        );
                         return (
                           <button
                             key={repo.id}
                             type="button"
+                            disabled={isAlreadyAdded}
                             onClick={() => {
+                              if (isAlreadyAdded) return;
                               setSelectedRepo(repo);
                               setName(repo.name);
                               setDescription(repo.description || "");
                               setGithubUrl(repo.html_url);
                               setType("code");
                             }}
-                            className={`w-full text-left p-3 rounded-lg border transition-all flex flex-col gap-1 cursor-pointer ${
-                              isSelected
-                                ? "bg-purple-500/10 border-purple-500/40 text-purple-300 font-medium"
-                                : "bg-white/[0.01] border-white/[0.05] hover:bg-white/[0.03] text-white/70"
+                            className={`w-full text-left p-3 rounded-lg border transition-all flex flex-col gap-1 ${
+                              isAlreadyAdded
+                                ? "bg-white/[0.01] border-white/[0.03] text-white/20 cursor-not-allowed opacity-50"
+                                : isSelected
+                                ? "bg-purple-500/10 border-purple-500/40 text-purple-300 font-medium cursor-pointer"
+                                : "bg-white/[0.01] border-white/[0.05] hover:bg-white/[0.03] text-white/70 cursor-pointer"
                             }`}
                           >
                             <div className="flex items-center justify-between">
                               <span className="text-xs font-semibold">{repo.name}</span>
-                              {repo.language && (
-                                <span className="text-[9px] bg-white/5 px-1.5 py-0.5 rounded text-white/50">{repo.language}</span>
-                              )}
+                              <div className="flex items-center gap-1.5">
+                                {isAlreadyAdded && (
+                                  <span className="text-[9px] bg-white/5 border border-white/10 px-1.5 py-0.5 rounded text-white/45 font-mono">Already Added</span>
+                                )}
+                                {repo.language && (
+                                  <span className="text-[9px] bg-white/5 px-1.5 py-0.5 rounded text-white/50">{repo.language}</span>
+                                )}
+                              </div>
                             </div>
                             {repo.description && (
                               <p className="text-[10px] text-white/45 line-clamp-1">{repo.description}</p>
@@ -3521,6 +3542,40 @@ export function ProjectOS() {
   useEffect(() => {
     loadCurationLists();
   }, [projects, isOpen]);
+
+  // Automatically add any uncurated projects to their respective phase lists
+  useEffect(() => {
+    if (typeof window === "undefined" || !isOpen) return;
+    let modified = false;
+    
+    // Get all currently curated IDs
+    const currentCuratedIds = new Set([
+      ...curatedLaunched,
+      ...curatedInDev,
+      ...curatedSketching,
+      ...curatedIdea
+    ]);
+
+    projects.forEach(p => {
+      if (!currentCuratedIds.has(p.id)) {
+        const key = `devos_curated_${p.phase}`;
+        const stored = localStorage.getItem(key);
+        let list: string[] = [];
+        if (stored) {
+          try { list = JSON.parse(stored); } catch {}
+        }
+        if (!list.includes(p.id)) {
+          list.push(p.id);
+          localStorage.setItem(key, JSON.stringify(list));
+          modified = true;
+        }
+      }
+    });
+
+    if (modified) {
+      loadCurationLists();
+    }
+  }, [projects, curatedLaunched, curatedInDev, curatedSketching, curatedIdea, isOpen]);
 
   // Automatically move project IDs in curated lists when their DB phase shifts!
   useEffect(() => {

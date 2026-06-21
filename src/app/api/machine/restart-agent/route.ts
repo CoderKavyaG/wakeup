@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import cp from 'child_process';
 import os from 'os';
+import fs from 'fs';
+import path from 'path';
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -10,14 +12,26 @@ export async function POST(req: Request) {
   }
 
   try {
+    let activePort = 3131;
+    try {
+      const portFilePath = path.join(process.cwd(), "devos-agent", "active-port.json");
+      if (fs.existsSync(portFilePath)) {
+        const content = fs.readFileSync(portFilePath, "utf8");
+        const data = JSON.parse(content);
+        if (data && typeof data.port === "number") {
+          activePort = data.port;
+        }
+      }
+    } catch (e) {}
+
     // Attempt to kill existing agent gracefully if endpoint exists
-    await fetch("http://127.0.0.1:3131/kill", { method: "POST" }).catch(() => {});
+    await fetch(`http://127.0.0.1:${activePort}/kill`, { method: "POST" }).catch(() => {});
     
-    // 1. Kill any process listening on 3131 (the agent)
+    // 1. Kill any process listening on the active port (the agent)
     const isWin = os.platform() === 'win32';
     const killCmd = isWin 
-      ? `FOR /F "tokens=5" %a in ('netstat -aon ^| findstr :3131') do taskkill /F /PID %a`
-      : `lsof -ti:3131 | xargs kill -9`;
+      ? `FOR /F "tokens=5" %a in ('netstat -aon ^| findstr :${activePort}') do taskkill /F /PID %a`
+      : `lsof -ti:${activePort} | xargs kill -9`;
       
     cp.exec(killCmd, (error) => {
       // It's okay if error occurs (port might not be in use yet)

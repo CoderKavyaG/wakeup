@@ -1,4 +1,6 @@
 import https from "https";
+import fs from "fs";
+import path from "path";
 
 export interface AgentResponse {
   ok: boolean;
@@ -15,8 +17,22 @@ export function agentFetch(
     body?: any;
   } = {}
 ): Promise<AgentResponse> {
+  let activePort = 3131;
+  try {
+    const portFilePath = path.join(process.cwd(), "devos-agent", "active-port.json");
+    if (fs.existsSync(portFilePath)) {
+      const content = fs.readFileSync(portFilePath, "utf8");
+      const data = JSON.parse(content);
+      if (data && typeof data.port === "number") {
+        activePort = data.port;
+      }
+    }
+  } catch (e) {
+    console.error("Failed to read active port, defaulting to 3131:", e);
+  }
+
   return new Promise((resolve, reject) => {
-    const urlStr = `https://local.wakeup.com:3131${
+    const urlStr = `https://local.wakeup.com:${activePort}${
       actionPath.startsWith("/") ? actionPath : "/" + actionPath
     }`;
     const url = new URL(urlStr);

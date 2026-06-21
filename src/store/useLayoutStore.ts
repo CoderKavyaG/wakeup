@@ -38,7 +38,7 @@ const widgetConfigs: { [key in WidgetType]: { minW: number, minH: number, defaul
   projects: { minW: 3, minH: 3, defaultW: 4, defaultH: 4 },
   github: { minW: 3, minH: 3, defaultW: 4, defaultH: 4 },
   focus: { minW: 3, minH: 4, defaultW: 4, defaultH: 4 },
-  machine: { minW: 4, minH: 6, defaultW: 6, defaultH: 6 },
+  machine: { minW: 2, minH: 3, defaultW: 6, defaultH: 6 },
   terminal: { minW: 4, minH: 6, defaultW: 6, defaultH: 8 },
 };
 
@@ -47,7 +47,7 @@ const defaultLayouts: { [key: string]: Layout } = {
     { i: "projects-1", x: 4, y: 0, w: 5, h: 4, minW: 4, minH: 3 },
     { i: "github-1", x: 9, y: 0, w: 3, h: 4, minW: 3, minH: 3 },
     { i: "focus-1", x: 0, y: 4, w: 10, h: 5, minW: 4, minH: 4 },
-    { i: "machine-1", x: 10, y: 4, w: 2, h: 6, minW: 4, minH: 6 },
+    { i: "machine-1", x: 10, y: 4, w: 2, h: 6, minW: 2, minH: 3 },
   ],
 };
 

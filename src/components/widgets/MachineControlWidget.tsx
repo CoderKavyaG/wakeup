@@ -42,8 +42,12 @@ export function MachineControlWidget() {
     { name: "VS Code", command: "VS Code" },
     { name: "Terminal", command: "Terminal" },
     { name: "Docker", command: "Docker Desktop" },
+    { name: "Brave Browser", command: "Brave" },
+    { name: "Google Chrome", command: "Chrome" },
+    { name: "YouTube", command: "https://youtube.com" },
     { name: "Restart Agent", command: "RESTART_AGENT" }
   ]);
+  const [agentPort, setAgentPort] = useState(3131);
   const [isEditingLaunchers, setIsEditingLaunchers] = useState(false);
   
   const [filesLoading, setFilesLoading] = useState(false);
@@ -105,6 +109,13 @@ export function MachineControlWidget() {
     if (savedLaunchers) {
       try { setCustomLaunchers(JSON.parse(savedLaunchers)); } catch {}
     }
+
+    fetch("/api/machine-port")
+      .then(r => r.json())
+      .then(data => {
+        if (data.port) setAgentPort(data.port);
+      })
+      .catch(() => {});
 
     fetchPorts();
     
@@ -427,7 +438,7 @@ export function MachineControlWidget() {
             </p>
             <ol className="list-decimal list-inside space-y-1 pl-1 font-sans font-medium text-amber-300">
               <li>
-                Click here: <a href="https://local.wakeup.com:3131/ports" target="_blank" rel="noopener noreferrer" className="underline hover:text-amber-200 font-bold">Authorize SSL Certificate</a>
+                Click here: <a href={`https://local.wakeup.com:${agentPort}/ports`} target="_blank" rel="noopener noreferrer" className="underline hover:text-amber-200 font-bold">Authorize SSL Certificate</a>
               </li>
               <li>
                 Click <strong>"Advanced"</strong> &➔ <strong>"Proceed to local.wakeup.com (unsafe)"</strong>.
@@ -696,6 +707,9 @@ export function MachineControlWidget() {
                           { name: "VS Code", command: "VS Code" },
                           { name: "Terminal", command: "Terminal" },
                           { name: "Docker", command: "Docker Desktop" },
+                          { name: "Brave Browser", command: "Brave" },
+                          { name: "Google Chrome", command: "Chrome" },
+                          { name: "YouTube", command: "https://youtube.com" },
                           { name: "Restart Agent", command: "RESTART_AGENT" }
                         ]);
                       }}>Reset Defaults</Button>

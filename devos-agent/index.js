@@ -160,10 +160,15 @@ app.post('/launch', (req, res) => {
   } else if (appName === 'Terminal') {
     cmd = isWin ? 'start cmd' : 'open -a Terminal';
   } else if (appName === 'Claude (main)' || appName === 'Claude (work)') {
-    // Assuming a local protocol or start command
     cmd = isWin ? 'start claude://' : 'open -a Claude';
+  } else if (appName === 'Brave') {
+    cmd = isWin ? 'start brave' : 'open -a "Brave Browser"';
+  } else if (appName === 'Chrome') {
+    cmd = isWin ? 'start chrome' : 'open -a "Google Chrome"';
+  } else if (appName.startsWith('http://') || appName.startsWith('https://')) {
+    cmd = isWin ? `start "" "${appName}"` : `open "${appName}"`;
   } else {
-    cmd = isWin ? `start ${appName}` : `open -a "${appName}"`;
+    cmd = isWin ? `start "" "${appName}"` : `open -a "${appName}"`;
   }
 
   exec(cmd, (error) => {
@@ -701,9 +706,31 @@ app.post('/generate-context', async (req, res) => {
   }
 });
 
-server.listen(PORT, () => {
-  console.log(`⚡ DevOS Agent secure loopback running on https://local.wakeup.com:${PORT}`);
-});
+function startServer(port) {
+  server.listen(port, () => {
+    console.log(`⚡ DevOS Agent secure loopback running on https://local.wakeup.com:${port}`);
+    // Write active port to active-port.json
+    try {
+      const portFilePath = path.join(__dirname, 'active-port.json');
+      fs.writeFileSync(portFilePath, JSON.stringify({ port }), 'utf8');
+      console.log(`🔑 Port ${port} saved to active-port.json`);
+    } catch (e) {
+      console.error("❌ Failed to write active-port.json:", e);
+    }
+  });
+
+  server.once('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.warn(`⚠️ Port ${port} is busy, trying next port ${port + 1}...`);
+      startServer(port + 1);
+    } else {
+      console.error("❌ Agent server error:", err);
+      process.exit(1);
+    }
+  });
+}
+
+startServer(PORT);
 
 const CRON_MS = 60 * 60 * 1000;
 

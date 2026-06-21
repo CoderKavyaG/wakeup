@@ -2,11 +2,21 @@
 
 import { useEffect } from "react";
 
+let activeAgentPort = 3131;
+
 export function ClientBootstrap() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
     const originalFetch = window.fetch;
+
+    // Fetch the active agent port on mount
+    originalFetch("/api/machine-port")
+      .then(r => r.json())
+      .then(data => {
+        if (data.port) activeAgentPort = data.port;
+      })
+      .catch(() => {});
 
     window.fetch = async function (input: RequestInfo | URL, init?: RequestInit) {
       let urlStr = "";
@@ -45,14 +55,22 @@ export function ClientBootstrap() {
               return originalFetch(input, init);
             }
 
-            // Build the direct local agent URL
-            const agentUrl = `https://local.wakeup.com:3131/${targetAction}${query}`;
-
             try {
               // Fetch directly from the user's local agent
-              const response = await originalFetch(agentUrl, init);
+              const response = await originalFetch(`https://local.wakeup.com:${activeAgentPort}/${targetAction}${query}`, init);
               return response;
             } catch (err) {
+              console.warn("Direct connection to local agent failed, checking if port changed...");
+              try {
+                const portRes = await originalFetch("/api/machine-port");
+                const portData = await portRes.json();
+                if (portData.port && portData.port !== activeAgentPort) {
+                  activeAgentPort = portData.port;
+                  console.log("Refetched agent port, retrying on new port:", activeAgentPort);
+                  return await originalFetch(`https://local.wakeup.com:${activeAgentPort}/${targetAction}${query}`, init);
+                }
+              } catch (e) {}
+
               console.warn("Direct connection to local agent failed, returning offline status:", err);
               // Return a 503 response to trigger offline mode in the UI
               return new Response(

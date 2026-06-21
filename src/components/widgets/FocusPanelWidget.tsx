@@ -166,7 +166,7 @@ function NoteCard({
 // ── Main Widget ──
 export function FocusPanelWidget() {
   const { tasks, addTask, toggleTask, deleteTask } = useTaskStore();
-  const { notes, deleteNote, fetchNotes } = useNoteStore();
+  const { notes, deleteNote, fetchNotes, addNote } = useNoteStore();
   const { projects } = useProjectStore();
 
   // Input state
@@ -186,21 +186,21 @@ export function FocusPanelWidget() {
   // Live input hint
   const inputType = detectInputType(noteText);
 
-  // Task-specific: only show date picker when input looks like a task
-  const showDatePicker = inputType === "task";
+  // Task-specific: only show date picker when input looks like a task and no project is tagged
+  const showDatePicker = inputType === "task" && !taggedProjectId;
   const todayStr = getLocalDateString();
   const maxDate = new Date();
   maxDate.setDate(new Date().getDate() + 30);
   const maxDateStr = getLocalDateString(maxDate);
   const [selectedDate, setSelectedDate] = useState(todayStr);
 
-  // Tasks display: show today's tasks OR all incomplete if none due today
+  // Tasks display: show today's tasks OR all incomplete if none due today, excluding project-tagged tasks
   const [showDone, setShowDone] = useState(false);
-  const todayTasks = tasks.filter((t) => !t.completed && t.dueDate === todayStr);
-  const allIncomplete = tasks.filter((t) => !t.completed);
+  const todayTasks = tasks.filter((t) => !t.completed && t.dueDate === todayStr && !t.projectId);
+  const allIncomplete = tasks.filter((t) => !t.completed && !t.projectId);
   const showingAllTasks = todayTasks.length === 0 && allIncomplete.length > 0;
   const pendingTasks = showingAllTasks ? allIncomplete : todayTasks;
-  const completedTasks = tasks.filter((t) => t.completed && t.dueDate === todayStr);
+  const completedTasks = tasks.filter((t) => t.completed && t.dueDate === todayStr && !t.projectId);
 
   // Mention filtering
   const filteredProjects = projects
@@ -250,9 +250,33 @@ export function FocusPanelWidget() {
   const handleSubmit = async () => {
     if (!noteText.trim()) return;
 
-    const rawText = noteText.trim();
-    const projId = taggedProjectId;
-    const projName = taggedProjectName;
+    let rawText = noteText.trim();
+    let projId = taggedProjectId;
+    let projName = taggedProjectName;
+
+    // If no project is tagged via dropdown, try parsing from raw text (e.g. "@ekeup" or "@wakeup")
+    if (!projId) {
+      const atMatches = rawText.match(/@([^\s]+)/g);
+      if (atMatches) {
+        for (const match of atMatches) {
+          const cleanTag = match.substring(1).toLowerCase().replace(/[^a-z0-9]/g, "");
+          if (cleanTag) {
+            const matchedProj = projects.find(p => {
+              const normName = p.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+              return normName === cleanTag || normName.includes(cleanTag) || cleanTag.includes(normName);
+            });
+            if (matchedProj) {
+              projId = matchedProj.id;
+              projName = matchedProj.name;
+              // Strip the tag from the text
+              rawText = rawText.replace(match, "").replace(/\s{2,}/g, " ").trim();
+              break;
+            }
+          }
+        }
+      }
+    }
+
     const detectedType = detectInputType(rawText);
 
     // Reset UI immediately
@@ -264,7 +288,7 @@ export function FocusPanelWidget() {
     try {
       setIsClassifying(true);
 
-      if (detectedType === "task") {
+      if (detectedType === "task" && !projId) {
         // Parse date from text, strip it from title
         const { date, stripped } = parseDateFromText(rawText);
         const lower = stripped.toLowerCase();
@@ -285,17 +309,11 @@ export function FocusPanelWidget() {
           title: cleanTitle || rawText,
           priority: parsePriority(lower),
           dueDate,
-          projectId: projId || undefined,
+          projectId: undefined,
         });
       } else {
-        // Save as note
-        const savedNote = await fetch("/api/notes", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content: rawText, projectId: projId }),
-        }).then((r) => r.json());
-
-        await fetchNotes();
+        // Save as note (either it's not a task, or it's project-specific)
+        const savedNote = await addNote(rawText, projId || undefined);
 
         // Background AI classification for project-tagged notes
         if (projId && savedNote?.id) {
@@ -392,7 +410,9 @@ export function FocusPanelWidget() {
     note: { label: "→ brain dump", color: "text-amber-400" },
     unclear: { label: "→ task or note", color: "text-white/30" },
   };
-  const hint = hintConfig[inputType];
+  const hint = taggedProjectId
+    ? { label: "→ project issue", color: "text-purple-400" }
+    : hintConfig[inputType];
 
   return (
     <div

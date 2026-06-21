@@ -112,7 +112,7 @@ ipcMain.handle('capture-screenshot', async () => {
 })
 
 app.on('certificate-error', (event, webContents, url, error, certificate, callback) => {
-  if (url.startsWith('https://local.wakeup.com:3131')) {
+  if (url.startsWith('https://local.wakeup.com:')) {
     event.preventDefault();
     callback(true);
   } else {
