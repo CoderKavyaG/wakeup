@@ -131,35 +131,68 @@ export async function GET(req: Request) {
         return NextResponse.json({ error: "Missing projectId" }, { status: 400 });
       }
 
-      // Try personal workspace first
-      let urlStr = `${VERCEL_API}/v6/deployments?limit=10&projectId=${vercelProjectId}`;
-      let res = await fetch(urlStr, { headers });
+      const cacheId = `vercel-deployments-${vercelProjectId}-${userId}`;
+      const cached = await prisma.vercelCache.findUnique({ where: { id: cacheId } });
+      const CACHE_TTL = 5 * 60 * 1000; // 5 minutes TTL
       
-      if (!res.ok) {
-        // Try teams workspace
-        try {
-          const teamsRes = await fetch(`${VERCEL_API}/v2/teams`, { headers });
-          if (teamsRes.ok) {
-            const teamsData = await teamsRes.json();
-            const teams = teamsData.teams || [];
-            for (const team of teams) {
-              const teamUrlStr = `${VERCEL_API}/v6/deployments?limit=10&projectId=${vercelProjectId}&teamId=${team.id}`;
-              const teamRes = await fetch(teamUrlStr, { headers });
-              if (teamRes.ok) {
-                res = teamRes;
-                break;
+      const fetchFresh = async () => {
+        let urlStr = `${VERCEL_API}/v6/deployments?limit=10&projectId=${vercelProjectId}`;
+        let res = await fetch(urlStr, { headers });
+        
+        if (!res.ok) {
+          try {
+            const teamsRes = await fetch(`${VERCEL_API}/v2/teams`, { headers });
+            if (teamsRes.ok) {
+              const teamsData = await teamsRes.json();
+              const teams = teamsData.teams || [];
+              for (const team of teams) {
+                const teamUrlStr = `${VERCEL_API}/v6/deployments?limit=10&projectId=${vercelProjectId}&teamId=${team.id}`;
+                const teamRes = await fetch(teamUrlStr, { headers });
+                if (teamRes.ok) {
+                  res = teamRes;
+                  break;
+                }
               }
             }
+          } catch (e) {
+            console.error("Failed to check teams for deployments:", e);
           }
-        } catch (e) {
-          console.error("Failed to check teams for deployments:", e);
         }
+
+        if (!res.ok) {
+          throw new Error(`Vercel API returned status ${res.status}`);
+        }
+        const data = await res.json();
+        await prisma.vercelCache.upsert({
+          where: { id: cacheId },
+          update: { data },
+          create: { id: cacheId, data, userId }
+        });
+        return data;
+      };
+
+      if (cached) {
+        const cacheAge = Date.now() - new Date(cached.updatedAt).getTime();
+        if (cacheAge < CACHE_TTL) {
+          return NextResponse.json(cached.data);
+        }
+        // Stale-while-revalidate background refresh
+        (async () => {
+          try {
+            await fetchFresh();
+          } catch (e) {
+            console.error("Background fresh deployments fetch failed", e);
+          }
+        })();
+        return NextResponse.json(cached.data);
       }
 
-      if (!res.ok) {
-        return NextResponse.json({ error: `Vercel API returned status ${res.status}` }, { status: res.status });
+      try {
+        const data = await fetchFresh();
+        return NextResponse.json(data);
+      } catch (e: any) {
+        return NextResponse.json({ error: e.message }, { status: 500 });
       }
-      return NextResponse.json(await res.json());
     }
 
     if (type === 'analytics') {
@@ -167,93 +200,164 @@ export async function GET(req: Request) {
       if (!projectId) {
         return NextResponse.json({ error: "Missing projectId" }, { status: 400 });
       }
-      const period = searchParams.get('period');
-      const days = period === 'lastweek' ? 14 : 7;
-      const toDays = period === 'lastweek' ? 7 : 0;
-      const from = Date.now() - days * 86400000;
-      const to = Date.now() - toDays * 86400000;
-
-      // Try personal workspace first
-      let urlStr = `${VERCEL_API}/v1/web/analytics/timeseries?projectId=${projectId}&from=${from}&to=${to}&granularity=day`;
-      let res = await fetch(urlStr, { headers });
+      const period = searchParams.get('period') || 'default';
       
-      if (!res.ok) {
-        // Try teams workspace
+      const cacheId = `vercel-analytics-${projectId}-${period}-${userId}`;
+      const cached = await prisma.vercelCache.findUnique({ where: { id: cacheId } });
+      const CACHE_TTL = 30 * 60 * 1000; // 30 minutes TTL
+
+      const fetchFresh = async () => {
+        const days = period === 'lastweek' ? 14 : 7;
+        const toDays = period === 'lastweek' ? 7 : 0;
+        const from = Date.now() - days * 86400000;
+        const to = Date.now() - toDays * 86400000;
+
+        let urlStr = `${VERCEL_API}/v1/web/analytics/timeseries?projectId=${projectId}&from=${from}&to=${to}&granularity=day`;
+        let res = await fetch(urlStr, { headers });
+        
+        if (!res.ok) {
+          try {
+            const teamsRes = await fetch(`${VERCEL_API}/v2/teams`, { headers });
+            if (teamsRes.ok) {
+              const teamsData = await teamsRes.json();
+              const teams = teamsData.teams || [];
+              for (const team of teams) {
+                const teamUrlStr = `${VERCEL_API}/v1/web/analytics/timeseries?projectId=${projectId}&from=${from}&to=${to}&granularity=day&teamId=${team.id}`;
+                const teamRes = await fetch(teamUrlStr, { headers });
+                if (teamRes.ok) {
+                  res = teamRes;
+                  break;
+                }
+              }
+            }
+          } catch (e) {
+            console.error("Failed to check teams for analytics:", e);
+          }
+        }
+
+        let data;
+        if (res.ok) {
+          data = await res.json();
+        } else {
+          // Fallback if real analytics is not enabled on Vercel
+          const fallbackData = [];
+          const seed = projectId.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+          for (let i = 6; i >= 0; i--) {
+            const date = new Date(Date.now() - i * 86400000).toISOString().split('T')[0];
+            const dayOfWeek = new Date(date).getDay();
+            const dayFactor = (dayOfWeek === 0 || dayOfWeek === 6) ? 0.6 : 1.0;
+            const sineVal = Math.sin(i * 1.5 + seed);
+            const visits = Math.max(5, Math.round((50 + (seed % 80)) * dayFactor * (0.85 + sineVal * 0.15)));
+            fallbackData.push({ date, visits, views: Math.round(visits * (1.5 + sineVal * 0.2)) });
+          }
+          data = { data: fallbackData, simulated: true };
+        }
+
+        await prisma.vercelCache.upsert({
+          where: { id: cacheId },
+          update: { data },
+          create: { id: cacheId, data, userId }
+        });
+        return data;
+      };
+
+      if (cached) {
+        const cacheAge = Date.now() - new Date(cached.updatedAt).getTime();
+        if (cacheAge < CACHE_TTL) {
+          return NextResponse.json(cached.data);
+        }
+        // Stale-while-revalidate background refresh
+        (async () => {
+          try {
+            await fetchFresh();
+          } catch (e) {
+            console.error("Background fresh analytics fetch failed", e);
+          }
+        })();
+        return NextResponse.json(cached.data);
+      }
+
+      try {
+        const data = await fetchFresh();
+        return NextResponse.json(data);
+      } catch (e: any) {
+        return NextResponse.json({ error: e.message }, { status: 500 });
+      }
+    }
+
+    if (type === 'projects') {
+      const cacheId = `vercel-projects-${userId}`;
+      const cached = await prisma.vercelCache.findUnique({ where: { id: cacheId } });
+      const CACHE_TTL = 15 * 60 * 1000; // 15 minutes TTL
+
+      const fetchFresh = async () => {
+        const allProjects = [];
+
+        // 1. Fetch personal projects
+        try {
+          const personalRes = await fetch(`${VERCEL_API}/v9/projects?limit=50`, { headers });
+          if (personalRes.ok) {
+            const personalData = await personalRes.json();
+            allProjects.push(...(personalData.projects || []));
+          }
+        } catch (e) {
+          console.error("Failed to fetch personal vercel projects:", e);
+        }
+
+        // 2. Fetch teams
         try {
           const teamsRes = await fetch(`${VERCEL_API}/v2/teams`, { headers });
           if (teamsRes.ok) {
             const teamsData = await teamsRes.json();
             const teams = teamsData.teams || [];
+            
             for (const team of teams) {
-              const teamUrlStr = `${VERCEL_API}/v1/web/analytics/timeseries?projectId=${projectId}&from=${from}&to=${to}&granularity=day&teamId=${team.id}`;
-              const teamRes = await fetch(teamUrlStr, { headers });
-              if (teamRes.ok) {
-                res = teamRes;
-                break;
+              try {
+                const teamProjRes = await fetch(`${VERCEL_API}/v9/projects?limit=50&teamId=${team.id}`, { headers });
+                if (teamProjRes.ok) {
+                  const teamProjData = await teamProjRes.json();
+                  allProjects.push(...(teamProjData.projects || []));
+                }
+              } catch (e) {
+                console.error(`Failed to fetch vercel projects for team ${team.id}:`, e);
               }
             }
           }
         } catch (e) {
-          console.error("Failed to check teams for analytics:", e);
+          console.error("Failed to fetch vercel teams:", e);
         }
-      }
 
-      if (res.ok) {
-        return NextResponse.json(await res.json());
-      }
-      
-      // Fallback if real analytics is not enabled on Vercel
-      const fallbackData = [];
-      const seed = projectId.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
-      for (let i = 6; i >= 0; i--) {
-        const date = new Date(Date.now() - i * 86400000).toISOString().split('T')[0];
-        const dayOfWeek = new Date(date).getDay();
-        const dayFactor = (dayOfWeek === 0 || dayOfWeek === 6) ? 0.6 : 1.0;
-        const sineVal = Math.sin(i * 1.5 + seed);
-        const visits = Math.max(5, Math.round((50 + (seed % 80)) * dayFactor * (0.85 + sineVal * 0.15)));
-        fallbackData.push({ date, visits, views: Math.round(visits * (1.5 + sineVal * 0.2)) });
-      }
-      return NextResponse.json({ data: fallbackData, simulated: true });
-    }
+        const data = { projects: allProjects };
+        await prisma.vercelCache.upsert({
+          where: { id: cacheId },
+          update: { data },
+          create: { id: cacheId, data, userId }
+        });
+        return data;
+      };
 
-    if (type === 'projects') {
-      const allProjects = [];
-
-      // 1. Fetch personal projects
-      try {
-        const personalRes = await fetch(`${VERCEL_API}/v9/projects?limit=50`, { headers });
-        if (personalRes.ok) {
-          const personalData = await personalRes.json();
-          allProjects.push(...(personalData.projects || []));
+      if (cached) {
+        const cacheAge = Date.now() - new Date(cached.updatedAt).getTime();
+        if (cacheAge < CACHE_TTL) {
+          return NextResponse.json(cached.data);
         }
-      } catch (e) {
-        console.error("Failed to fetch personal vercel projects:", e);
-      }
-
-      // 2. Fetch teams
-      try {
-        const teamsRes = await fetch(`${VERCEL_API}/v2/teams`, { headers });
-        if (teamsRes.ok) {
-          const teamsData = await teamsRes.json();
-          const teams = teamsData.teams || [];
-          
-          for (const team of teams) {
-            try {
-              const teamProjRes = await fetch(`${VERCEL_API}/v9/projects?limit=50&teamId=${team.id}`, { headers });
-              if (teamProjRes.ok) {
-                const teamProjData = await teamProjRes.json();
-                allProjects.push(...(teamProjData.projects || []));
-              }
-            } catch (e) {
-              console.error(`Failed to fetch vercel projects for team ${team.id}:`, e);
-            }
+        // Stale-while-revalidate background refresh
+        (async () => {
+          try {
+            await fetchFresh();
+          } catch (e) {
+            console.error("Background fresh projects fetch failed", e);
           }
-        }
-      } catch (e) {
-        console.error("Failed to fetch vercel teams:", e);
+        })();
+        return NextResponse.json(cached.data);
       }
 
-      return NextResponse.json({ projects: allProjects });
+      try {
+        const data = await fetchFresh();
+        return NextResponse.json(data);
+      } catch (e: any) {
+        return NextResponse.json({ error: e.message }, { status: 500 });
+      }
     }
 
     return NextResponse.json({ error: "Invalid type" }, { status: 400 });
@@ -282,6 +386,11 @@ export async function POST(req: Request) {
       data: { vercelToken: encrypt(token) }
     });
 
+    // Invalidate Vercel cache for this user
+    await prisma.vercelCache.deleteMany({
+      where: { userId }
+    });
+
     return NextResponse.json({ success: true });
   } catch {
     return NextResponse.json({ error: "Failed to update token" }, { status: 500 });
@@ -301,6 +410,12 @@ export async function DELETE() {
       where: { id: userId },
       data: { vercelToken: null }
     });
+
+    // Invalidate Vercel cache for this user
+    await prisma.vercelCache.deleteMany({
+      where: { userId }
+    });
+
     return NextResponse.json({ success: true });
   } catch {
     return NextResponse.json({ error: "Failed to delete token" }, { status: 500 });
