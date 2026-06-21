@@ -3,7 +3,7 @@ import { create } from 'zustand'
 interface ProjectOSStore {
   isOpen: boolean
   selectedProjectId: string | null
-  activeTab: 'ideas' | 'media' | 'controlroom'
+  activeTab: 'ideas' | 'media' | 'controlroom' | 'tasks'
   activePhase: 'launched' | 'in_development' | 'sketching' | 'idea'
   commandPaletteOpen: boolean
   searchQuery: string

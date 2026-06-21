@@ -288,7 +288,7 @@ export function FocusPanelWidget() {
     try {
       setIsClassifying(true);
 
-      if (detectedType === "task" && !projId) {
+      if (detectedType === "task") {
         // Parse date from text, strip it from title
         const { date, stripped } = parseDateFromText(rawText);
         const lower = stripped.toLowerCase();
@@ -309,10 +309,10 @@ export function FocusPanelWidget() {
           title: cleanTitle || rawText,
           priority: parsePriority(lower),
           dueDate,
-          projectId: undefined,
+          projectId: projId || undefined,
         });
       } else {
-        // Save as note (either it's not a task, or it's project-specific)
+        // Save as note (it's not a task)
         const savedNote = await addNote(rawText, projId || undefined);
 
         // Background AI classification for project-tagged notes
