@@ -109,6 +109,7 @@ export async function POST(request: Request) {
         projectHealth: 100.0,
         completionPercentage: 50.0, // Initial estimate for imported project
         userId,
+        phase: "in_development",
       },
     });
 

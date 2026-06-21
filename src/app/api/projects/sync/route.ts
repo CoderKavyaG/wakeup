@@ -77,7 +77,7 @@ export async function POST(request: Request) {
           workspace: "main",
           type: "code",
           priority: "medium",
-          phase: "idea",
+          phase: "in_development",
           ogImageUrl: favicon
         }
       });

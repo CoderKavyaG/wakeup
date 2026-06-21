@@ -3399,6 +3399,9 @@ export function ProjectOS() {
   const [isHtmlDragOver, setIsHtmlDragOver] = useState(false);
 
   const selectedProject = projects.find(p => p.id === selectedProjectId) || null;
+  const selectedProjectResolvedPhase = selectedProject
+    ? ((selectedProject.phase === "idea" && selectedProject.type !== "idea") ? "in_development" : selectedProject.phase)
+    : null;
 
   const handleHideProject = (projectId: string, phase: string) => {
     const key = `devos_curated_${phase}`;
@@ -3436,6 +3439,8 @@ export function ProjectOS() {
       if (selectedProjectId === id) {
         selectProject(null);
       }
+      setDeleteConfirmId(null);
+      setDeleteConfirmName("");
     } catch (err: any) {
       alert(`Failed to delete: ${err.message}`);
     }
@@ -3558,7 +3563,8 @@ export function ProjectOS() {
 
     projects.forEach(p => {
       if (!currentCuratedIds.has(p.id)) {
-        const key = `devos_curated_${p.phase}`;
+        const resolvedPhase = (p.phase === "idea" && p.type !== "idea") ? "in_development" : p.phase;
+        const key = `devos_curated_${resolvedPhase}`;
         const stored = localStorage.getItem(key);
         let list: string[] = [];
         if (stored) {
@@ -3582,9 +3588,10 @@ export function ProjectOS() {
     if (typeof window === "undefined") return;
     let modified = false;
     projects.forEach(p => {
+      const resolvedPhase = (p.phase === "idea" && p.type !== "idea") ? "in_development" : p.phase;
       // Find if this project is currently curated in a phase that doesn't match its DB phase
       PHASES.forEach(phaseObj => {
-        if (p.phase !== phaseObj.id) {
+        if (resolvedPhase !== phaseObj.id) {
           const key = `devos_curated_${phaseObj.id}`;
           const stored = localStorage.getItem(key);
           if (stored) {
@@ -3597,7 +3604,7 @@ export function ProjectOS() {
                 modified = true;
 
                 // Add to correct phase list
-                const correctKey = `devos_curated_${p.phase}`;
+                const correctKey = `devos_curated_${resolvedPhase}`;
                 const correctStored = localStorage.getItem(correctKey);
                 let correctList = correctStored ? JSON.parse(correctStored) : [];
                 if (!correctList.includes(p.id)) {
@@ -3635,9 +3642,15 @@ export function ProjectOS() {
 
   // Curated lists
   const launchedProjects = projects.filter(p => p.phase === "launched" && curatedLaunched.includes(p.id));
-  const inDevProjects = projects.filter(p => p.phase === "in_development" && curatedInDev.includes(p.id));
+  const inDevProjects = projects.filter(p => {
+    const resolvedPhase = (p.phase === "idea" && p.type !== "idea") ? "in_development" : p.phase;
+    return resolvedPhase === "in_development" && curatedInDev.includes(p.id);
+  });
   const sketchingProjects = projects.filter(p => p.phase === "sketching" && curatedSketching.includes(p.id));
-  const ideaProjects = projects.filter(p => p.phase === "idea" && curatedIdea.includes(p.id));
+  const ideaProjects = projects.filter(p => {
+    const resolvedPhase = (p.phase === "idea" && p.type !== "idea") ? "in_development" : p.phase;
+    return resolvedPhase === "idea" && curatedIdea.includes(p.id);
+  });
 
   // Curated list for the currently active phase tab (for left rail sidebar list)
   const activeCuratedList =
@@ -3661,9 +3674,15 @@ export function ProjectOS() {
   // Stats calculation by phase (all DB projects, not curated only, to match totals)
   const stats = {
     launched: projects.filter(p => p.phase === "launched").length,
-    in_development: projects.filter(p => p.phase === "in_development").length,
+    in_development: projects.filter(p => {
+      const resolvedPhase = (p.phase === "idea" && p.type !== "idea") ? "in_development" : p.phase;
+      return resolvedPhase === "in_development";
+    }).length,
     sketching: projects.filter(p => p.phase === "sketching").length,
-    idea: projects.filter(p => p.phase === "idea").length,
+    idea: projects.filter(p => {
+      const resolvedPhase = (p.phase === "idea" && p.type !== "idea") ? "in_development" : p.phase;
+      return resolvedPhase === "idea";
+    }).length,
   };
 
   // Dashboard general stats based on all curated projects across all columns
@@ -3812,7 +3831,7 @@ export function ProjectOS() {
         <div className="flex flex-1 min-h-0">
 
           {/* Left Rail Sidebar */}
-          {selectedProjectId && selectedProject?.phase !== "idea" && (
+          {selectedProjectId && selectedProjectResolvedPhase !== "idea" && (
             <div className="w-60 border-r border-surface-border bg-surface-1 flex flex-col flex-shrink-0 select-none">
 
               {/* Sidebar projects list search filter */}
@@ -3957,7 +3976,7 @@ export function ProjectOS() {
             <div className="flex-1 flex flex-col min-w-0 min-h-0 bg-surface-0">
 
               {/* Detailed Project Header */}
-              {selectedProject.phase !== "idea" && (
+              {selectedProjectResolvedPhase !== "idea" && (
                 <div className="px-6 py-4 border-b border-surface-border flex items-start gap-4 flex-shrink-0 bg-surface-1">
                   <div className="w-10 h-10 rounded-lg bg-white/[0.03] border border-white/[0.06] shrink-0 flex items-center justify-center select-none">
                     <ProjectIcon project={selectedProject} className="w-full h-full" isLarge={true} />
@@ -3999,7 +4018,7 @@ export function ProjectOS() {
               )}
 
               {/* Tab Navigation Menu */}
-              {selectedProject.phase !== "idea" && (
+              {selectedProjectResolvedPhase !== "idea" && (
                 <div className="px-6 flex items-center gap-1 border-b border-surface-border flex-shrink-0 bg-surface-1 select-none">
                   {TABS.map(tab => (
                     <button
@@ -4017,8 +4036,8 @@ export function ProjectOS() {
               )}
 
               {/* Tab content — ideas fills, others scroll */}
-              <div className={`flex-1 min-h-0 ${selectedProject.phase === "idea" ? "overflow-hidden" : (activeTab === 'ideas' ? 'overflow-hidden' : 'overflow-y-auto custom-scrollbar')}`}>
-                {selectedProject.phase === "idea" ? (
+              <div className={`flex-1 min-h-0 ${selectedProjectResolvedPhase === "idea" ? "overflow-hidden" : (activeTab === 'ideas' ? 'overflow-hidden' : 'overflow-y-auto custom-scrollbar')}`}>
+                {selectedProjectResolvedPhase === "idea" ? (
                   <IdeaCanvasView project={selectedProject} />
                 ) : (
                   <>
@@ -4140,6 +4159,7 @@ export function ProjectOS() {
                                     await addProject({
                                       name: val,
                                       phase: "idea",
+                                      type: "idea",
                                       status: "planning",
                                       description: "",
                                       tags: [],
@@ -4355,6 +4375,7 @@ export function ProjectOS() {
               localStorage.setItem(key, JSON.stringify(list));
             }
             loadCurationLists();
+            selectProject(null);
           }}
         />
 
