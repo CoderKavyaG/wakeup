@@ -64,6 +64,7 @@ const TABS = [
   { id: 'controlroom', label: 'Control Room' },
   { id: 'ideas', label: 'Ideas' },
   { id: 'media', label: 'Media' },
+  { id: 'tasks', label: 'Tasks' },
 ];
 
 function getProjectFaviconUrl(project: Project): string | null {
@@ -926,6 +927,11 @@ function IdeaCanvasView({ project }: { project: Project }) {
           <span className="text-[11px] font-bold text-white/90">{project.name}</span>
           <div className="h-3 w-px bg-white/10" />
           <PhaseBadge project={project} />
+          <div className="h-3 w-px bg-white/10" />
+          <span className="text-[9px] font-medium text-amber-400/80 flex items-center gap-1.5">
+            <AlertCircle className="w-3 h-3 text-amber-500" />
+            Saved in Browser Storage
+          </span>
         </div>
       </div>
 
@@ -1066,7 +1072,8 @@ function IdeaCanvasView({ project }: { project: Project }) {
           <h2 className={`text-sm font-semibold ${isLightMode ? 'text-slate-400' : 'text-white/50'}`}>Idea Sandbox Canvas</h2>
           <p className={`text-[11px] mt-1 max-w-sm leading-relaxed ${isLightMode ? 'text-slate-500' : 'text-white/30'}`}>
             Double-click anywhere to spawn a sticky note.<br />
-            Paste an image (`Ctrl + V`) to import. Use the toolbar to record voice or upload assets.
+            Paste an image (`Ctrl + V`) to import. Use the toolbar to record voice or upload assets.<br />
+            <span className="text-[10px] text-amber-400/80 block mt-2 font-semibold">⚠️ All notes and media uploaded here are saved in your browser's local storage, not in the app databases.</span>
           </p>
         </div>
       )}
@@ -1489,7 +1496,7 @@ interface MediaItem {
   createdAt: string;
 }
 
-const MEDIA_FILTERS = ['all', 'image', 'screenshot', 'sketch', 'link_preview'] as const;
+const MEDIA_FILTERS = ['all', 'image', 'link_preview'] as const;
 
 function MediaVaultTab({ project }: { project: Project }) {
   const [media, setMedia] = useState<MediaItem[]>([]);
@@ -1528,11 +1535,21 @@ function MediaVaultTab({ project }: { project: Project }) {
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
+
+    const customTitle = window.prompt("Enter a label/name for this image:", files[0].name.replace(/\.[^/.]+$/, ""));
+    if (customTitle === null) {
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
     setUploading(true);
 
     const formData = new FormData();
     Array.from(files).forEach(f => formData.append('files', f));
     formData.append('type', 'image');
+    if (customTitle.trim()) {
+      formData.append('title', customTitle.trim());
+    }
 
     try {
       const res = await fetch(`/api/projects/${project.id}/media`, {
@@ -1655,7 +1672,7 @@ function MediaVaultTab({ project }: { project: Project }) {
       <div className="mb-4 p-2.5 rounded-lg bg-amber-500/5 border border-amber-500/10 flex items-center gap-2 text-[10px] text-amber-400/80 leading-normal select-none">
         <AlertCircle className="w-3.5 h-3.5 shrink-0 text-amber-500" />
         <span>
-          Images are stored locally in your project's upload directory (<code>public/uploads</code>). Moving or deleting these files on disk will break the links in DevOS.
+          All uploaded images and media will be saved in the local storage of the browser, not in the app databases.
         </span>
       </div>
 
@@ -1926,6 +1943,7 @@ function ControlRoomTab({ project }: { project: Project }) {
   const [scriptsLoading, setScriptsLoading] = useState(false);
   const [runningScript, setRunningScript] = useState<string | null>(null);
   const [systemStats, setSystemStats] = useState<{ cpu: number; ram: number } | null>(null);
+  const [statsError, setStatsError] = useState<string | null>(null);
   const [visitsError, setVisitsError] = useState<string | null>(null);
 
   const fetchDeploymentsAndVisits = () => {
@@ -2035,13 +2053,20 @@ function ControlRoomTab({ project }: { project: Project }) {
     let interval: NodeJS.Timeout;
     const fetchStats = () => {
       fetch("/api/machine/stats")
-        .then(r => r.json())
+        .then(async r => {
+          if (!r.ok) throw new Error("offline");
+          return r.json();
+        })
         .then(data => {
           if (data && typeof data.cpu === "number" && typeof data.ram === "number") {
             setSystemStats({ cpu: data.cpu, ram: data.ram });
+            setStatsError(null);
           }
         })
-        .catch(() => {});
+        .catch(() => {
+          setSystemStats(null);
+          setStatsError("Agent Offline");
+        });
     };
 
     fetchStats();
@@ -2202,7 +2227,16 @@ function ControlRoomTab({ project }: { project: Project }) {
               )}
             </div>
 
-            {!project.vercelProjectId ? (
+            {!vercel?.hasToken ? (
+              <div className="flex-1 flex flex-col justify-center space-y-2 py-4 select-none">
+                <p className="text-[11px] text-white/50 leading-normal">
+                  Vercel integration is not configured.
+                </p>
+                <p className="text-[10px] text-white/30 leading-normal">
+                  Add your Vercel API token in Settings to fetch visitor traffic metrics and track deployments.
+                </p>
+              </div>
+            ) : !project.vercelProjectId ? (
               <div className="flex-1 flex flex-col justify-center space-y-3 py-4">
                 <p className="text-[11px] text-white/50 leading-normal">
                   Connect a Vercel project to load visitor traffic metrics and trigger production deployments.
@@ -2290,9 +2324,16 @@ function ControlRoomTab({ project }: { project: Project }) {
 
           {/* System Performance Card */}
           <div className="bg-[#121217]/40 border border-white/[0.06] backdrop-blur-sm p-5 rounded-2xl flex flex-col space-y-4 shadow-sm">
-            <div className="flex items-center gap-1.5">
-              <Activity className="w-3.5 h-3.5 text-amber-400" />
-              <h4 className="text-[11px] uppercase font-mono tracking-widest text-white/40 font-bold">System Performance</h4>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <Activity className="w-3.5 h-3.5 text-amber-400" />
+                <h4 className="text-[11px] uppercase font-mono tracking-widest text-white/40 font-bold">System Performance</h4>
+              </div>
+              {statsError && (
+                <span className="text-[8px] px-2 py-0.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/20 font-mono font-bold uppercase tracking-wider animate-pulse">
+                  {statsError}
+                </span>
+              )}
             </div>
 
             <div className="flex-1 flex flex-col justify-center space-y-5 py-2">
@@ -3653,10 +3694,11 @@ export function ProjectOS() {
   });
 
   // Curated list for the currently active phase tab (for left rail sidebar list)
+  const sidebarPhase = selectedProjectResolvedPhase || activePhase;
   const activeCuratedList =
-    activePhase === "launched" ? launchedProjects :
-      activePhase === "in_development" ? inDevProjects :
-        activePhase === "sketching" ? sketchingProjects : ideaProjects;
+    sidebarPhase === "launched" ? launchedProjects :
+      sidebarPhase === "in_development" ? inDevProjects :
+        sidebarPhase === "sketching" ? sketchingProjects : ideaProjects;
 
   // Filter sidebar projects by active tab & search query
   const filteredProjects = activeCuratedList.filter(p => {
@@ -4036,7 +4078,7 @@ export function ProjectOS() {
               )}
 
               {/* Tab content — ideas fills, others scroll */}
-              <div className={`flex-1 min-h-0 ${selectedProjectResolvedPhase === "idea" ? "overflow-hidden" : (activeTab === 'ideas' ? 'overflow-hidden' : 'overflow-y-auto custom-scrollbar')}`}>
+              <div className={`flex-1 min-h-0 ${selectedProjectResolvedPhase === "idea" ? "overflow-hidden" : (activeTab === 'ideas' || activeTab === 'tasks' ? 'overflow-hidden' : 'overflow-y-auto custom-scrollbar')}`}>
                 {selectedProjectResolvedPhase === "idea" ? (
                   <IdeaCanvasView project={selectedProject} />
                 ) : (
@@ -4044,6 +4086,7 @@ export function ProjectOS() {
                     {activeTab === 'ideas' && <IdeasTab project={selectedProject} />}
                     {activeTab === 'media' && <MediaVaultTab project={selectedProject} />}
                     {activeTab === 'controlroom' && <ControlRoomTab project={selectedProject} />}
+                    {activeTab === 'tasks' && <ProjectTasksTab project={selectedProject} />}
                   </>
                 )}
               </div>

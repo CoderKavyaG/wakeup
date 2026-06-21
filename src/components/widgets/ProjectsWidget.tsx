@@ -349,7 +349,7 @@ export function ProjectsWidget() {
     }
   };
 
-  const { tasks } = useTaskStore();
+  const { tasks, deleteTask } = useTaskStore();
   const { notes, fetchNotes, addNote: notesStoreAddNote, deleteNote: notesStoreDeleteNote } = useNoteStore();
 
   // GitHub Stats State
@@ -459,6 +459,14 @@ export function ProjectsWidget() {
       setProjectNotes(prev => prev.filter(n => n.id !== noteId));
     } catch (err) {
       console.error("Failed to delete note", err);
+    }
+  };
+
+  const handleDeleteTask = async (taskId: string) => {
+    try {
+      await deleteTask(taskId);
+    } catch (err) {
+      console.error("Failed to delete task", err);
     }
   };
 
@@ -1560,52 +1568,100 @@ export function ProjectsWidget() {
               </div>
             )}
 
-            {/* ── Brain Dump Notes ── */}
-            <div className="rounded-xl border border-white/[0.06] bg-white/[0.01] p-3 space-y-2.5">
-              <span className="text-[9px] uppercase font-bold tracking-widest text-white/35">Brain Dump</span>
-              <div className="space-y-2">
-                {projectNotes.length === 0 ? (
-                  <div className="py-4 text-center">
-                    <p className="text-[11px] text-white/25">No notes for this project yet.</p>
-                    <p className="text-[10px] text-white/20 mt-1">Use <span className="font-mono text-amber-400/50">@{selectedProject.name}</span> in Focus Panel</p>
-                  </div>
-                ) : (
-                  projectNotes.map(note => {
-                    const categoryStyle: Record<string, string> = {
-                      feedback: 'bg-orange-500/15 text-orange-300 border-orange-500/20',
-                      bug: 'bg-red-500/15 text-red-300 border-red-500/20',
-                      idea: 'bg-amber-500/15 text-amber-300 border-amber-500/20',
-                      note: 'bg-white/5 text-white/40 border-white/10'
-                    };
-                    const cat = note.category;
-                    const colorClass = cat && cat !== 'classifying...' ? (categoryStyle[cat.toLowerCase()] || categoryStyle.note) : categoryStyle.note;
-                    return (
-                      <div key={note.id} className="group p-2.5 rounded-lg border border-white/[0.05] bg-white/[0.01] hover:bg-white/[0.03] transition-colors space-y-1.5">
-                        <div className="flex items-center gap-2">
-                          <Badge variant="secondary" className={`text-[8px] py-0 px-1.5 uppercase shrink-0 ${(!cat || cat === 'classifying...') ? 'animate-pulse bg-white/5 text-white/30 border-white/10' : colorClass}`}>
-                            {(!cat || cat === 'classifying...') ? 'classifying...' : cat}
-                          </Badge>
-                          <span className="text-[9px] text-white/25 font-mono ml-auto">{timeAgo(note.createdAt)}</span>
-                        </div>
-                        <p className="text-[11px] text-white/65 leading-relaxed line-clamp-3">{note.content}</p>
-                        <div className="flex gap-1.5">
-                          <button onClick={() => handleDeleteNote(note.id)}
-                            className="text-[9px] px-2 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20 hover:bg-green-500/20 transition-colors flex items-center gap-1">
-                            <CheckCircle2 className="w-2.5 h-2.5" /> Resolve
-                          </button>
-                          {selectedProject.githubUrl && (
-                            <button onClick={() => createGitHubIssue(note)} disabled={isCreatingIssue === note.id}
-                              className="text-[9px] px-2 py-0.5 rounded bg-white/5 text-white/40 border border-white/10 hover:bg-blue-500/10 hover:text-blue-300 hover:border-blue-500/20 transition-colors flex items-center gap-1 disabled:opacity-50">
-                              {isCreatingIssue === note.id ? <><span className="w-2.5 h-2.5 rounded-full border border-current border-t-transparent animate-spin" /> Creating</> : <><GitBranch className="w-2.5 h-2.5" /> Issue</>}
-                            </button>
-                          )}
-                        </div>
+            {/* ── Brain Dump Notes & Tasks ── */}
+            {(() => {
+              const cleanProjectTag = `@${selectedProject.name.toLowerCase().replace(/\s+/g, "")}`;
+              const spaceProjectTag = `@${selectedProject.name.toLowerCase()}`;
+              const projectTasks = tasks.filter(t => {
+                if (t.completed) return false;
+                const titleLower = t.title.toLowerCase();
+                return t.projectId === selectedProject.id ||
+                       titleLower.includes(cleanProjectTag) ||
+                       titleLower.includes(spaceProjectTag);
+              });
+
+              return (
+                <div className="rounded-xl border border-white/[0.06] bg-white/[0.01] p-3 space-y-2.5">
+                  <span className="text-[9px] uppercase font-bold tracking-widest text-white/35">Brain Dump & Tasks</span>
+                  <div className="space-y-2">
+                    {projectNotes.length === 0 && projectTasks.length === 0 ? (
+                      <div className="py-4 text-center">
+                        <p className="text-[11px] text-white/25">No active notes or tasks for this project.</p>
+                        <p className="text-[10px] text-white/20 mt-1">Use <span className="font-mono text-amber-400/50">@{selectedProject.name}</span> in Focus Panel</p>
                       </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
+                    ) : (
+                      <>
+                        {/* Tasks */}
+                        {projectTasks.map(task => {
+                          const priorityColor = task.priority === 'high' ? 'bg-orange-500/15 text-orange-300 border-orange-500/20' : 'bg-white/5 text-white/40 border-white/10';
+                          return (
+                            <div key={task.id} className="group p-2.5 rounded-lg border border-white/[0.05] bg-white/[0.01] hover:bg-white/[0.03] transition-colors space-y-1.5 animate-in fade-in duration-200">
+                              <div className="flex items-center gap-2">
+                                <Badge variant="secondary" className="text-[8px] py-0 px-1.5 uppercase shrink-0 bg-blue-500/10 text-blue-400 border-blue-500/25">
+                                  Task
+                                </Badge>
+                                <Badge variant="secondary" className={`text-[8px] py-0 px-1.5 uppercase shrink-0 ${priorityColor}`}>
+                                  {task.priority}
+                                </Badge>
+                                <span className="text-[9px] text-white/25 font-mono ml-auto">{timeAgo(task.createdAt)}</span>
+                              </div>
+                              <p className="text-[11px] text-white/65 leading-relaxed line-clamp-3">{task.title}</p>
+                              <div className="flex gap-1.5">
+                                <button onClick={() => handleDeleteTask(task.id)}
+                                  className="text-[9px] px-2 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20 hover:bg-green-500/20 transition-colors flex items-center gap-1">
+                                  <CheckCircle2 className="w-2.5 h-2.5" /> Resolve
+                                </button>
+                                {selectedProject.githubUrl && (
+                                  <button onClick={() => createGitHubIssue({ id: task.id, content: task.title, category: 'task' })} disabled={isCreatingIssue === task.id}
+                                    className="text-[9px] px-2 py-0.5 rounded bg-white/5 text-white/40 border border-white/10 hover:bg-blue-500/10 hover:text-blue-300 hover:border-blue-500/20 transition-colors flex items-center gap-1 disabled:opacity-50">
+                                    {isCreatingIssue === task.id ? <><span className="w-2.5 h-2.5 rounded-full border border-current border-t-transparent animate-spin" /> Creating</> : <><GitBranch className="w-2.5 h-2.5" /> Issue</>}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+
+                        {/* Notes */}
+                        {projectNotes.map(note => {
+                          const categoryStyle: Record<string, string> = {
+                            feedback: 'bg-orange-500/15 text-orange-300 border-orange-500/20',
+                            bug: 'bg-red-500/15 text-red-300 border-red-500/20',
+                            idea: 'bg-amber-500/15 text-amber-300 border-amber-500/20',
+                            note: 'bg-white/5 text-white/40 border-white/10'
+                          };
+                          const cat = note.category;
+                          const colorClass = cat && cat !== 'classifying...' ? (categoryStyle[cat.toLowerCase()] || categoryStyle.note) : categoryStyle.note;
+                          return (
+                            <div key={note.id} className="group p-2.5 rounded-lg border border-white/[0.05] bg-white/[0.01] hover:bg-white/[0.03] transition-colors space-y-1.5">
+                              <div className="flex items-center gap-2">
+                                <Badge variant="secondary" className={`text-[8px] py-0 px-1.5 uppercase shrink-0 ${(!cat || cat === 'classifying...') ? 'animate-pulse bg-white/5 text-white/30 border-white/10' : colorClass}`}>
+                                  {(!cat || cat === 'classifying...') ? 'classifying...' : cat}
+                                </Badge>
+                                <span className="text-[9px] text-white/25 font-mono ml-auto">{timeAgo(note.createdAt)}</span>
+                              </div>
+                              <p className="text-[11px] text-white/65 leading-relaxed line-clamp-3">{note.content}</p>
+                              <div className="flex gap-1.5">
+                                <button onClick={() => handleDeleteNote(note.id)}
+                                  className="text-[9px] px-2 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20 hover:bg-green-500/20 transition-colors flex items-center gap-1">
+                                  <CheckCircle2 className="w-2.5 h-2.5" /> Resolve
+                                </button>
+                                {selectedProject.githubUrl && (
+                                  <button onClick={() => createGitHubIssue(note)} disabled={isCreatingIssue === note.id}
+                                    className="text-[9px] px-2 py-0.5 rounded bg-white/5 text-white/40 border border-white/10 hover:bg-blue-500/10 hover:text-blue-300 hover:border-blue-500/20 transition-colors flex items-center gap-1 disabled:opacity-50">
+                                    {isCreatingIssue === note.id ? <><span className="w-2.5 h-2.5 rounded-full border border-current border-t-transparent animate-spin" /> Creating</> : <><GitBranch className="w-2.5 h-2.5" /> Issue</>}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}

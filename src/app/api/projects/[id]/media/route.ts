@@ -82,6 +82,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       const formData = await request.formData();
       const files = formData.getAll("files") as File[];
       const type = (formData.get("type") as string) || "image";
+      const title = (formData.get("title") as string) || undefined;
 
       if (!files || files.length === 0) {
         return NextResponse.json({ error: "No files provided" }, { status: 400 });
@@ -106,7 +107,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           data: {
             type,
             url: publicUrl,
-            title: file.name,
+            title: title || file.name,
             mimeType: file.type || null,
             sizeBytes: buffer.length,
             projectId: id,
