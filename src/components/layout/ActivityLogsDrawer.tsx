@@ -14,7 +14,6 @@ import {
   FileText,
   Loader2,
 } from "lucide-react";
-import { useBootstrapStore } from "@/store/useBootstrapStore";
 
 interface TimelineEvent {
   id: string;
@@ -26,10 +25,15 @@ interface TimelineEvent {
 }
 
 interface TimelineStats {
-  commitsLast7Days: number;
-  completedTasksLast7Days: number;
-  activeProjectsCount: number;
-  staleProjectsCount: number;
+  commitsPushed: number;
+  tasksCompleted: number;
+  activeProjects: number;
+  staleProjects: number;
+}
+
+interface DiagnosticAlert {
+  id: string;
+  message: string;
 }
 
 interface ActivityLogsDrawerProps {
@@ -41,32 +45,22 @@ export function ActivityLogsDrawer({ isOpen, onClose }: ActivityLogsDrawerProps)
   const [activeTab, setActiveTab] = useState<"daily" | "weekly">("daily");
   const [events, setEvents] = useState<TimelineEvent[]>([]);
   const [stats, setStats] = useState<TimelineStats | null>(null);
+  const [diagnostics, setDiagnostics] = useState<DiagnosticAlert[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const telegramLinked = useBootstrapStore((s) => s.telegramLinked);
-  const vercelToken = useBootstrapStore((s) => s.vercel);
-  const userId = useBootstrapStore((s) => s.userId);
-
-  const [hasGithubToken, setHasGithubToken] = useState(false);
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      setHasGithubToken(!!localStorage.getItem("GITHUB_TOKEN"));
-    }
-  }, [isOpen]);
 
   const fetchTimeline = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/system/timeline");
+      const res = await fetch("/api/system/timeline", { cache: "no-store" });
       if (!res.ok) {
         throw new Error("Failed to fetch timeline logs");
       }
       const data = await res.json();
-      setEvents(data.events || []);
-      setStats(data.stats || null);
+      setEvents(data.timeline || []);
+      setStats(data.weeklyReview || null);
+      setDiagnostics(data.diagnostics || []);
     } catch (err: any) {
       setError(err.message || "An error occurred");
     } finally {
@@ -148,38 +142,11 @@ export function ActivityLogsDrawer({ isOpen, onClose }: ActivityLogsDrawerProps)
     });
   };
 
-  const getDiagnostics = () => {
-    const list = [];
-    if (!hasGithubToken) {
-      list.push({
-        id: "github",
-        message: "GitHub Token: Missing. Local commit tracking is inactive.",
-      });
-    }
-    if (!vercelToken?.hasToken) {
-      list.push({
-        id: "vercel",
-        message: "Vercel Integration: Token missing. Deployment monitoring disabled.",
-      });
-    }
-    if (!telegramLinked) {
-      list.push({
-        id: "telegram",
-        message: `Telegram Bot: Unlinked. Use code DEVOS-${userId ? userId.slice(0, 8) : "..."} in @AssistmeOs_Bot.`,
-      });
-    }
-    return list;
-  };
-
-  const diagnostics = getDiagnostics();
-
   const isTelegramSource = (event: TimelineEvent) => {
-    const desc = event.description.toLowerCase();
-    const title = event.title.toLowerCase();
     return (
-      desc.includes("telegram") ||
-      title.includes("telegram") ||
-      (event.metadata && event.metadata.source === "telegram")
+      (event.metadata && event.metadata.source === "telegram") ||
+      event.description.toLowerCase().includes("telegram") ||
+      event.title.toLowerCase().includes("telegram")
     );
   };
 
@@ -212,7 +179,7 @@ export function ActivityLogsDrawer({ isOpen, onClose }: ActivityLogsDrawerProps)
             <div className="flex items-center justify-between px-4 py-3 bg-[#0a0a0f] border-b border-white/[0.04] shrink-0">
               <div className="flex items-center gap-2">
                 <Activity className="w-4 h-4 text-amber-500" />
-                <span className="text-xs font-bold text-white/90 uppercase tracking-widest">
+                <span className="text-xs font-bold text-white/90 uppercase tracking-widest font-sans">
                   System Logs
                 </span>
               </div>
@@ -240,8 +207,8 @@ export function ActivityLogsDrawer({ isOpen, onClose }: ActivityLogsDrawerProps)
                   onClick={() => setActiveTab("daily")}
                   className={`flex-1 text-center py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all duration-150 cursor-pointer ${
                     activeTab === "daily"
-                      ? "bg-white/10 text-white shadow-sm"
-                      : "text-white/40 hover:text-white/60"
+                      ? "bg-white/10 text-white shadow-sm font-sans"
+                      : "text-white/40 hover:text-white/60 font-sans"
                   }`}
                 >
                   Daily Activity
@@ -250,8 +217,8 @@ export function ActivityLogsDrawer({ isOpen, onClose }: ActivityLogsDrawerProps)
                   onClick={() => setActiveTab("weekly")}
                   className={`flex-1 text-center py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all duration-150 cursor-pointer ${
                     activeTab === "weekly"
-                      ? "bg-white/10 text-white shadow-sm"
-                      : "text-white/40 hover:text-white/60"
+                      ? "bg-white/10 text-white shadow-sm font-sans"
+                      : "text-white/40 hover:text-white/60 font-sans"
                   }`}
                 >
                   Weekly Review
@@ -261,15 +228,15 @@ export function ActivityLogsDrawer({ isOpen, onClose }: ActivityLogsDrawerProps)
 
             <div className="flex-1 overflow-y-auto min-h-0 bg-[#0d0d10] p-4 space-y-4">
               {diagnostics.length > 0 && (
-                <div className="space-y-1.5">
-                  <div className="text-[9px] font-bold text-rose-400/80 uppercase tracking-widest px-1">
+                <div className="space-y-1.5 shrink-0">
+                  <div className="text-[9px] font-bold text-rose-400/80 uppercase tracking-widest px-1 font-mono">
                     System Alerts ({diagnostics.length})
                   </div>
-                  <div className="space-y-1 bg-rose-500/5 border border-rose-500/10 rounded-xl p-3">
+                  <div className="space-y-1.5 bg-rose-500/5 border border-rose-500/10 rounded-xl p-3">
                     {diagnostics.map((diag) => (
                       <div key={diag.id} className="flex items-start gap-1.5 text-[10px] text-rose-400">
                         <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-rose-400/80" />
-                        <span className="leading-normal">{diag.message}</span>
+                        <span className="leading-normal font-sans">{diag.message}</span>
                       </div>
                     ))}
                   </div>
@@ -277,21 +244,21 @@ export function ActivityLogsDrawer({ isOpen, onClose }: ActivityLogsDrawerProps)
               )}
 
               {activeTab === "weekly" && stats && (
-                <div className="space-y-1.5">
-                  <div className="text-[9px] font-bold text-white/30 uppercase tracking-widest px-1">
+                <div className="space-y-1.5 shrink-0">
+                  <div className="text-[9px] font-bold text-white/30 uppercase tracking-widest px-1 font-mono">
                     Weekly Statistics
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div className="bg-white/[0.01] border border-white/[0.04] rounded-lg p-2.5 text-center">
-                      <div className="text-[8px] uppercase font-bold text-white/30">Commits</div>
+                      <div className="text-[8px] uppercase font-bold text-white/30 font-sans">Commits</div>
                       <div className="text-sm font-mono font-semibold text-white/80 mt-0.5">
-                        {stats.commitsLast7Days}
+                        {stats.commitsPushed}
                       </div>
                     </div>
                     <div className="bg-white/[0.01] border border-white/[0.04] rounded-lg p-2.5 text-center">
-                      <div className="text-[8px] uppercase font-bold text-white/30">Tasks Cleared</div>
+                      <div className="text-[8px] uppercase font-bold text-white/30 font-sans">Tasks Cleared</div>
                       <div className="text-sm font-mono font-semibold text-green-400 mt-0.5">
-                        {stats.completedTasksLast7Days}
+                        {stats.tasksCompleted}
                       </div>
                     </div>
                   </div>
@@ -302,20 +269,20 @@ export function ActivityLogsDrawer({ isOpen, onClose }: ActivityLogsDrawerProps)
                 {loading && events.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-16 gap-2 text-white/30">
                     <Loader2 className="w-5 h-5 animate-spin" />
-                    <span className="text-xs">Loading logs...</span>
+                    <span className="text-xs font-sans">Loading logs...</span>
                   </div>
                 ) : error ? (
-                  <div className="text-center py-8 text-xs text-rose-400">
+                  <div className="text-center py-8 text-xs text-rose-400 font-sans">
                     {error}
                   </div>
                 ) : Object.keys(groupedEvents).length === 0 ? (
-                  <div className="text-center py-16 text-xs text-white/20">
+                  <div className="text-center py-16 text-xs text-white/20 font-sans">
                     No activity recorded
                   </div>
                 ) : (
                   Object.entries(groupedEvents).map(([date, eventList]) => (
                     <div key={date} className="space-y-2">
-                      <div className="text-[9px] font-bold text-white/20 uppercase tracking-wider px-1 font-mono">
+                      <div className="text-[9px] font-bold text-white/25 uppercase tracking-wider px-1 font-mono">
                         {date}
                       </div>
                       <div className="space-y-2 pl-1 border-l border-white/[0.03] ml-2">
