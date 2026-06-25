@@ -20,7 +20,21 @@ import { ActivityLogsDrawer } from "./ActivityLogsDrawer";
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
   const [isLogsOpen, setIsLogsOpen] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const [isMobile, setIsMobile] = useState(false);
+  const [bypassMobile, setBypassMobile] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    const checkDevice = () => {
+      const isMobileSize = window.innerWidth < 720;
+      const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      setIsMobile(isMobileSize || isMobileUA);
+    };
+
+    checkDevice();
+    window.addEventListener("resize", checkDevice);
+    return () => window.removeEventListener("resize", checkDevice);
+  }, []);
 
   const { data: session } = useSession();
   const { isLocked, toggleLock, resetLayout, clearLayout, setLayouts, saveCurrentLayout, loadSavedLayout, savedLayout } = useLayoutStore();
@@ -30,6 +44,51 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const ai = useBootstrapStore((s) => s.ai);
 
   const showKeysModal = loaded && ai && !ai.hasGroqApiKey && !ai.hasOpenrouterApiKey;
+
+  if (mounted && isMobile && !bypassMobile) {
+    return (
+      <div className="fixed inset-0 z-[99999] flex flex-col items-center justify-center bg-[#0f0f11] text-white p-6 font-sans">
+        <div className="max-w-md w-full border border-white/[0.08] bg-[#161619] rounded-2xl p-6 text-center space-y-6 shadow-2xl relative overflow-hidden">
+          <div className="absolute -top-24 -left-24 w-48 h-48 bg-rose-500/10 rounded-full blur-3xl pointer-events-none" />
+          
+          <div className="flex justify-center">
+            <div className="w-16 h-16 rounded-full bg-rose-500/10 border border-rose-500/25 flex items-center justify-center text-rose-400">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-8 h-8">
+                <rect x="2" y="3" width="20" height="14" rx="2" />
+                <line x1="8" y1="21" x2="16" y2="21" />
+                <line x1="12" y1="17" x2="12" y2="21" />
+              </svg>
+            </div>
+          </div>
+          
+          <div className="space-y-2">
+            <h2 className="text-xs font-bold uppercase tracking-widest text-rose-400 font-mono">
+              Desktop Workspace Recommended
+            </h2>
+            <p className="text-xs text-white/60 leading-relaxed">
+              DevOS is a developer command center designed for larger screen dimensions. It relies on full-width widget layouts and interactive tiling that do not support mobile layouts.
+            </p>
+          </div>
+
+          <div className="pt-4 border-t border-white/[0.04] space-y-2">
+            <p className="text-[10px] text-white/30 uppercase tracking-widest font-mono">
+              Suggested Action
+            </p>
+            <p className="text-xs text-white/50">
+              Open this web application on your laptop or computer browser.
+            </p>
+          </div>
+
+          <button
+            onClick={() => setBypassMobile(true)}
+            className="w-full py-2.5 rounded-lg border border-white/10 hover:border-white/20 hover:bg-white/[0.02] text-xs font-semibold text-white/40 hover:text-white transition-all font-mono cursor-pointer"
+          >
+            → Force open desktop layout
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (mounted && showKeysModal) {
     return <OnboardingKeysModal />;

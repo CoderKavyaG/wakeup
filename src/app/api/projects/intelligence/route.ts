@@ -19,7 +19,14 @@ export async function GET() {
       where: { userId }
     });
     const notes = await prisma.note.findMany({
-      where: { userId }
+      where: {
+        userId,
+        NOT: {
+          source: {
+            in: ["cockpit_helpful", "cockpit_unhelpful"]
+          }
+        }
+      }
     });
 
     // Analyze each project

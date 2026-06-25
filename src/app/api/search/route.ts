@@ -142,7 +142,14 @@ export async function POST(request: Request) {
     // 3. Search Notes
     if (!filters?.types || filters.types.includes("note")) {
       const notes = await prisma.note.findMany({
-        where: { userId },
+        where: {
+          userId,
+          NOT: {
+            source: {
+              in: ["cockpit_helpful", "cockpit_unhelpful"]
+            }
+          }
+        },
       });
 
       notes.forEach((note) => {
