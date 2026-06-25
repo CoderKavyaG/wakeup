@@ -443,10 +443,8 @@ export function FocusPanelWidget() {
             className="min-h-[56px] max-h-[130px] overflow-y-auto text-sm resize-none bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 p-3 pb-1.5 focus:outline-none"
           />
 
-          {/* Bottom toolbar */}
           <div className="flex items-center justify-between px-3 py-2 border-t border-white/[0.04] bg-white/[0.01] rounded-b-xl shrink-0 gap-2">
             <div className="flex items-center gap-2 flex-wrap">
-              {/* Live hint (Interactive Override Selector) */}
               {noteText.trim() && (
                 <div className="flex items-center gap-0.5 bg-white/[0.03] border border-white/5 rounded-md p-0.5 select-none shrink-0">
                   <button
