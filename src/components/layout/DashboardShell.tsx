@@ -24,7 +24,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setMounted(true);
     const checkDevice = () => {
-      const isMobileSize = window.innerWidth < 768;
+      const isMobileSize = window.innerWidth < 720;
       const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
       setIsMobile(isMobileSize || isMobileUA);
     };
