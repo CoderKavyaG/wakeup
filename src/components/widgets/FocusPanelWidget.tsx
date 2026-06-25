@@ -171,6 +171,7 @@ export function FocusPanelWidget() {
 
   // Input state
   const [noteText, setNoteText] = useState("");
+  const [overrideType, setOverrideType] = useState<"task" | "note" | null>(null);
   const [mentionQuery, setMentionQuery] = useState("");
   const [showMentionMenu, setShowMentionMenu] = useState(false);
   const [taggedProjectId, setTaggedProjectId] = useState<string | null>(null);
@@ -184,7 +185,8 @@ export function FocusPanelWidget() {
   const unifiedInputRef = useRef<HTMLTextAreaElement>(null);
 
   // Live input hint
-  const inputType = detectInputType(noteText);
+  const autoType = detectInputType(noteText);
+  const inputType = overrideType || (autoType === "task" ? "task" : "note");
 
   // Task-specific: only show date picker when input looks like a task and no project is tagged
   const showDatePicker = inputType === "task" && !taggedProjectId;
@@ -218,6 +220,9 @@ export function FocusPanelWidget() {
   // Input handler
   function handleNoteInput(value: string) {
     setNoteText(value);
+    if (value.trim() === "") {
+      setOverrideType(null);
+    }
     const atMatch = value.match(/@([^\s@]*)$/);
     if (atMatch) {
       setMentionQuery(atMatch[1].toLowerCase());
@@ -277,7 +282,7 @@ export function FocusPanelWidget() {
       }
     }
 
-    const detectedType = detectInputType(rawText);
+    const detectedType = overrideType || detectInputType(rawText);
 
     // Reset UI immediately
     setNoteText("");
@@ -335,6 +340,7 @@ export function FocusPanelWidget() {
     } finally {
       setIsClassifying(false);
       setSelectedDate(todayStr);
+      setOverrideType(null);
     }
   };
 
@@ -440,11 +446,32 @@ export function FocusPanelWidget() {
           {/* Bottom toolbar */}
           <div className="flex items-center justify-between px-3 py-2 border-t border-white/[0.04] bg-white/[0.01] rounded-b-xl shrink-0 gap-2">
             <div className="flex items-center gap-2 flex-wrap">
-              {/* Live hint */}
+              {/* Live hint (Interactive Override Selector) */}
               {noteText.trim() && (
-                <span className={`text-[10px] font-semibold transition-colors ${hint.color}`}>
-                  {hint.label}
-                </span>
+                <div className="flex items-center gap-0.5 bg-white/[0.03] border border-white/5 rounded-md p-0.5 select-none shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setOverrideType("task")}
+                    className={`px-1.5 py-0.5 rounded-[4px] text-[10px] font-bold tracking-tight transition-all duration-150 cursor-pointer ${
+                      inputType === "task"
+                        ? "bg-green-500/15 text-green-400 border border-green-500/10 shadow-sm"
+                        : "text-white/30 hover:text-white/60 border border-transparent"
+                    }`}
+                  >
+                    Task
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setOverrideType("note")}
+                    className={`px-1.5 py-0.5 rounded-[4px] text-[10px] font-bold tracking-tight transition-all duration-150 cursor-pointer ${
+                      inputType === "note"
+                        ? "bg-amber-500/15 text-amber-400 border border-amber-500/10 shadow-sm"
+                        : "text-white/30 hover:text-white/60 border border-transparent"
+                    }`}
+                  >
+                    Thought
+                  </button>
+                </div>
               )}
 
               {/* Date picker — only for task-type input */}
