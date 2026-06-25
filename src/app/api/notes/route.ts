@@ -13,7 +13,14 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const projectId = url.searchParams.get('projectId');
     
-    const whereClause: any = { userId };
+    const whereClause: any = {
+      userId,
+      NOT: {
+        source: {
+          in: ["cockpit_helpful", "cockpit_unhelpful"]
+        }
+      }
+    };
     if (projectId) {
       whereClause.projectId = projectId;
     }

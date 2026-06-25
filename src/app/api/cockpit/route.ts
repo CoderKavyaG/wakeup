@@ -175,10 +175,21 @@ Provide the audit review:`;
     }
 
     // 1. FRESH DB PULL FOR EACH REQUEST
-    const [dbProjects, dbTasks, notes, commits] = await Promise.all([
+    const [dbProjects, dbTasks, notes, commits, helpfulFeedback, unhelpfulFeedback] = await Promise.all([
       prisma.project.findMany({ where: { userId }, include: { links: true }, take: 20 }),
       prisma.task.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } }),
-      prisma.note.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: 10 }),
+      prisma.note.findMany({
+        where: {
+          userId,
+          NOT: {
+            source: {
+              in: ["cockpit_helpful", "cockpit_unhelpful"]
+            }
+          }
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 10
+      }),
       prisma.commit.findMany({
         where: {
           project: { userId },
@@ -186,6 +197,16 @@ Provide the audit review:`;
         },
         orderBy: { date: 'desc' },
         take: 50
+      }),
+      prisma.note.findMany({
+        where: { userId, source: "cockpit_helpful" },
+        orderBy: { createdAt: 'desc' },
+        take: 5
+      }),
+      prisma.note.findMany({
+        where: { userId, source: "cockpit_unhelpful" },
+        orderBy: { createdAt: 'desc' },
+        take: 5
       })
     ]);
 
@@ -260,11 +281,26 @@ Provide the audit review:`;
       .join('\n');
 
     // 6. BUILD FRESH CONTEXT SYSTEM PROMPT
+    const helpfulContext = helpfulFeedback.map(f => {
+      const parts = f.content.split(" || ");
+      return `  User: "${parts[0]}"\n  AI Response (Good): "${parts[1]}"`;
+    }).join("\n---\n");
+
+    const unhelpfulContext = unhelpfulFeedback.map(f => {
+      const parts = f.content.split(" || ");
+      return `  User: "${parts[0]}"\n  AI Response (Avoid): "${parts[1]}"`;
+    }).join("\n---\n");
+
     const systemPrompt = `You are the AI brain of DevOS — ${userName}'s personal developer operating system.
 ${userName} is a developer, building multiple projects simultaneously.
 You have live access to their workspace data. Be specific, direct, and actionable.
 Never give generic advice. Always reference actual project names, task titles, or commit messages.
 Keep answers under 120 words unless asked for detail. No bullet points unless listing >3 items.
+
+LEARNED PREFERENCES / FEW-SHOT ALIGNMENT:
+${helpfulContext ? `The user liked and marked these past answers as HELPFUL (mimic this structure, style, and quality):\n${helpfulContext}` : "  No positive preferences recorded yet."}
+
+${unhelpfulContext ? `The user marked these past answers as UNHELPFUL (AVOID this style, formatting, or mistakes):\n${unhelpfulContext}` : "  No negative preferences recorded yet."}
 
 LIVE WORKSPACE DATA:
 Projects (${projects.length} total, ${stale.length} stale):

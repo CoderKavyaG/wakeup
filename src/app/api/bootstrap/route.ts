@@ -29,7 +29,14 @@ export async function GET() {
         orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
       }),
       prisma.note.findMany({
-        where: { userId },
+        where: {
+          userId,
+          NOT: {
+            source: {
+              in: ["cockpit_helpful", "cockpit_unhelpful"]
+            }
+          }
+        },
         orderBy: { createdAt: "desc" },
         take: 50,
       }),

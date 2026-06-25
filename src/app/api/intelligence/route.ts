@@ -19,7 +19,18 @@ export async function POST(request: Request) {
     const [dbProjects, dbTasks, notes, commits] = await Promise.all([
       prisma.project.findMany({ where: { userId }, include: { links: true }, take: 20 }),
       prisma.task.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } }),
-      prisma.note.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: 10 }),
+      prisma.note.findMany({
+        where: {
+          userId,
+          NOT: {
+            source: {
+              in: ["cockpit_helpful", "cockpit_unhelpful"]
+            }
+          }
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 10
+      }),
       prisma.commit.findMany({
         where: { project: { userId }, date: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } },
         orderBy: { date: 'desc' },
