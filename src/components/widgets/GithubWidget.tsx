@@ -134,7 +134,7 @@ export function GithubWidget() {
   };
 
   return (
-    <div className="flex flex-col h-full overflow-hidden text-foreground">
+    <div className="flex flex-col h-full overflow-hidden text-foreground px-4 py-3">
       {/* Header */}
       <div className="flex items-center justify-between mb-3 shrink-0">
         <div className="flex items-center space-x-2">
