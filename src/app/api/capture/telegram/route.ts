@@ -18,12 +18,14 @@ export async function POST(req: NextRequest) {
     const chatId = message.chat.id;
     const text = message.text.trim();
 
-    // Link code check
     if (text.startsWith("DEVOS-")) {
       const shortId = text.replace("DEVOS-", "").trim();
-      const user = await prisma.user.findFirst({
-        where: { id: { startsWith: shortId } },
-      });
+      let user = null;
+      if (shortId.length >= 8) {
+        user = await prisma.user.findFirst({
+          where: { id: { startsWith: shortId } },
+        });
+      }
       if (user) {
         await prisma.telegramLink.upsert({
           where: { userId: user.id },
