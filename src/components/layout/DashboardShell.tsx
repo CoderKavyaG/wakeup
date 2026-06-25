@@ -5,7 +5,7 @@ import { CockpitCommand } from "./CockpitCommand";
 import { OnboardingGuide } from "./OnboardingGuide";
 import { useLayoutStore } from "@/store/useLayoutStore";
 import { useUrlStore } from "@/store/useUrlStore";
-import { Lock, Unlock, Bookmark, X, Search, Trash2 } from "lucide-react";
+import { Lock, Unlock, Bookmark, X, Search, Trash2, Activity } from "lucide-react";
 import { Button } from "../ui/button";
 import { QuickLinksWidget } from "../widgets/QuickLinksWidget";
 import { AnimatePresence, motion } from "framer-motion";
@@ -15,9 +15,11 @@ import { useSession, signOut } from "next-auth/react";
 import { useProjectOSStore } from "@/store/useProjectOSStore";
 import { ProjectOS } from "./ProjectOS";
 import { OnboardingKeysModal } from "./OnboardingKeysModal";
+import { ActivityLogsDrawer } from "./ActivityLogsDrawer";
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
+  const [isLogsOpen, setIsLogsOpen] = useState(false);
   useEffect(() => setMounted(true), []);
 
   const { data: session } = useSession();
@@ -153,11 +155,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
       <AmbientBar />
 
-      {/* Main Workspace */}
       <main className="flex-1 overflow-y-auto p-6 relative">
         {children}
 
-        {/* ── QUICK LINKS FAB & PANEL ── */}
         <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-3 pointer-events-none">
           <AnimatePresence>
             {isQuickLinksOpen && (
@@ -172,19 +172,30 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               </motion.div>
             )}
           </AnimatePresence>
+
+          <button
+            onClick={() => setIsLogsOpen(true)}
+            className="w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-all pointer-events-auto border bg-[#1a1a1d] text-muted-foreground border-white/10 hover:text-foreground hover:bg-[#252528] hover:border-white/20 cursor-pointer"
+            title="System Logs"
+          >
+            <Activity className="w-4 h-4" />
+          </button>
           
           <button
             onClick={toggleQuickLinks}
             className={`w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-all pointer-events-auto border ${
               isQuickLinksOpen 
                 ? "bg-white/10 text-white border-white/20 hover:bg-white/20" 
-                : "bg-[#1a1a1d] text-muted-foreground border-white/10 hover:text-foreground hover:bg-[#252528] hover:border-white/20"
+                : "bg-[#1a1a1d] text-muted-foreground border-white/10 hover:text-foreground hover:bg-[#252528] hover:border-white/20 cursor-pointer"
             }`}
+            title="Quick Links"
           >
             {isQuickLinksOpen ? <X className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}
           </button>
         </div>
       </main>
+
+      <ActivityLogsDrawer isOpen={isLogsOpen} onClose={() => setIsLogsOpen(false)} />
 
       <AnimatePresence>
         {isProjectOSOpen && <ProjectOS />}
