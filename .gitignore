@@ -50,3 +50,6 @@ README.md
 
 # uploads
 /public/uploads/
+
+devos-agent/active-port.json
+.agents/
