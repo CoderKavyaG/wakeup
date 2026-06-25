@@ -126,6 +126,7 @@ export function CockpitCommand() {
   const [streamedAnswer, setStreamedAnswer] = useState("");
   const [answerDone, setAnswerDone] = useState(false);
   const [lastQuery, setLastQuery] = useState("");
+  const [feedbackRating, setFeedbackRating] = useState<"up" | "down" | null>(null);
 
   // Search state
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -490,6 +491,33 @@ export function CockpitCommand() {
     askCockpit(val);
   };
 
+  // ── Handle AI feedback rating ────────────────
+  const handleFeedback = async (rating: "up" | "down") => {
+    if (feedbackRating) return;
+    setFeedbackRating(rating);
+    try {
+      const res = await fetch("/api/cockpit/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: lastQuery,
+          response: streamedAnswer,
+          rating,
+        }),
+      });
+      if (res.ok) {
+        setConfirmation(
+          rating === "up"
+            ? "✓ Thumbs up recorded! DevOS has added this to its positive learning context."
+            : "✓ Thumbs down recorded! DevOS will avoid this style or content in the future."
+        );
+        setTimeout(() => setConfirmation(null), 4000);
+      }
+    } catch (err) {
+      console.error("Failed to submit feedback:", err);
+    }
+  };
+
   // ── Create task from AI answer ────────────────
   const createTaskFromAnswer = () => {
     if (!streamedAnswer) return;
@@ -540,6 +568,7 @@ export function CockpitCommand() {
     setSearchResults([]);
     setConfirmation(null);
     setLastQuery("");
+    setFeedbackRating(null);
   };
 
   const closeOverlay = () => {
@@ -669,10 +698,26 @@ export function CockpitCommand() {
                     {answerDone && !isStreaming && (
                       <div className="flex items-center gap-2 pt-2 border-t border-border/30">
                         <span className="text-[10px] text-muted-foreground/50 font-mono">Helpful?</span>
-                        <button className="p-1 rounded hover:bg-green-500/10 text-muted-foreground hover:text-green-400 transition-colors">
+                        <button
+                          onClick={() => handleFeedback("up")}
+                          disabled={feedbackRating !== null}
+                          className={`p-1 rounded transition-colors cursor-pointer ${
+                            feedbackRating === "up"
+                              ? "bg-green-500/20 text-green-400"
+                              : "hover:bg-green-500/10 text-muted-foreground hover:text-green-400"
+                          } disabled:opacity-50`}
+                        >
                           <ThumbsUp className="w-3.5 h-3.5" />
                         </button>
-                        <button className="p-1 rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-colors">
+                        <button
+                          onClick={() => handleFeedback("down")}
+                          disabled={feedbackRating !== null}
+                          className={`p-1 rounded transition-colors cursor-pointer ${
+                            feedbackRating === "down"
+                              ? "bg-red-500/20 text-red-400"
+                              : "hover:bg-red-500/10 text-muted-foreground hover:text-red-400"
+                          } disabled:opacity-50`}
+                        >
                           <ThumbsDown className="w-3.5 h-3.5" />
                         </button>
                         <div className="flex-1" />

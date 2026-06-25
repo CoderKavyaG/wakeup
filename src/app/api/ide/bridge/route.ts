@@ -209,7 +209,15 @@ async function handleGetProjectContext(userId: string, context?: IDECommand["con
     });
 
     const notes = await prisma.note.findMany({
-      where: { userId, projectId },
+      where: {
+        userId,
+        projectId,
+        NOT: {
+          source: {
+            in: ["cockpit_helpful", "cockpit_unhelpful"]
+          }
+        }
+      },
       take: 5,
       orderBy: { createdAt: "desc" },
     });
