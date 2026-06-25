@@ -1739,30 +1739,28 @@ export function ProjectsWidget() {
             <div className="border-t border-white/5 pt-4 space-y-2">
               <label className="text-xs font-semibold text-muted-foreground flex items-center justify-between">
                 <span>Telegram Integration</span>
-                <span className="text-[10px] uppercase tracking-wider font-mono font-bold text-amber-400">
-                  ○ On Hold
-                </span>
+                {telegramLinked ? (
+                  <span className="text-[10px] uppercase tracking-wider font-mono font-bold text-green-400">
+                    ● Linked
+                  </span>
+                ) : (
+                  <span className="text-[10px] uppercase tracking-wider font-mono font-bold text-amber-400">
+                    ○ Ready to Link
+                  </span>
+                )}
               </label>
-
-              {/* Service Advisory Banner */}
-              <div className="bg-amber-500/5 border border-amber-500/15 rounded-lg p-3 space-y-1 text-left">
-                <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider font-mono flex items-center gap-1">
-                  ⚠️ Service Advisory
-                </span>
-                <p className="text-[10px] text-amber-400/80 leading-relaxed font-sans">
-                  This integration is temporarily on hold due to a Telegram ban by the government. Sorry, and thank you! We will surely be bringing other alternatives soon.
-                </p>
-              </div>
               
-              <div className="bg-white/[0.01] border border-white/[0.04] rounded-lg p-3 space-y-2 opacity-50 select-none pointer-events-none">
+              <div className="bg-white/[0.01] border border-white/[0.04] rounded-lg p-3 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] text-white/40 font-medium">Your Link Code:</span>
-                  <code className="text-xs font-mono font-bold text-white/30 bg-white/5 px-1.5 py-0.5 rounded border border-white/5">
+                  <code className="text-xs font-mono font-bold text-amber-400 bg-white/5 px-1.5 py-0.5 rounded border border-white/5 select-all">
                     DEVOS-{userId ? userId.slice(0, 8) : 'unknown'}
                   </code>
                 </div>
-                <p className="text-[10px] text-white/30 leading-relaxed">
-                  Message this code to the bot @AssistmeOs_Bot to link your accounts. (Service suspended).
+                <p className="text-[10px] text-white/40 leading-relaxed">
+                  {telegramLinked 
+                    ? "Connected! You can send messages directly to @AssistmeOs_Bot to capture tasks, ideas, and notes onto your DevOS dashboard instantly."
+                    : "Message this code to the bot @AssistmeOs_Bot to link your accounts and start capturing tasks, ideas, and notes on the go."}
                 </p>
               </div>
             </div>
