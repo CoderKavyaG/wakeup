@@ -491,7 +491,6 @@ export function CockpitCommand() {
     askCockpit(val);
   };
 
-  // ── Handle AI feedback rating ────────────────
   const handleFeedback = async (rating: "up" | "down") => {
     if (feedbackRating) return;
     setFeedbackRating(rating);
