@@ -5,7 +5,6 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
-    // Verify the request is from Telegram
     const secret = req.headers.get("X-Telegram-Bot-Api-Secret-Token");
     if (secret !== process.env.TELEGRAM_WEBHOOK_SECRET) {
       return Response.json({ error: "unauthorized" }, { status: 401 });
@@ -51,7 +50,140 @@ export async function POST(req: NextRequest) {
       return Response.json({ ok: true });
     }
 
-    // STEP 1: Detect @project mention
+    const session = await prisma.telegramSession.findUnique({
+      where: { chatId: chatId.toString() },
+    });
+    const isSessionActive = session && new Date(session.expiresAt) > new Date();
+
+    if (text.startsWith("/")) {
+      const parts = text.split(" ");
+      const command = parts[0].toLowerCase();
+
+      if (command === "/projects") {
+        const projects = await prisma.project.findMany({
+          where: { userId },
+          orderBy: { name: "asc" },
+        });
+        if (projects.length === 0) {
+          await sendTelegramMessage(chatId, "You don't have any projects registered yet.");
+          return Response.json({ ok: true });
+        }
+        const listStr = projects
+          .map((p, idx) => `${idx + 1}. <b>${p.name}</b> (${p.status})`)
+          .join("\n");
+        await sendTelegramMessage(
+          chatId,
+          `Select a project to lock by replying with its number:\n\n${listStr}\n\nSend /done to cancel.`
+        );
+        return Response.json({ ok: true });
+      }
+
+      if (command === "/done") {
+        await prisma.telegramSession.deleteMany({
+          where: { chatId: chatId.toString() },
+        });
+        await sendTelegramMessage(chatId, "🔓 Project lock cleared. Future captures will be global.");
+        return Response.json({ ok: true });
+      }
+
+      if (command === "/today") {
+        const todayStr = new Date().toISOString().split("T")[0];
+        const tasks = await prisma.task.findMany({
+          where: { userId, completed: false, dueDate: todayStr },
+          orderBy: { createdAt: "desc" },
+        });
+        if (tasks.length === 0) {
+          await sendTelegramMessage(chatId, "No tasks due today.");
+          return Response.json({ ok: true });
+        }
+        const listStr = tasks.map((t, idx) => `${idx + 1}. [${t.priority}] ${t.title}`).join("\n");
+        await sendTelegramMessage(chatId, `<b>Tasks due today:</b>\n\n${listStr}`);
+        return Response.json({ ok: true });
+      }
+
+      if (command === "/ideas") {
+        const ideas = await prisma.idea.findMany({
+          where: { userId },
+          take: 10,
+          orderBy: { createdAt: "desc" },
+          include: { project: { select: { name: true } } },
+        });
+        if (ideas.length === 0) {
+          await sendTelegramMessage(chatId, "No ideas captured yet.");
+          return Response.json({ ok: true });
+        }
+        const listStr = ideas
+          .map((i, idx) => `${idx + 1}. "${i.content}"${i.project ? ` [${i.project.name}]` : ""}`)
+          .join("\n");
+        await sendTelegramMessage(chatId, `<b>Recent Ideas:</b>\n\n${listStr}`);
+        return Response.json({ ok: true });
+      }
+
+      if (command === "/notes") {
+        const notes = await prisma.note.findMany({
+          where: { userId, NOT: { source: { in: ["cockpit_helpful", "cockpit_unhelpful"] } } },
+          take: 5,
+          orderBy: { createdAt: "desc" },
+        });
+        if (notes.length === 0) {
+          await sendTelegramMessage(chatId, "No notes captured yet.");
+          return Response.json({ ok: true });
+        }
+        const listStr = notes.map((n, idx) => `${idx + 1}. "${n.content}"`).join("\n");
+        await sendTelegramMessage(chatId, `<b>Recent Notes:</b>\n\n${listStr}`);
+        return Response.json({ ok: true });
+      }
+
+      if (command === "/status") {
+        const [openTasks, projectsCount, ideasCount, notesCount] = await Promise.all([
+          prisma.task.count({ where: { userId, completed: false } }),
+          prisma.project.count({ where: { userId } }),
+          prisma.idea.count({ where: { userId } }),
+          prisma.note.count({
+            where: { userId, NOT: { source: { in: ["cockpit_helpful", "cockpit_unhelpful"] } } },
+          }),
+        ]);
+        const statusLock = isSessionActive && session?.activeProjectName
+          ? `Locked to: <b>${session.activeProjectName}</b>`
+          : "Global mode";
+        await sendTelegramMessage(
+          chatId,
+          `<b>DevOS Status Summary:</b>\n\nMode: ${statusLock}\nOpen Tasks: ${openTasks}\nProjects: ${projectsCount}\nIdeas: ${ideasCount}\nNotes/Thoughts: ${notesCount}`
+        );
+        return Response.json({ ok: true });
+      }
+    }
+
+    if (/^\d+$/.test(text)) {
+      const index = parseInt(text, 10);
+      const projects = await prisma.project.findMany({
+        where: { userId },
+        orderBy: { name: "asc" },
+      });
+      if (index >= 1 && index <= projects.length) {
+        const selected = projects[index - 1];
+        await prisma.telegramSession.upsert({
+          where: { chatId: chatId.toString() },
+          update: {
+            activeProjectId: selected.id,
+            activeProjectName: selected.name,
+            expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+          },
+          create: {
+            chatId: chatId.toString(),
+            activeProjectId: selected.id,
+            activeProjectName: selected.name,
+            expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+          },
+        });
+        await sendTelegramMessage(
+          chatId,
+          `🔒 Session locked to project <b>${selected.name}</b>.\n\nAll messages will be auto-tagged to this project. Send /done to clear.`
+        );
+        return Response.json({ ok: true });
+      }
+    }
+
     const mentionMatch = text.match(/@([\w-]+)/i);
     let projectId: string | null = null;
     let projectName: string | null = null;
@@ -67,11 +199,13 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // STEP 2: AI classification
+    if (!projectId && isSessionActive && session?.activeProjectId) {
+      projectId = session.activeProjectId;
+      projectName = session.activeProjectName;
+    }
+
     const classification = await classifyCapture(text, userId);
 
-
-    // STEP 3: Save based on type
     let savedAs = "";
     if (classification.type === "task") {
       await prisma.task.create({
@@ -109,7 +243,13 @@ export async function POST(req: NextRequest) {
       savedAs = `note${projectName ? ` for ${projectName}` : ""}`;
     }
 
-    // STEP 4: Reply with confirmation
+    if (isSessionActive) {
+      await prisma.telegramSession.update({
+        where: { chatId: chatId.toString() },
+        data: { expiresAt: new Date(Date.now() + 30 * 60 * 1000) },
+      });
+    }
+
     const emoji =
       classification.type === "task"
         ? "✅"
@@ -130,7 +270,6 @@ export async function POST(req: NextRequest) {
 
 async function classifyCapture(text: string, userId?: string) {
   try {
-    // Try user's own encrypted Groq key first, then fall back to server-side key
     let groqKey = process.env.GROQ_API_KEY || "";
     if (userId) {
       try {
@@ -147,7 +286,6 @@ async function classifyCapture(text: string, userId?: string) {
     }
 
     if (!groqKey) {
-      // No key at all — fall back to simple keyword classification
       const lower = text.toLowerCase();
       const isTask = /^(fix|build|add|create|update|refactor|deploy|write|check|review|test|push|send|call|email|make|finish|complete)\b/.test(lower);
       const isIdea = /\b(idea|concept|what if|could we|should we|maybe|consider)\b/.test(lower);
@@ -194,7 +332,6 @@ Rules: task = actionable ("fix X", "build Y", "add Z"), idea = new feature/conce
     return { type: "note", cleanContent: text };
   }
 }
-
 
 async function sendTelegramMessage(chatId: number, text: string) {
   try {

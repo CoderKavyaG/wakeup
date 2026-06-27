@@ -365,4 +365,13 @@ model TelegramLink {
   linkedAt  DateTime @default(now())
 }
 
+model TelegramSession {
+  chatId            String   @id
+  activeProjectId   String?
+  activeProjectName String?
+  expiresAt         DateTime
+  updatedAt         DateTime @updatedAt
+}
+
+
 
