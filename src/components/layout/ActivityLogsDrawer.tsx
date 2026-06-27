@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   PlusCircle,
   FileText,
+  Lightbulb,
   Loader2,
 } from "lucide-react";
 
@@ -113,6 +114,8 @@ export function ActivityLogsDrawer({ isOpen, onClose }: ActivityLogsDrawerProps)
         return <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />;
       case "note":
         return <FileText className="w-3.5 h-3.5 text-amber-400" />;
+      case "idea":
+        return <Lightbulb className="w-3.5 h-3.5 text-yellow-400" />;
       case "commit":
         return <GitCommit className="w-3.5 h-3.5 text-zinc-400" />;
       default:
@@ -130,6 +133,8 @@ export function ActivityLogsDrawer({ isOpen, onClose }: ActivityLogsDrawerProps)
         return "border-green-500/20";
       case "note":
         return "border-amber-500/20";
+      case "idea":
+        return "border-yellow-500/20";
       default:
         return "border-white/5";
     }
@@ -152,7 +157,7 @@ export function ActivityLogsDrawer({ isOpen, onClose }: ActivityLogsDrawerProps)
 
   const dailyEvents = events;
   const weeklyEvents = events.filter(
-    (e) => e.type === "project" || e.type === "task-completed"
+    (e) => e.type === "project" || e.type === "task-completed" || e.type === "idea"
   );
 
   const displayedEvents = activeTab === "daily" ? dailyEvents : weeklyEvents;

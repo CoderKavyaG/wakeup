@@ -12,7 +12,7 @@ export async function GET() {
     }
     const userId = session.user.id;
 
-    const [projects, tasks, notes, caches, user, telegramLink] = await Promise.all([
+    const [projects, tasks, notes, caches, user, telegramLink, ideas] = await Promise.all([
       prisma.project.findMany({
         where: { userId },
         orderBy: { createdAt: "desc" }
@@ -41,6 +41,11 @@ export async function GET() {
       }),
       prisma.telegramLink.findUnique({
         where: { userId }
+      }),
+      prisma.idea.findMany({
+        where: { userId },
+        include: { project: { select: { id: true, name: true } } },
+        orderBy: { createdAt: "desc" }
       })
     ]);
 
@@ -90,6 +95,18 @@ export async function GET() {
         description: n.content,
         date: n.createdAt.toISOString(),
         metadata: { source: n.source, projectId: n.projectId, projectName }
+      });
+    });
+
+    ideas.forEach((idea) => {
+      const projectName = idea.project?.name ?? (idea.projectId ? projectMap.get(idea.projectId) : null);
+      timelineEvents.push({
+        id: `event-idea-${idea.id}`,
+        type: "idea",
+        title: projectName ? `Idea for ${projectName}` : "Global Idea Captured",
+        description: idea.content,
+        date: idea.createdAt.toISOString(),
+        metadata: { source: idea.source, status: idea.status, projectId: idea.projectId, projectName }
       });
     });
 
