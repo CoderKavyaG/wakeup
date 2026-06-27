@@ -4,6 +4,7 @@ import { useTaskStore } from "./useTaskStore";
 import { useNoteStore } from "./useNoteStore";
 import { useUrlStore } from "./useUrlStore";
 import { useLayoutStore } from "./useLayoutStore";
+import { useIdeaStore } from "./useIdeaStore";
 
 interface DerivedSignals {
   staleProjects: string[];
@@ -71,6 +72,7 @@ export const useBootstrapStore = create<BootstrapState>((set, get) => ({
       useTaskStore.getState().setTasks(data.tasks ?? []);
       useNoteStore.getState().setNotes(data.notes ?? []);
       useUrlStore.getState().setUrls(data.urls ?? []);
+      useIdeaStore.getState().setIdeas(data.ideas ?? []);
 
       set({
         loaded: true,

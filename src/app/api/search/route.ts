@@ -173,7 +173,36 @@ export async function POST(request: Request) {
       });
     }
 
-    // 4. Search URLs
+    // 4. Search Ideas
+    if (!filters?.types || filters.types.includes("idea")) {
+      const ideas = await prisma.idea.findMany({
+        where: { userId },
+        include: { project: { select: { id: true, name: true } } },
+      });
+
+      ideas.forEach((idea) => {
+        const score = calculateRelevance(query, idea.content, false);
+        if (score > 20) {
+          results.push({
+            id: idea.id,
+            type: "idea",
+            title: idea.content.substring(0, 60) + (idea.content.length > 60 ? "..." : ""),
+            description: idea.project ? `Project: ${idea.project.name}` : "Global idea",
+            metadata: {
+              status: idea.status,
+              source: idea.source,
+              starred: idea.starred,
+              updatedAt: idea.updatedAt.toISOString(),
+              tags: ["idea", idea.status, idea.source].filter(Boolean),
+            },
+            relevanceScore: score,
+            matchedFields: ["content"],
+          });
+        }
+      });
+    }
+
+    // 5. Search URLs
     if (!filters?.types || filters.types.includes("url")) {
       const urls = await prisma.url.findMany({
         where: { userId },

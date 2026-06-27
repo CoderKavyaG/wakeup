@@ -15,7 +15,7 @@ export async function GET() {
     const now = new Date();
     const staleCutoff = new Date(Date.now() - 14 * 86400000);
 
-    const [projects, tasks, notes, urls, layoutState, telegramLink] = await Promise.all([
+    const [projects, tasks, notes, urls, layoutState, telegramLink, ideas] = await Promise.all([
       prisma.project.findMany({
         where: { userId },
         include: {
@@ -49,6 +49,11 @@ export async function GET() {
       }),
       prisma.telegramLink.findUnique({
         where: { userId }
+      }),
+      prisma.idea.findMany({
+        where: { userId },
+        include: { project: { select: { id: true, name: true } } },
+        orderBy: [{ starred: "desc" }, { createdAt: "desc" }],
       })
     ]);
 
@@ -156,6 +161,7 @@ export async function GET() {
       tasks,
       incompleteTasks,
       notes,
+      ideas,
       urls,
       layoutState: finalLayoutState,
       vercel: vercelData,
