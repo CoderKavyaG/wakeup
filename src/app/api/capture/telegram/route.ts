@@ -10,25 +10,20 @@ function escapeHtml(text: string): string {
     .replace(/>/g, "&gt;");
 }
 
-function formatIdeaOrNoteContent(content: string): string {
+function formatIdeaOrNoteContent(content: string): string | null {
   try {
     if (content.trim().startsWith("{") && content.trim().endsWith("}")) {
       const parsed = JSON.parse(content);
       if (parsed.type === "text") {
-        return parsed.text || "";
+        return parsed.text && parsed.text.trim() ? parsed.text.trim() : null;
       }
       if (parsed.type === "voice") {
-        return parsed.text ? `[Voice Note] ${parsed.text}` : "[Voice Note]";
+        return parsed.text && parsed.text.trim() ? `[Voice Note] ${parsed.text.trim()}` : null;
       }
-      if (parsed.type === "image") {
-        return parsed.text ? `[Image] ${parsed.text}` : "[Image]";
-      }
-      if (parsed.type) {
-        return `[Canvas ${parsed.type}]`;
-      }
+      return parsed.text && parsed.text.trim() ? parsed.text.trim() : null;
     }
   } catch (e) {}
-  return content;
+  return content.trim() ? content.trim() : null;
 }
 
 export async function POST(req: NextRequest) {
@@ -110,7 +105,11 @@ export async function POST(req: NextRequest) {
         };
         const phaseDbValue = phaseMap[command];
         const projects = await prisma.project.findMany({
-          where: { userId, phase: phaseDbValue },
+          where: {
+            userId,
+            phase: phaseDbValue,
+            ...(command === "/inplanning" ? { status: "planning" } : {})
+          },
           orderBy: { name: "asc" }
         });
         if (projects.length === 0) {
@@ -175,18 +174,24 @@ export async function POST(req: NextRequest) {
       if (command === "/ideas") {
         const ideas = await prisma.idea.findMany({
           where: { userId },
-          take: 10,
           orderBy: { createdAt: "desc" },
           include: { project: { select: { name: true } } },
         });
-        if (ideas.length === 0) {
+        const cleanIdeas = ideas
+          .map((i) => {
+            const cleanContent = formatIdeaOrNoteContent(i.content);
+            return cleanContent ? { ...i, cleanContent } : null;
+          })
+          .filter((i): i is NonNullable<typeof i> => i !== null)
+          .slice(0, 10);
+
+        if (cleanIdeas.length === 0) {
           await sendTelegramMessage(chatId, "No ideas captured yet.");
           return Response.json({ ok: true });
         }
-        const listStr = ideas
+        const listStr = cleanIdeas
           .map((i, idx) => {
-            const cleanContent = formatIdeaOrNoteContent(i.content);
-            const escaped = escapeHtml(cleanContent);
+            const escaped = escapeHtml(i.cleanContent);
             return `${idx + 1}. "${escaped}"${i.project ? ` [${i.project.name}]` : ""}`;
           })
           .join("\n");
@@ -197,18 +202,26 @@ export async function POST(req: NextRequest) {
       if (command === "/notes") {
         const notes = await prisma.note.findMany({
           where: { userId, NOT: { source: { in: ["cockpit_helpful", "cockpit_unhelpful"] } } },
-          take: 5,
           orderBy: { createdAt: "desc" },
         });
-        if (notes.length === 0) {
+        const cleanNotes = notes
+          .map((n) => {
+            const cleanContent = formatIdeaOrNoteContent(n.content);
+            return cleanContent ? { ...n, cleanContent } : null;
+          })
+          .filter((n): n is NonNullable<typeof n> => n !== null)
+          .slice(0, 5);
+
+        if (cleanNotes.length === 0) {
           await sendTelegramMessage(chatId, "No notes captured yet.");
           return Response.json({ ok: true });
         }
-        const listStr = notes.map((n, idx) => {
-          const cleanContent = formatIdeaOrNoteContent(n.content);
-          const escaped = escapeHtml(cleanContent);
-          return `${idx + 1}. "${escaped}"`;
-        }).join("\n");
+        const listStr = cleanNotes
+          .map((n, idx) => {
+            const escaped = escapeHtml(n.cleanContent);
+            return `${idx + 1}. "${escaped}"`;
+          })
+          .join("\n");
         await sendTelegramMessage(chatId, `<b>Recent Notes:</b>\n\n${listStr}`);
         return Response.json({ ok: true });
       }
@@ -244,7 +257,11 @@ export async function POST(req: NextRequest) {
       if (isSessionActive && session?.activeProjectId?.startsWith("phase:")) {
         const phaseDbValue = session.activeProjectId.replace("phase:", "");
         const projects = await prisma.project.findMany({
-          where: { userId, phase: phaseDbValue },
+          where: {
+            userId,
+            phase: phaseDbValue,
+            ...(phaseDbValue === "idea" ? { status: "planning" } : {})
+          },
           orderBy: { name: "asc" },
         });
         if (index >= 1 && index <= projects.length) {
