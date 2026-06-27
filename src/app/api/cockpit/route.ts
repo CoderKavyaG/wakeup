@@ -5,12 +5,32 @@ import { auth } from "@/auth";
 import { decrypt } from "@/lib/encryption";
 import { agentFetch } from "@/lib/agentFetch";
 
-
 export const dynamic = "force-dynamic";
 
 interface CockpitRequest {
   query: string;
   screenshot?: string;
+}
+
+function formatIdeaOrNoteContent(content: string): string {
+  try {
+    if (content.trim().startsWith("{") && content.trim().endsWith("}")) {
+      const parsed = JSON.parse(content);
+      if (parsed.type === "text") {
+        return parsed.text || "";
+      }
+      if (parsed.type === "voice") {
+        return parsed.text ? `[Voice Note] ${parsed.text}` : "[Voice Note]";
+      }
+      if (parsed.type === "image") {
+        return parsed.text ? `[Image] ${parsed.text}` : "[Image]";
+      }
+      if (parsed.type) {
+        return `[Canvas ${parsed.type}]`;
+      }
+    }
+  } catch (e) {}
+  return content;
 }
 
 export async function POST(request: Request) {
@@ -37,9 +57,8 @@ export async function POST(request: Request) {
       return Response.json({ error: "Query is required" }, { status: 400 });
     }
 
-    const q = query.toLowerCase();
+    const q = query.toLowerCase().trim();
 
-    // -- INTENT: DESIGN REVIEW --
     if (q.startsWith("review design")) {
       if (!screenshot) {
         return Response.json({
@@ -85,7 +104,6 @@ export async function POST(request: Request) {
       return createTextStreamResponse({ textStream: result.textStream });
     }
 
-    // -- INTENT: CODE REVIEW --
     if (q.startsWith("review code")) {
       const topic = query.replace(/^review code\s*/i, "").trim();
       if (!topic) {
@@ -94,7 +112,6 @@ export async function POST(request: Request) {
         });
       }
 
-      // Fetch file content from the local agent
       let files = [];
       let agentError = "";
       try {
@@ -116,14 +133,13 @@ export async function POST(request: Request) {
         });
       }
 
-      // Read Claude.md/Agents.md guidelines from project root
       let codingRules = "";
       try {
         const fs = require("fs");
         const path = require("path");
         const rulesPath = path.join(process.cwd(), "Claude.md");
         if (fs.existsSync(rulesPath)) {
-          codingRules = fs.readFileSync(rulesPath, "utf8").substring(0, 3000); // grab first 3kb
+          codingRules = fs.readFileSync(rulesPath, "utf8").substring(0, 3000);
         }
       } catch (e) {}
 
@@ -174,7 +190,6 @@ Provide the audit review:`;
       return createTextStreamResponse({ textStream: result.textStream });
     }
 
-    // 1. FRESH DB PULL FOR EACH REQUEST
     const [dbProjects, dbTasks, notes, commits, helpfulFeedback, unhelpfulFeedback, ideas] = await Promise.all([
       prisma.project.findMany({ where: { userId }, include: { links: true }, take: 20 }),
       prisma.task.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } }),
@@ -212,7 +227,6 @@ Provide the audit review:`;
       })
     ]);
 
-    // Map DB fields to prompt requirements in memory
     const projects = dbProjects.map(p => ({
       ...p,
       health: p.projectHealth,
@@ -221,7 +235,6 @@ Provide the audit review:`;
 
     const tasks = dbTasks.filter(t => !t.completed).slice(0, 30);
 
-    // 2. COMPUTE DERIVED SIGNALS
     const now = Date.now();
     const stale = projects.filter(p => (now - new Date(p.updatedAt).getTime()) > 14 * 86400000);
     const overdue = tasks.filter(t => t.dueDate && new Date(t.dueDate) < new Date());
@@ -232,7 +245,12 @@ Provide the audit review:`;
       return d.toDateString() === today.toDateString();
     });
 
-    // 3. SMART INTENT ROUTING — direct DB responses, no AI hallucination
+    if (q === "clear ideas" || q === "clear all ideas" || q === "delete all ideas" || q === "delete ideas") {
+      await prisma.idea.deleteMany({ where: { userId } });
+      const msg = "Successfully cleared all your ideas.";
+      return Response.json({ response: msg, result: msg });
+    }
+
     if (q.includes('stale')) {
       const list = stale.map(p => `${p.name} — ${Math.floor((now - new Date(p.updatedAt).getTime())/86400000)}d ago`).join('\n');
       const responseMsg = stale.length === 0 ? 'All projects are active.' : `${stale.length} stale projects:\n${list}`;
@@ -255,7 +273,10 @@ Provide the audit review:`;
       if (notes.length === 0) {
         return Response.json({ response: 'No notes saved yet.', result: '' });
       }
-      const list = notes.slice(0, 20).map((n, i) => `${i + 1}. "${n.content}"`).join('\n');
+      const list = notes.slice(0, 20).map((n, i) => {
+        const cleanContent = formatIdeaOrNoteContent(n.content);
+        return `${i + 1}. "${cleanContent}"`;
+      }).join('\n');
       const msg = `Your notes (${notes.length} total):\n${list}`;
       return Response.json({ response: msg, result: msg });
     }
@@ -265,9 +286,10 @@ Provide the audit review:`;
         return Response.json({ response: 'No ideas saved yet. Try sending some via Telegram!', result: '' });
       }
       const list = ideas.slice(0, 20).map((idea, i) => {
+        const cleanContent = formatIdeaOrNoteContent(idea.content);
         const proj = idea.project?.name ? ` [${idea.project.name}]` : ' [global]';
         const src = idea.source === 'telegram' ? ' 📱' : '';
-        return `${i + 1}. "${idea.content}"${proj}${src}`;
+        return `${i + 1}. "${cleanContent}"${proj}${src}`;
       }).join('\n');
       const msg = `Your ideas (${ideas.length} total):\n${list}`;
       return Response.json({ response: msg, result: msg });
@@ -283,7 +305,6 @@ Provide the audit review:`;
       return Response.json({ response: msg, result: msg });
     }
 
-    // 4. CHOOSE MODEL AND VERIFY CONFIGURATION
     let modelInstance = null;
     if (decryptedGroq) {
       const groqClient = createOpenAI({
@@ -303,7 +324,6 @@ Provide the audit review:`;
       return Response.json({ error: "Please configure your Groq or OpenRouter API keys in Settings to enable AI responses." }, { status: 500 });
     }
 
-    // 5. COMMIT SUMMARY GROUPED BY REPO
     const byRepo = commits.reduce((acc, c) => {
       acc[c.repoName] = acc[c.repoName] || [];
       acc[c.repoName].push(c.message);
@@ -314,7 +334,6 @@ Provide the audit review:`;
       .map(([repo, msgs]) => `  ${repo} (${msgs.length} commits): ${msgs.slice(0,3).join(' | ')}`)
       .join('\n');
 
-    // 6. BUILD FRESH CONTEXT SYSTEM PROMPT
     const helpfulContext = helpfulFeedback.map(f => {
       const parts = f.content.split(" || ");
       return `  User: "${parts[0]}"\n  AI Response (Good): "${parts[1]}"`;
@@ -347,19 +366,22 @@ ${tasks.slice(0,20).map(t => `  "${t.title}" [${t.priority}]${t.dueDate ? ` due 
 
 Ideas (${ideas.length} total):
 ${ideas.slice(0,15).map(i => {
+  const cleanContent = formatIdeaOrNoteContent(i.content);
   const proj = i.project?.name ? `[${i.project.name}]` : '[global]';
-  return `  ${proj} "${i.content}" [${i.status}] from:${i.source}`;
+  return `  ${proj} "${cleanContent}" [${i.status}] from:${i.source}`;
 }).join('\n') || '  None yet'}
 
 Notes (${notes.length} total):
-${notes.slice(0,10).map(n => `  "${n.content.slice(0, 120)}"`).join('\n') || '  Empty'}
+${notes.slice(0,10).map(n => {
+  const cleanContent = formatIdeaOrNoteContent(n.content);
+  return `  "${cleanContent.slice(0, 120)}"`;
+}).join('\n') || '  Empty'}
 
 This week's commits (${commits.length} total):
 ${commitSummary || '  No recent commits'}
 
 Today is ${new Date().toLocaleDateString('en-IN', { weekday:'long', day:'numeric', month:'long', year:'numeric' })}.`;
 
-    // 7. CALL AI MODEL AND STREAM TEXT RESPONSE
     const result = streamText({
       model: modelInstance,
       system: systemPrompt,

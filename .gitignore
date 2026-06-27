@@ -53,3 +53,8 @@ README.md
 
 devos-agent/active-port.json
 .agents/
+
+/electron/
+/scripts/
+/devos-agent/
+
