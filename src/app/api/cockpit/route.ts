@@ -175,20 +175,16 @@ Provide the audit review:`;
     }
 
     // 1. FRESH DB PULL FOR EACH REQUEST
-    const [dbProjects, dbTasks, notes, commits, helpfulFeedback, unhelpfulFeedback] = await Promise.all([
+    const [dbProjects, dbTasks, notes, commits, helpfulFeedback, unhelpfulFeedback, ideas] = await Promise.all([
       prisma.project.findMany({ where: { userId }, include: { links: true }, take: 20 }),
       prisma.task.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } }),
       prisma.note.findMany({
         where: {
           userId,
-          NOT: {
-            source: {
-              in: ["cockpit_helpful", "cockpit_unhelpful"]
-            }
-          }
+          NOT: { source: { in: ["cockpit_helpful", "cockpit_unhelpful"] } }
         },
         orderBy: { createdAt: 'desc' },
-        take: 10
+        take: 20
       }),
       prisma.commit.findMany({
         where: {
@@ -207,6 +203,12 @@ Provide the audit review:`;
         where: { userId, source: "cockpit_unhelpful" },
         orderBy: { createdAt: 'desc' },
         take: 5
+      }),
+      prisma.idea.findMany({
+        where: { userId },
+        include: { project: { select: { id: true, name: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: 30
       })
     ]);
 
@@ -230,7 +232,7 @@ Provide the audit review:`;
       return d.toDateString() === today.toDateString();
     });
 
-    // 3. SMART INTENT ROUTING (Direct DB bypass before AI)
+    // 3. SMART INTENT ROUTING — direct DB responses, no AI hallucination
     if (q.includes('stale')) {
       const list = stale.map(p => `${p.name} — ${Math.floor((now - new Date(p.updatedAt).getTime())/86400000)}d ago`).join('\n');
       const responseMsg = stale.length === 0 ? 'All projects are active.' : `${stale.length} stale projects:\n${list}`;
@@ -247,6 +249,38 @@ Provide the audit review:`;
       const list = todayTasks.map(t => `"${t.title}" [${t.priority}]`).join('\n');
       const responseMsg = todayTasks.length === 0 ? 'No tasks due today.' : `Today's tasks:\n${list}`;
       return Response.json({ response: responseMsg, result: responseMsg });
+    }
+
+    if (q.includes('note') || q.includes('brain dump') || q.includes('brain') && q.includes('dump')) {
+      if (notes.length === 0) {
+        return Response.json({ response: 'No notes saved yet.', result: '' });
+      }
+      const list = notes.slice(0, 20).map((n, i) => `${i + 1}. "${n.content}"`).join('\n');
+      const msg = `Your notes (${notes.length} total):\n${list}`;
+      return Response.json({ response: msg, result: msg });
+    }
+
+    if (q.includes('idea') || q.includes('ideas')) {
+      if (ideas.length === 0) {
+        return Response.json({ response: 'No ideas saved yet. Try sending some via Telegram!', result: '' });
+      }
+      const list = ideas.slice(0, 20).map((idea, i) => {
+        const proj = idea.project?.name ? ` [${idea.project.name}]` : ' [global]';
+        const src = idea.source === 'telegram' ? ' 📱' : '';
+        return `${i + 1}. "${idea.content}"${proj}${src}`;
+      }).join('\n');
+      const msg = `Your ideas (${ideas.length} total):\n${list}`;
+      return Response.json({ response: msg, result: msg });
+    }
+
+    if (q.includes('completed') || (q.includes('done') && q.includes('task')) || q.includes('finished task')) {
+      const completedTasks = dbTasks.filter(t => t.completed);
+      if (completedTasks.length === 0) {
+        return Response.json({ response: 'No completed tasks yet.', result: '' });
+      }
+      const list = completedTasks.slice(0, 15).map(t => `"${t.title}" [${t.priority}]`).join('\n');
+      const msg = `Completed tasks (${completedTasks.length} total):\n${list}`;
+      return Response.json({ response: msg, result: msg });
     }
 
     // 4. CHOOSE MODEL AND VERIFY CONFIGURATION
@@ -309,13 +343,19 @@ ${projects.map(p => `  ${p.name} [${p.status}] health:${p.health ?? 'unknown'} t
 Stale projects (no activity >14d): ${stale.map(p=>p.name).join(', ') || 'none'}
 
 Open tasks (${tasks.length} total, ${overdue.length} overdue, ${todayTasks.length} due today):
-${tasks.slice(0,10).map(t => `  "${t.title}" [${t.priority}]${t.dueDate ? ` due ${new Date(t.dueDate).toLocaleDateString()}` : ''}`).join('\n')}
+${tasks.slice(0,20).map(t => `  "${t.title}" [${t.priority}]${t.dueDate ? ` due ${new Date(t.dueDate).toLocaleDateString()}` : ''}${t.source === 'telegram' ? ' 📱' : ''}`).join('\n')}
+
+Ideas (${ideas.length} total):
+${ideas.slice(0,15).map(i => {
+  const proj = i.project?.name ? `[${i.project.name}]` : '[global]';
+  return `  ${proj} "${i.content}" [${i.status}] from:${i.source}`;
+}).join('\n') || '  None yet'}
+
+Notes (${notes.length} total):
+${notes.slice(0,10).map(n => `  "${n.content.slice(0, 120)}"`).join('\n') || '  Empty'}
 
 This week's commits (${commits.length} total):
 ${commitSummary || '  No recent commits'}
-
-Recent brain dump:
-${notes.slice(0,5).map(n => `  "${n.content.slice(0,60)}"`).join('\n') || '  Empty'}
 
 Today is ${new Date().toLocaleDateString('en-IN', { weekday:'long', day:'numeric', month:'long', year:'numeric' })}.`;
 
