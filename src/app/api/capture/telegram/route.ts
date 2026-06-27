@@ -313,11 +313,13 @@ export async function POST(req: NextRequest) {
 
     let savedAs = "";
     if (classification.type === "task") {
+      const localDate = new Date(new Date().getTime() + 5.5 * 60 * 60 * 1000);
+      const todayStr = localDate.toISOString().split("T")[0];
       await prisma.task.create({
         data: {
           title: classification.cleanContent || text,
           priority: classification.priority || "medium",
-          dueDate: classification.dueDate || null,
+          dueDate: classification.dueDate || todayStr,
           projectId,
           userId,
           source: "telegram",

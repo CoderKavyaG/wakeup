@@ -198,11 +198,11 @@ export function FocusPanelWidget() {
 
   // Tasks display: show today's tasks OR all incomplete if none due today, excluding project-tagged tasks
   const [showDone, setShowDone] = useState(false);
-  const todayTasks = tasks.filter((t) => !t.completed && t.dueDate === todayStr && !t.projectId);
-  const allIncomplete = tasks.filter((t) => !t.completed && !t.projectId);
+  const todayTasks = tasks.filter((t) => !t.completed && t.dueDate === todayStr);
+  const allIncomplete = tasks.filter((t) => !t.completed);
   const showingAllTasks = todayTasks.length === 0 && allIncomplete.length > 0;
   const pendingTasks = showingAllTasks ? allIncomplete : todayTasks;
-  const completedTasks = tasks.filter((t) => t.completed && t.dueDate === todayStr && !t.projectId);
+  const completedTasks = tasks.filter((t) => t.completed && t.dueDate === todayStr);
 
   // Mention filtering
   const filteredProjects = projects
@@ -617,6 +617,11 @@ export function FocusPanelWidget() {
                             }`}
                           >
                             {t.dueDate}
+                          </span>
+                        )}
+                        {t.projectId && (
+                          <span className="text-[9px] font-bold bg-amber-500/10 text-amber-300 border border-amber-500/20 px-1.5 py-0.5 rounded">
+                            @{projects.find((p) => p.id === t.projectId)?.name || "project"}
                           </span>
                         )}
                       </div>
