@@ -3,6 +3,34 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function formatIdeaOrNoteContent(content: string): string {
+  try {
+    if (content.trim().startsWith("{") && content.trim().endsWith("}")) {
+      const parsed = JSON.parse(content);
+      if (parsed.type === "text") {
+        return parsed.text || "";
+      }
+      if (parsed.type === "voice") {
+        return parsed.text ? `[Voice Note] ${parsed.text}` : "[Voice Note]";
+      }
+      if (parsed.type === "image") {
+        return parsed.text ? `[Image] ${parsed.text}` : "[Image]";
+      }
+      if (parsed.type) {
+        return `[Canvas ${parsed.type}]`;
+      }
+    }
+  } catch (e) {}
+  return content;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const secret = req.headers.get("X-Telegram-Bot-Api-Secret-Token");
@@ -60,20 +88,55 @@ export async function POST(req: NextRequest) {
       const command = parts[0].toLowerCase();
 
       if (command === "/projects") {
+        await sendTelegramMessage(
+          chatId,
+          `Select a phase to view its projects:\n\n/indevelopment — Projects in development\n/launched — Launched projects\n/sketching — Sketching & prototyping\n/inplanning — Ideas & planning`
+        );
+        return Response.json({ ok: true });
+      }
+
+      if (command === "/indevelopment" || command === "/launched" || command === "/sketching" || command === "/inplanning") {
+        const phaseMap: Record<string, string> = {
+          "/indevelopment": "in_development",
+          "/launched": "launched",
+          "/sketching": "sketching",
+          "/inplanning": "idea"
+        };
+        const phaseLabelMap: Record<string, string> = {
+          "/indevelopment": "In Development",
+          "/launched": "Launched",
+          "/sketching": "Sketching",
+          "/inplanning": "In Planning"
+        };
+        const phaseDbValue = phaseMap[command];
         const projects = await prisma.project.findMany({
-          where: { userId },
-          orderBy: { name: "asc" },
+          where: { userId, phase: phaseDbValue },
+          orderBy: { name: "asc" }
         });
         if (projects.length === 0) {
-          await sendTelegramMessage(chatId, "You don't have any projects registered yet.");
+          await sendTelegramMessage(chatId, `No projects found in phase: ${phaseLabelMap[command]}.`);
           return Response.json({ ok: true });
         }
         const listStr = projects
-          .map((p, idx) => `${idx + 1}. <b>${p.name}</b> (${p.status})`)
+          .map((p, idx) => `${idx + 1}. <b>${p.name}</b>`)
           .join("\n");
+        await prisma.telegramSession.upsert({
+          where: { chatId: chatId.toString() },
+          update: {
+            activeProjectId: `phase:${phaseDbValue}`,
+            activeProjectName: "Awaiting Selection",
+            expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+          },
+          create: {
+            chatId: chatId.toString(),
+            activeProjectId: `phase:${phaseDbValue}`,
+            activeProjectName: "Awaiting Selection",
+            expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+          },
+        });
         await sendTelegramMessage(
           chatId,
-          `Select a project to lock by replying with its number:\n\n${listStr}\n\nSend /done to cancel.`
+          `<b>Projects in ${phaseLabelMap[command]}:</b>\n\n${listStr}\n\nReply with the number to lock, or send /done to cancel.`
         );
         return Response.json({ ok: true });
       }
@@ -83,6 +146,14 @@ export async function POST(req: NextRequest) {
           where: { chatId: chatId.toString() },
         });
         await sendTelegramMessage(chatId, "🔓 Project lock cleared. Future captures will be global.");
+        return Response.json({ ok: true });
+      }
+
+      if (command === "/clearideas") {
+        await prisma.idea.deleteMany({
+          where: { userId },
+        });
+        await sendTelegramMessage(chatId, "🗑️ Cleared all ideas from your database.");
         return Response.json({ ok: true });
       }
 
@@ -96,7 +167,7 @@ export async function POST(req: NextRequest) {
           await sendTelegramMessage(chatId, "No tasks due today.");
           return Response.json({ ok: true });
         }
-        const listStr = tasks.map((t, idx) => `${idx + 1}. [${t.priority}] ${t.title}`).join("\n");
+        const listStr = tasks.map((t, idx) => `${idx + 1}. [${t.priority}] ${escapeHtml(t.title)}`).join("\n");
         await sendTelegramMessage(chatId, `<b>Tasks due today:</b>\n\n${listStr}`);
         return Response.json({ ok: true });
       }
@@ -113,7 +184,11 @@ export async function POST(req: NextRequest) {
           return Response.json({ ok: true });
         }
         const listStr = ideas
-          .map((i, idx) => `${idx + 1}. "${i.content}"${i.project ? ` [${i.project.name}]` : ""}`)
+          .map((i, idx) => {
+            const cleanContent = formatIdeaOrNoteContent(i.content);
+            const escaped = escapeHtml(cleanContent);
+            return `${idx + 1}. "${escaped}"${i.project ? ` [${i.project.name}]` : ""}`;
+          })
           .join("\n");
         await sendTelegramMessage(chatId, `<b>Recent Ideas:</b>\n\n${listStr}`);
         return Response.json({ ok: true });
@@ -129,7 +204,11 @@ export async function POST(req: NextRequest) {
           await sendTelegramMessage(chatId, "No notes captured yet.");
           return Response.json({ ok: true });
         }
-        const listStr = notes.map((n, idx) => `${idx + 1}. "${n.content}"`).join("\n");
+        const listStr = notes.map((n, idx) => {
+          const cleanContent = formatIdeaOrNoteContent(n.content);
+          const escaped = escapeHtml(cleanContent);
+          return `${idx + 1}. "${escaped}"`;
+        }).join("\n");
         await sendTelegramMessage(chatId, `<b>Recent Notes:</b>\n\n${listStr}`);
         return Response.json({ ok: true });
       }
@@ -152,35 +231,44 @@ export async function POST(req: NextRequest) {
         );
         return Response.json({ ok: true });
       }
+
+      await sendTelegramMessage(
+        chatId,
+        `<b>Available Commands:</b>\n\n/projects — Show project phases\n/indevelopment — Projects in development\n/launched — Launched projects\n/sketching — Projects in sketching/prototyping\n/inplanning — Projects in planning/ideas\n/today — List tasks due today\n/ideas — List recent ideas\n/notes — List recent notes/thoughts\n/status — DevOS workspace status\n/clearideas — Delete all ideas\n/done — Unlock active project`
+      );
+      return Response.json({ ok: true });
     }
 
     if (/^\d+$/.test(text)) {
       const index = parseInt(text, 10);
-      const projects = await prisma.project.findMany({
-        where: { userId },
-        orderBy: { name: "asc" },
-      });
-      if (index >= 1 && index <= projects.length) {
-        const selected = projects[index - 1];
-        await prisma.telegramSession.upsert({
-          where: { chatId: chatId.toString() },
-          update: {
-            activeProjectId: selected.id,
-            activeProjectName: selected.name,
-            expiresAt: new Date(Date.now() + 30 * 60 * 1000),
-          },
-          create: {
-            chatId: chatId.toString(),
-            activeProjectId: selected.id,
-            activeProjectName: selected.name,
-            expiresAt: new Date(Date.now() + 30 * 60 * 1000),
-          },
+      if (isSessionActive && session?.activeProjectId?.startsWith("phase:")) {
+        const phaseDbValue = session.activeProjectId.replace("phase:", "");
+        const projects = await prisma.project.findMany({
+          where: { userId, phase: phaseDbValue },
+          orderBy: { name: "asc" },
         });
-        await sendTelegramMessage(
-          chatId,
-          `🔒 Session locked to project <b>${selected.name}</b>.\n\nAll messages will be auto-tagged to this project. Send /done to clear.`
-        );
-        return Response.json({ ok: true });
+        if (index >= 1 && index <= projects.length) {
+          const selected = projects[index - 1];
+          await prisma.telegramSession.upsert({
+            where: { chatId: chatId.toString() },
+            update: {
+              activeProjectId: selected.id,
+              activeProjectName: selected.name,
+              expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+            },
+            create: {
+              chatId: chatId.toString(),
+              activeProjectId: selected.id,
+              activeProjectName: selected.name,
+              expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+            },
+          });
+          await sendTelegramMessage(
+            chatId,
+            `🔒 Session locked to project <b>${selected.name}</b>.\n\nAll messages will be auto-tagged to this project. Send /done to clear.`
+          );
+          return Response.json({ ok: true });
+        }
       }
     }
 
@@ -199,7 +287,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    if (!projectId && isSessionActive && session?.activeProjectId) {
+    if (!projectId && isSessionActive && session?.activeProjectId && !session.activeProjectId.startsWith("phase:")) {
       projectId = session.activeProjectId;
       projectName = session.activeProjectName;
     }
@@ -243,7 +331,7 @@ export async function POST(req: NextRequest) {
       savedAs = `note${projectName ? ` for ${projectName}` : ""}`;
     }
 
-    if (isSessionActive) {
+    if (isSessionActive && !session.activeProjectId?.startsWith("phase:")) {
       await prisma.telegramSession.update({
         where: { chatId: chatId.toString() },
         data: { expiresAt: new Date(Date.now() + 30 * 60 * 1000) },
