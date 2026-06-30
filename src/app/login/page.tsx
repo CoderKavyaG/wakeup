@@ -215,10 +215,10 @@ export default function LoginPage() {
 
   useEffect(() => {
     const checkAgent = () => {
-      fetch("https://local.wakeup.com:3131/stats")
-        .then((res) => {
-          if (res.ok) setAgentConnected(true);
-          else setAgentConnected(false);
+      fetch("/api/machine-ping")
+        .then((res) => res.json())
+        .then((data) => {
+          setAgentConnected(!!data.online);
         })
         .catch(() => {
           setAgentConnected(false);
