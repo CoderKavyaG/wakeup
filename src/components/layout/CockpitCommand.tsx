@@ -794,26 +794,31 @@ export function CockpitCommand() {
                     ))}
 
                     {/* Command shortcuts legend */}
-                    <div className="pt-3 px-2 border-t border-border/20 mt-2 grid grid-cols-1 gap-2">
-                      {[
-                        { prefix: "add <widget>", desc: "E.g., add projects, add focus" },
-                        { prefix: "review code <file>", desc: "Get AI code review for matching file(s)" },
-                        { prefix: "review design", desc: "AI design critique of DevOS layout (Electron)" },
-                        { prefix: "quicklinks", desc: "Toggle quick links panel" },
-                        { prefix: "task:", desc: "Create a task instantly" },
-                        { prefix: "note:", desc: "Save a quick note" },
-                        { prefix: "save layout", desc: "Save current grid layout" },
-                        { prefix: "restore layout", desc: "Restore last saved layout" },
-                        { prefix: "reset layout", desc: "Reset workspace to defaults" },
-                        { prefix: "sign out", desc: "Sign out of DevOS session" },
-                      ].map((c) => (
-                        <div key={c.prefix} className="flex items-center gap-1.5 text-[10px] text-muted-foreground/40">
-                          <code className="font-mono bg-white/5 px-1.5 py-0.5 rounded text-muted-foreground/60">
-                            {c.prefix}
-                          </code>
-                          <span>{c.desc}</span>
-                        </div>
-                      ))}
+                    <div className="pt-4 px-3 border-t border-white/[0.06] mt-4 space-y-2">
+                      <p className="text-[9px] font-bold uppercase text-white/30 tracking-widest font-mono">
+                        ⌨️ Command Cheatsheet
+                      </p>
+                      <div className="grid grid-cols-2 gap-x-6 gap-y-2.5">
+                        {[
+                          { prefix: "add <widget>", desc: "add projects, focus, machine, terminal" },
+                          { prefix: "task: <text>", desc: "Create a task instantly" },
+                          { prefix: "note: <text>", desc: "Save a quick note" },
+                          { prefix: "quicklinks", desc: "Toggle quick links side-panel" },
+                          { prefix: "review code <file>", desc: "Get AI review of matching file(s)" },
+                          { prefix: "review design", desc: "AI layout critique (Electron)" },
+                          { prefix: "save layout", desc: "Save current grid layout" },
+                          { prefix: "restore layout", desc: "Restore last saved layout" },
+                          { prefix: "reset layout", desc: "Reset workspace to defaults" },
+                          { prefix: "sign out", desc: "Exit current developer session" },
+                        ].map((c) => (
+                          <div key={c.prefix} className="flex items-center justify-between text-[10px] hover:bg-white/[0.02] p-1 rounded transition-colors">
+                            <code className="font-mono bg-white/5 px-2 py-0.5 rounded text-[#5B8DEF] font-bold border border-white/[0.04]">
+                              {c.prefix}
+                            </code>
+                            <span className="text-white/50 text-[10px] text-right truncate max-w-[160px]" title={c.desc}>{c.desc}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 )}
