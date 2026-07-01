@@ -34,6 +34,66 @@ const KNOWN_PORTS: Record<number, string> = {
   8080: "Generic Server"
 };
 
+const renderAppIcon = (name: string) => {
+  const norm = name.toLowerCase();
+  if (norm.includes("vs code") || norm.includes("vscode")) {
+    return (
+      <svg className="w-3.5 h-3.5 mr-1.5 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M23.91 6.32a.48.48 0 0 0-.17-.37L19.46.22a.48.48 0 0 0-.77.38v4.29l-4.57 3.8-3.08-2.56a.48.48 0 0 0-.74.1L.12 17.5a.48.48 0 0 0 .27.77l10.4-2.6 3.48 2.9a.48.48 0 0 0 .77-.37v-4.29l4.57-3.8 3.08 2.56a.48.48 0 0 0 .74-.1L23.9 6.5a.48.48 0 0 0 .01-.18z" fill="#007acc"/>
+      </svg>
+    );
+  }
+  if (norm.includes("terminal") || norm.includes("console") || norm.includes("powershell") || norm.includes("cmd") || norm.includes("git bash")) {
+    return (
+      <svg className="w-3.5 h-3.5 mr-1.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="4 17 10 11 4 5" stroke="#38bdf8" />
+        <line x1="12" y1="19" x2="20" y2="19" stroke="#38bdf8" />
+      </svg>
+    );
+  }
+  if (norm.includes("docker")) {
+    return (
+      <svg className="w-3.5 h-3.5 mr-1.5 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M13.983 8.871h-1.996V10.87h1.996V8.871zM13.983 6.371h-1.996v2.001h1.996V6.371zM11.488 8.871H9.493V10.87h1.995V8.871zM11.488 6.371H9.493v2.001h1.995V6.371zM8.995 8.871H7v1.999h1.995V8.871zM8.995 6.371H7v2.001h1.995V6.371zM11.488 3.876H9.493V5.87h1.995V3.876zM6.505 8.871H4.51v1.999h1.995V8.871zM16.478 8.871h-1.995V10.87h1.995V8.871zM23.993 11.23c-.122-.041-.83-.243-1.637-.243-.655 0-1.838.252-2.464.747a.267.267 0 0 0-.083.189v4.291c-.006.182-.016.364-.029.544-.127 1.545-1.127 2.378-2.617 2.378-1.503 0-2.883-.932-3.64-2.222l-.027-.052-.027.052c-.757 1.29-2.137 2.222-3.64 2.222-1.489 0-2.489-.833-2.617-2.378-.013-.18-.023-.362-.029-.544v-5.698c0-.129-.089-.241-.215-.27l-5.64-1.282A.263.263 0 0 0 0 11.839v1.204c0 4.673 3.655 8.461 8.163 8.461 4.509 0 8.164-3.788 8.164-8.461V12.7c.489-.481 1.258-.752 1.837-.752.483 0 .903.111 1.206.271a.267.267 0 0 0 .399-.234v-1c0-.128-.09-.239-.215-.269" fill="#0db7ed"/>
+      </svg>
+    );
+  }
+  if (norm.includes("brave")) {
+    return (
+      <svg className="w-3.5 h-3.5 mr-1.5 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 0L1.5 4.5v7c0 5.5 4.5 10.5 10.5 12.5 6-2 10.5-7 10.5-12.5v-7L12 0zm0 4.7c1.3 0 2.5 1.1 2.5 2.5s-1.1 2.5-2.5 2.5-2.5-1.1-2.5-2.5 1.1-2.5 2.5-2.5zm0 6.8c2.8 0 5 2.2 5 5H7c0-2.8 2.2-5 5-5z" fill="#ff5000"/>
+      </svg>
+    );
+  }
+  if (norm.includes("chrome") || norm.includes("google chrome")) {
+    return (
+      <svg className="w-3.5 h-3.5 mr-1.5 shrink-0" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="10" fill="#4285F4"/>
+        <path d="M12 2a10 10 0 0 0-8.66 5l4.33 7.5A5 5 0 0 1 12 7h8.66A10 10 0 0 0 12 2z" fill="#EA4335"/>
+        <path d="M22 12a10 10 0 0 1-5 8.66l-4.33-7.5A5 5 0 0 0 17 12h5z" fill="#FBBC05"/>
+        <path d="M12 22a10 10 0 0 1-5-8.66l4.33 7.5A5 5 0 0 0 12 17v5z" fill="#34A853"/>
+        <circle cx="12" cy="12" r="4" fill="#FFFFFF"/>
+        <circle cx="12" cy="12" r="3.5" fill="#4285F4"/>
+      </svg>
+    );
+  }
+  if (norm.includes("discord")) {
+    return (
+      <svg className="w-3.5 h-3.5 mr-1.5 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.094 13.094 0 0 1-1.873-.894.077.077 0 0 1-.008-.128c.126-.093.252-.19.372-.287a.075.075 0 0 1 .077-.011c3.92 1.793 8.18 1.793 12.061 0a.073.073 0 0 1 .078.009c.12.099.246.195.373.289a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.894.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.156-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.156 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.156-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.156 2.418z" fill="#5865F2"/>
+      </svg>
+    );
+  }
+  if (norm.includes("spotify")) {
+    return (
+      <svg className="w-3.5 h-3.5 mr-1.5 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424c-.18.295-.565.387-.86.207-2.377-1.454-5.37-1.783-8.893-.982-.336.075-.668-.135-.744-.47-.077-.337.135-.669.47-.745 3.848-.879 7.14-.51 9.82 1.13.296.18.387.563.207.86zm1.224-2.722c-.226.367-.707.487-1.074.26-2.72-1.672-6.87-2.157-10.076-1.182-.413.125-.847-.107-.972-.52-.125-.413.108-.847.52-.972 3.666-1.112 8.232-.572 11.342 1.342.366.226.486.707.26 1.074zm.106-2.833C14.382 8.788 8.568 8.6 5.16 9.633c-.523.158-1.076-.14-1.235-.662-.158-.523.14-1.078.662-1.235 3.91-1.187 10.339-.974 14.407 1.442.47.28.623.89.343 1.36-.28.47-.89.62-1.36.34z" fill="#1DB954"/>
+      </svg>
+    );
+  }
+  return <Play className="w-3 h-3 text-blue-400 mr-1.5 shrink-0" />;
+};
+
 export function MachineControlWidget() {
   const [workspacePath, setWorkspacePath] = useState<string>("");
   const [isEditingPath, setIsEditingPath] = useState(false);
@@ -950,7 +1010,16 @@ export function MachineControlWidget() {
                     className="h-7 text-[10px] bg-[#1db954]/10 text-[#1db954] hover:bg-[#1db954]/20 border-[#1db954]/20 justify-start hover:scale-102 transition-all font-semibold"
                     onClick={handleLaunchMusic}
                   >
-                    <Music className="w-3 h-3 mr-1.5" /> Music Player
+                    <svg className="w-3.5 h-3.5 mr-1.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 10v4" />
+                      <path d="M6 6v12" />
+                      <path d="M9 10v4" />
+                      <path d="M12 4v16" />
+                      <path d="M15 8v8" />
+                      <path d="M18 11v2" />
+                      <path d="M21 9v6" />
+                    </svg>
+                    Music Player
                   </Button>
                   <Button
                     variant="outline"
@@ -958,7 +1027,11 @@ export function MachineControlWidget() {
                     className="h-7 text-[10px] bg-primary/10 text-primary hover:bg-primary/20 border-primary/20 justify-start hover:scale-102 transition-all font-semibold"
                     onClick={handleLaunchAI}
                   >
-                    <MessageSquare className="w-3 h-3 mr-1.5" /> AI Chat
+                    <svg className="w-3.5 h-3.5 mr-1.5 shrink-0 animate-spin-slow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 3v1m0 16v1M4 12H3m18 0h-1m-3-7l-1 1m-11 11l-1 1m0-13l1 1m11 11l1 1" />
+                      <circle cx="12" cy="12" r="4" fill="currentColor" fillOpacity="0.2" />
+                    </svg>
+                    AI Chat
                   </Button>
                 </div>
               </div>
@@ -1064,7 +1137,7 @@ export function MachineControlWidget() {
                           disabled={agentOffline}
                           title={app.command}
                         >
-                          <Play className="w-3 h-3 text-blue-400 mr-1.5 shrink-0" />
+                          {renderAppIcon(app.name)}
                           <span className="truncate">{app.name}</span>
                         </Button>
                       ))
@@ -1180,10 +1253,30 @@ export function MachineControlWidget() {
                     {savedLinks.length > 0 ? (
                       savedLinks.map((link) => {
                         const getIcon = () => {
-                          if (link.platform === 'github') return <FolderGit2 className="w-3 h-3 text-purple-400 mr-1.5 shrink-0" />;
-                          if (link.platform === 'claude') return <Sparkles className="w-3 h-3 text-orange-400 mr-1.5 shrink-0" />;
-                          if (link.platform === 'chatgpt') return <Bot className="w-3 h-3 text-emerald-400 mr-1.5 shrink-0" />;
-                          return <Globe className="w-3 h-3 text-blue-400 mr-1.5 shrink-0" />;
+                          const normName = link.name.toLowerCase();
+                          const normPlat = link.platform.toLowerCase();
+                          if (normPlat === 'github' || normName.includes('github')) {
+                            return (
+                              <svg className="w-3.5 h-3.5 mr-1.5 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" fill="#ffffff" opacity="0.8"/>
+                              </svg>
+                            );
+                          }
+                          if (normPlat === 'claude' || normName.includes('claude')) {
+                            return (
+                              <svg className="w-3.5 h-3.5 mr-1.5 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12.012 3.655l2.001 4.545 4.966.275-3.834 3.195 1.353 4.792-4.486-2.585-4.486 2.585 1.353-4.792-3.834-3.195 4.966-.275 2.001-4.545zm5.748-1.589l1.492.614-1.636 3.974-1.492-.614 1.636-3.974zm-11.488 0l1.636 3.974-1.492.614-1.636-3.974 1.492-.614z" fill="#D97706"/>
+                              </svg>
+                            );
+                          }
+                          if (normPlat === 'chatgpt' || normName.includes('chatgpt') || normName.includes('openai')) {
+                            return (
+                              <svg className="w-3.5 h-3.5 mr-1.5 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M21.74 11.57c.28-.79.41-1.63.4-2.47a5.5 5.5 0 0 0-3.32-5.06c-.75-.32-1.57-.45-2.39-.4a5.5 5.5 0 0 0-4.88 3.32c-.17.47-.27.95-.3 1.44a5.5 5.5 0 0 0-3.13 1.1c-.63.48-1.13 1.12-1.44 1.86a5.5 5.5 0 0 0-.4 2.39c.04.83.25 1.63.63 2.37a5.5 5.5 0 0 0 3.32 3.13c.48.2 1 .31 1.51.32a5.5 5.5 0 0 0 4.88-3.32 5.5 5.5 0 0 0 3.13-1.1 5.5 5.5 0 0 0 1.5-1.98zm-11-7.73a4.13 4.13 0 0 1 1.79 1.15c.67.7 1.15 1.56 1.4 2.5a5.5 5.5 0 0 0-1.84.3A4.14 4.14 0 0 1 9.4 4.87a4.13 4.13 0 0 1 1.34-1.03zm-4.3 3.86a4.13 4.13 0 0 1 2.97-.67 4.14 4.14 0 0 1 2.35 1.64c-.45.83-.69 1.76-.71 2.7a5.5 5.5 0 0 0-1.86-1.44a4.14 4.14 0 0 1-2.75-2.23zm-.67 6.47a4.13 4.13 0 0 1-1.15-1.79c-.1-.4-.14-.81-.12-1.22a4.14 4.14 0 0 1 3.5 1.16 5.5 5.5 0 0 0 .3 2.33a4.14 4.14 0 0 1-2.53-.48zm4.3 3.86a4.13 4.13 0 0 1-1.34-1.03 4.14 4.14 0 0 1-.46-3.03a5.5 5.5 0 0 0 1.84-.3c.25.94.73 1.8 1.4 2.5a4.13 4.13 0 0 1-1.44 1.86zm6.47.67a4.13 4.13 0 0 1-3.03-.46c.45-.83.69-1.76.71-2.7a5.5 5.5 0 0 0 1.86 1.44c.48.63.79 1.39.88 2.2a4.13 4.13 0 0 1-.42.52zm3.86-4.3a4.13 4.13 0 0 1-.52.42c-.4-.1-.81-.14-1.22-.12a4.14 4.14 0 0 1-.3-2.33a5.5 5.5 0 0 0 1.86 1.44c.1.2.16.4.18.59zm-7-2c-.53 0-.96-.43-.96-.96s.43-.96.96-.96.96.43.96.96-.43.96-.96.96z" fill="#10a37f"/>
+                              </svg>
+                            );
+                          }
+                          return <Globe className="w-3.5 h-3.5 text-blue-400 mr-1.5 shrink-0" />;
                         };
                         return (
                           <Button
