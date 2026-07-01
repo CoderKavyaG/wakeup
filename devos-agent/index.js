@@ -185,7 +185,9 @@ app.post('/launch', (req, res) => {
     if (browser === 'chrome') {
       cmd = isWin ? `start chrome "${url}"` : `open -a "Google Chrome" "${url}"`;
     } else if (browser === 'brave') {
-      cmd = isWin ? `start brave "${url}"` : `open -a "Brave Browser" "${url}"`;
+      cmd = isWin 
+        ? `if exist "%LOCALAPPDATA%\\BraveSoftware\\Brave-Browser\\Application\\brave.exe" (start "" "%LOCALAPPDATA%\\BraveSoftware\\Brave-Browser\\Application\\brave.exe" "${url}") else (start brave "${url}")`
+        : `open -a "Brave Browser" "${url}"`;
     } else if (browser === 'edge') {
       cmd = isWin ? `start msedge "${url}"` : `open -a "Microsoft Edge" "${url}"`;
     } else {
@@ -200,11 +202,21 @@ app.post('/launch', (req, res) => {
     } else if (appName === 'Claude (main)' || appName === 'Claude (work)') {
       cmd = isWin ? 'start claude://' : 'open -a Claude';
     } else if (appName === 'Brave') {
-      cmd = isWin ? 'start brave' : 'open -a "Brave Browser"';
+      cmd = isWin 
+        ? 'if exist "%LOCALAPPDATA%\\BraveSoftware\\Brave-Browser\\Application\\brave.exe" (start "" "%LOCALAPPDATA%\\BraveSoftware\\Brave-Browser\\Application\\brave.exe") else (start brave)'
+        : 'open -a "Brave Browser"';
     } else if (appName === 'Chrome') {
       cmd = isWin ? 'start chrome' : 'open -a "Google Chrome"';
     } else if (appName === 'Spotify') {
       cmd = isWin ? 'start spotify' : 'open -a Spotify';
+    } else if (appName === 'Discord') {
+      cmd = isWin
+        ? 'if exist "%LOCALAPPDATA%\\Discord\\Update.exe" (start "" "%LOCALAPPDATA%\\Discord\\Update.exe" --processStart Discord.exe) else (start discord://)'
+        : 'open -a Discord';
+    } else if (appName === 'Docker Desktop' || appName === 'Docker') {
+      cmd = isWin
+        ? 'if exist "C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe" (start "" "C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe") else (start "" "Docker Desktop")'
+        : 'open -a Docker';
     } else if (appName.startsWith('http://') || appName.startsWith('https://')) {
       cmd = isWin ? `start "" "${appName}"` : `open "${appName}"`;
     } else {

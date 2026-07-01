@@ -47,7 +47,7 @@ export function MachineControlWidget() {
     { id: "3", name: "Docker Desktop", command: "Docker Desktop" },
     { id: "4", name: "Brave Browser", command: "Brave" },
     { id: "5", name: "Google Chrome", command: "Chrome" },
-    { id: "6", name: "Spotify Desktop", command: "Spotify" }
+    { id: "6", name: "Discord", command: "Discord" }
   ]);
   const [isEditingApps, setIsEditingApps] = useState(false);
   const [isAddingApp, setIsAddingApp] = useState(false);
@@ -134,7 +134,7 @@ export function MachineControlWidget() {
         { id: "3", name: "Docker Desktop", command: "Docker Desktop" },
         { id: "4", name: "Brave Browser", command: "Brave" },
         { id: "5", name: "Google Chrome", command: "Chrome" },
-        { id: "6", name: "Spotify Desktop", command: "Spotify" }
+        { id: "6", name: "Discord", command: "Discord" }
       ];
       setCustomApps(defaultApps);
       localStorage.setItem("DEVOS_CUSTOM_APPS", JSON.stringify(defaultApps));
