@@ -17,11 +17,49 @@ import { ProjectOS } from "./ProjectOS";
 import { OnboardingKeysModal } from "./OnboardingKeysModal";
 import { ActivityLogsDrawer } from "./ActivityLogsDrawer";
 
+const playStartupChime = () => {
+  if (typeof window === "undefined") return;
+  try {
+    const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContext) return;
+    const ctx = new AudioContext();
+    const now = ctx.currentTime;
+    
+    const playTone = (freq: number, delay: number, duration: number, volume: number) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, now + delay);
+      
+      gain.gain.setValueAtTime(0, now + delay);
+      gain.gain.linearRampToValueAtTime(volume, now + delay + 0.08);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + delay + duration);
+      
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      
+      osc.start(now + delay);
+      osc.stop(now + delay + duration);
+    };
+
+    // Synthesize C Major 7th arpeggio chime
+    playTone(261.63, 0.0, 1.8, 0.08); // C4
+    playTone(329.63, 0.1, 1.8, 0.06); // E4
+    playTone(392.00, 0.2, 1.8, 0.06); // G4
+    playTone(493.88, 0.3, 2.2, 0.05); // B4
+    playTone(523.25, 0.4, 2.5, 0.04); // C5
+  } catch (e) {
+    console.warn("Startup chime blocked or failed", e);
+  }
+};
+
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
   const [isLogsOpen, setIsLogsOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [bypassMobile, setBypassMobile] = useState(false);
+  const [hasPlayedChime, setHasPlayedChime] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -42,6 +80,13 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const loaded = useBootstrapStore((s) => s.loaded);
   const isProjectOSOpen = useProjectOSStore((s) => s.isOpen);
   const ai = useBootstrapStore((s) => s.ai);
+
+  useEffect(() => {
+    if (loaded && mounted && !hasPlayedChime) {
+      playStartupChime();
+      setHasPlayedChime(true);
+    }
+  }, [loaded, mounted, hasPlayedChime]);
 
   const showKeysModal = loaded && ai && !ai.hasGroqApiKey && !ai.hasOpenrouterApiKey;
 
