@@ -39,10 +39,39 @@ try {
 
 const server = https.createServer(serverOptions, app);
 
-// GET /ports - returns array of listening ports
+const pingPort = (port) => {
+  return new Promise((resolve) => {
+    const socket = new net.Socket();
+    socket.setTimeout(400);
+    socket.on('connect', () => {
+      socket.destroy();
+      resolve(true);
+    });
+    socket.on('timeout', () => {
+      socket.destroy();
+      resolve(false);
+    });
+    socket.on('error', () => {
+      socket.destroy();
+      resolve(false);
+    });
+    socket.connect(port, '127.0.0.1');
+  });
+};
+
+// GET /ports - returns array of listening ports with active status
 app.get('/ports', (req, res) => {
   const isWin = os.platform() === 'win32';
   
+  const handlePortsList = async (portsSet) => {
+    const portsArray = Array.from(portsSet).sort((a, b) => a - b);
+    const results = await Promise.all(portsArray.map(async (port) => {
+      const active = await pingPort(port);
+      return { port, active };
+    }));
+    res.json(results);
+  };
+
   if (isWin) {
     exec('netstat -ano | findstr LISTENING', (error, stdout) => {
       if (error) return res.json([]);
@@ -50,15 +79,13 @@ app.get('/ports', (req, res) => {
       const ports = new Set();
       lines.forEach(line => {
         const parts = line.trim().split(/\s+/);
-        // Protocol LocalAddress ForeignAddress State PID
-        // TCP 0.0.0.0:3000 0.0.0.0:0 LISTENING 1234
         if (parts.length >= 2) {
           const localAddress = parts[1];
           const portMatch = localAddress.match(/:(\d+)$/);
           if (portMatch) ports.add(parseInt(portMatch[1], 10));
         }
       });
-      res.json(Array.from(ports).sort((a, b) => a - b));
+      handlePortsList(ports);
     });
   } else {
     exec('lsof -i -P -n | grep LISTEN', (error, stdout) => {
@@ -69,7 +96,7 @@ app.get('/ports', (req, res) => {
         const match = line.match(/:(\d+)\s+\(LISTEN\)/);
         if (match) ports.add(parseInt(match[1], 10));
       });
-      res.json(Array.from(ports).sort((a, b) => a - b));
+      handlePortsList(ports);
     });
   }
 });
@@ -149,26 +176,52 @@ app.post('/open', (req, res) => {
 
 // POST /launch
 app.post('/launch', (req, res) => {
-  const { app: appName } = req.body;
+  const { app: appName, browser, url } = req.body;
   let cmd = '';
 
   const isWin = os.platform() === 'win32';
 
-  // Basic examples of custom launchers
-  if (appName === 'VS Code') {
-    cmd = 'code';
-  } else if (appName === 'Terminal') {
-    cmd = isWin ? 'start cmd' : 'open -a Terminal';
-  } else if (appName === 'Claude (main)' || appName === 'Claude (work)') {
-    cmd = isWin ? 'start claude://' : 'open -a Claude';
-  } else if (appName === 'Brave') {
-    cmd = isWin ? 'start brave' : 'open -a "Brave Browser"';
-  } else if (appName === 'Chrome') {
-    cmd = isWin ? 'start chrome' : 'open -a "Google Chrome"';
-  } else if (appName.startsWith('http://') || appName.startsWith('https://')) {
-    cmd = isWin ? `start "" "${appName}"` : `open "${appName}"`;
+  if (url) {
+    if (browser === 'chrome') {
+      cmd = isWin ? `start chrome "${url}"` : `open -a "Google Chrome" "${url}"`;
+    } else if (browser === 'brave') {
+      cmd = isWin 
+        ? `if exist "%LOCALAPPDATA%\\BraveSoftware\\Brave-Browser\\Application\\brave.exe" (start "" "%LOCALAPPDATA%\\BraveSoftware\\Brave-Browser\\Application\\brave.exe" "${url}") else (start brave "${url}")`
+        : `open -a "Brave Browser" "${url}"`;
+    } else if (browser === 'edge') {
+      cmd = isWin ? `start msedge "${url}"` : `open -a "Microsoft Edge" "${url}"`;
+    } else {
+      cmd = isWin ? `start "" "${url}"` : `open "${url}"`;
+    }
   } else {
-    cmd = isWin ? `start "" "${appName}"` : `open -a "${appName}"`;
+    // Basic examples of custom launchers
+    if (appName === 'VS Code') {
+      cmd = 'code';
+    } else if (appName === 'Terminal') {
+      cmd = isWin ? 'start cmd' : 'open -a Terminal';
+    } else if (appName === 'Claude (main)' || appName === 'Claude (work)') {
+      cmd = isWin ? 'start claude://' : 'open -a Claude';
+    } else if (appName === 'Brave') {
+      cmd = isWin 
+        ? 'if exist "%LOCALAPPDATA%\\BraveSoftware\\Brave-Browser\\Application\\brave.exe" (start "" "%LOCALAPPDATA%\\BraveSoftware\\Brave-Browser\\Application\\brave.exe") else (start brave)'
+        : 'open -a "Brave Browser"';
+    } else if (appName === 'Chrome') {
+      cmd = isWin ? 'start chrome' : 'open -a "Google Chrome"';
+    } else if (appName === 'Spotify') {
+      cmd = isWin ? 'start spotify' : 'open -a Spotify';
+    } else if (appName === 'Discord') {
+      cmd = isWin
+        ? 'if exist "%LOCALAPPDATA%\\Discord\\Update.exe" (start "" "%LOCALAPPDATA%\\Discord\\Update.exe" --processStart Discord.exe) else (start discord://)'
+        : 'open -a Discord';
+    } else if (appName === 'Docker Desktop' || appName === 'Docker') {
+      cmd = isWin
+        ? 'if exist "C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe" (start "" "C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe") else (start "" "Docker Desktop")'
+        : 'open -a Docker';
+    } else if (appName.startsWith('http://') || appName.startsWith('https://')) {
+      cmd = isWin ? `start "" "${appName}"` : `open "${appName}"`;
+    } else {
+      cmd = isWin ? `start "" "${appName}"` : `open -a "${appName}"`;
+    }
   }
 
   exec(cmd, (error) => {
@@ -496,8 +549,17 @@ app.get('/git-status-all', async (req, res) => {
       
       lastCommit = await execPromise('git log -1 --pretty=%s');
     }
+
+    let npmScripts = {};
+    const pkgPath = path.join(targetPath, 'package.json');
+    if (fs.existsSync(pkgPath)) {
+      try {
+        const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+        npmScripts = pkg.scripts || {};
+      } catch(e) {}
+    }
     
-    return { path: targetPath, name, branch, uncommitted, ahead, lastCommit };
+    return { path: targetPath, name, branch, uncommitted, ahead, lastCommit, npmScripts };
   }));
 
   res.json(results);
@@ -586,6 +648,10 @@ const { WebSocketServer } = require('ws');
 const { spawn } = require('child_process');
 
 const wss = new WebSocketServer({ server });
+
+wss.on('error', (err) => {
+  console.warn('⚠️ WebSocket server error:', err.message);
+});
 
 wss.on('connection', (ws, req) => {
   const params = new URL(req.url, 'http://localhost').searchParams;
