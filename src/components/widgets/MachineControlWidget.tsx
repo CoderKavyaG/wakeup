@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { getAgentUrl } from "@/lib/agentClient";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -97,6 +98,54 @@ export function MachineControlWidget() {
   const sendTerminalCommand = useTerminalStore((s) => s.sendCommand);
   const localProjects = projects.filter(p => p.folderPath).slice(0, 3);
 
+  const initAgentConnection = async () => {
+    const isLocal = typeof window !== "undefined" && 
+      (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+
+    let startingPort = 3131;
+    if (isLocal) {
+      try {
+        const r = await fetch("/api/machine-port");
+        const data = await r.json();
+        if (data.port) {
+          startingPort = data.port;
+        }
+      } catch (e) {}
+    }
+
+    // Scan startingPort and surrounding ports (3131 to 3135) to find active agent
+    const candidatePorts = [startingPort];
+    for (let p = 3131; p <= 3135; p++) {
+      if (!candidatePorts.includes(p)) candidatePorts.push(p);
+    }
+
+    for (const port of candidatePorts) {
+      try {
+        const controller = new AbortController();
+        const id = setTimeout(() => controller.abort(), 600);
+        const res = await fetch(`https://local.wakeup.com:${port}/stats`, {
+          signal: controller.signal,
+          mode: "cors"
+        });
+        clearTimeout(id);
+        if (res.ok) {
+          setAgentPort(port);
+          localStorage.setItem("DEVOS_AGENT_PORT", port.toString());
+          setAgentOffline(false);
+          console.log("[MachineControl] Detected agent running on port:", port);
+          return port;
+        }
+      } catch (e) {
+        // check next port
+      }
+    }
+    
+    // Default fallback
+    setAgentPort(startingPort);
+    localStorage.setItem("DEVOS_AGENT_PORT", startingPort.toString());
+    return null;
+  };
+
   // Load saved configurations on mount
   useEffect(() => {
     setIsElectron(typeof window !== "undefined" && !!(window as any).electronAPI?.isElectron);
@@ -118,7 +167,7 @@ export function MachineControlWidget() {
     fetchFiles(saved);
     
     // Auto-register workspace
-    fetch("/api/machine/register-workspace", {
+    fetch(getAgentUrl("/register-workspace"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ path: saved })
@@ -169,14 +218,7 @@ export function MachineControlWidget() {
       localStorage.setItem("DEVOS_SAVED_LINKS", JSON.stringify(defaultLinks));
     }
 
-    fetch("/api/machine-port")
-      .then(r => r.json())
-      .then(data => {
-        if (data.port) setAgentPort(data.port);
-      })
-      .catch(() => {});
-
-    fetchPorts();
+    initAgentConnection().then(() => fetchPorts());
     
     // Auto refresh ports every 10 seconds
     const portInterval = setInterval(fetchPorts, 10000);
@@ -184,7 +226,7 @@ export function MachineControlWidget() {
     // Poll stats every 5 seconds
     const fetchStats = async () => {
       try {
-        const res = await fetch("/api/machine/stats");
+        const res = await fetch(getAgentUrl("/stats"));
         if (res.ok) setStats(await res.json());
       } catch {}
     };
@@ -200,7 +242,7 @@ export function MachineControlWidget() {
   const fetchGitRepos = async () => {
     setGitReposLoading(true);
     try {
-      const res = await fetch("/api/machine/git-status-all");
+      const res = await fetch(getAgentUrl("/git-status-all"));
       if (res.ok) setGitRepos(await res.json());
     } catch {}
     setGitReposLoading(false);
@@ -215,7 +257,7 @@ export function MachineControlWidget() {
     if (!workspacePath) return;
     const fetchGit = async () => {
       try {
-        const res = await fetch(`/api/machine/git?path=${encodeURIComponent(workspacePath)}`);
+        const res = await fetch(getAgentUrl(`/git?path=${encodeURIComponent(workspacePath)}`));
         if (res.ok) setGitInfo(await res.json());
       } catch {}
     };
@@ -223,7 +265,7 @@ export function MachineControlWidget() {
 
     const fetchNpmScripts = async () => {
       try {
-        const res = await fetch(`/api/machine/npm-scripts?path=${encodeURIComponent(workspacePath)}`);
+        const res = await fetch(getAgentUrl(`/npm-scripts?path=${encodeURIComponent(workspacePath)}`));
         if (res.ok) {
           const data = await res.json();
           setNpmScripts(data.scripts || {});
@@ -253,7 +295,7 @@ export function MachineControlWidget() {
     setFilesLoading(true);
     setAgentOffline(false);
     try {
-      const res = await fetch(`/api/machine/files?path=${encodeURIComponent(path)}`);
+      const res = await fetch(getAgentUrl(`/files?path=${encodeURIComponent(path)}`));
       if (res.status === 503) {
         setAgentOffline(true);
         return;
@@ -283,7 +325,7 @@ export function MachineControlWidget() {
     } catch {}
 
     try {
-      const res = await fetch(`/api/machine/ports`);
+      const res = await fetch(getAgentUrl(`/ports`));
       if (res.status === 503) {
         setAgentOffline(true);
         return;
@@ -317,7 +359,7 @@ export function MachineControlWidget() {
     fetchFiles(targetPath);
     
     // Auto-register so it shows up in Repos list
-    fetch("/api/machine/register-workspace", {
+    fetch(getAgentUrl("/register-workspace"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ path: targetPath })
@@ -327,7 +369,7 @@ export function MachineControlWidget() {
   const handleOpenVSCode = async () => {
     if (!workspacePath) return;
     try {
-      await fetch(`/api/machine/open`, {
+      await fetch(getAgentUrl(`/open`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ path: workspacePath, app: "vscode" })
@@ -347,7 +389,7 @@ export function MachineControlWidget() {
     
     if (command === "RESTART_AGENT") {
       try {
-        await fetch("/api/machine/restart-agent", { method: "POST" });
+        await fetch(getAgentUrl("/restart"), { method: "POST" });
         setAgentOffline(true);
         setTimeout(fetchPorts, 2000);
       } catch (e) {
@@ -357,7 +399,7 @@ export function MachineControlWidget() {
     }
 
     try {
-      await fetch(`/api/machine/launch`, {
+      await fetch(getAgentUrl(`/launch`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ app: command, cwd: workspacePath || undefined })
@@ -377,7 +419,7 @@ export function MachineControlWidget() {
   const handleLaunchMusic = async () => {
     if (musicPref === "spotify_desktop") {
       try {
-        await fetch(`/api/machine/launch`, {
+        await fetch(getAgentUrl(`/launch`), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ app: "Spotify" })
@@ -475,7 +517,7 @@ export function MachineControlWidget() {
         await addWidget("terminal", { initialCwd: targetPath });
       }
       
-      await fetch("/api/machine/run-npm-script", {
+      await fetch(getAgentUrl("/run-npm-script"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ path: targetPath, script: scriptName })
@@ -494,7 +536,7 @@ export function MachineControlWidget() {
 
   const handleKillPort = async (port: number) => {
     try {
-      await fetch("/api/machine/kill-port", { 
+      await fetch(getAgentUrl("/kill-port"), { 
         method: "POST", 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ port }) 
@@ -636,7 +678,7 @@ export function MachineControlWidget() {
           <Button 
             size="sm" 
             className="mt-4 h-7 text-xs bg-white text-black hover:bg-white/90 px-4 cursor-pointer"
-            onClick={fetchPorts}
+            onClick={() => initAgentConnection().then(() => fetchPorts())}
             disabled={portsLoading}
           >
             <RefreshCw className={`w-3 h-3 mr-1.5 ${portsLoading ? 'animate-spin' : ''}`} />

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { getAgentUrl } from "@/lib/agentClient";
 import { motion, AnimatePresence } from "framer-motion";
 import { useProjectStore, Project } from "@/store/useProjectStore";
 import { useNoteStore } from "@/store/useNoteStore";
@@ -2773,7 +2774,7 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
     // This calls picker.ps1 on the user's local machine via the DevOS agent.
     setLocalScanning(true);
     try {
-      const res = await fetch("/api/machine/pick-and-scan-folder", {
+      const res = await fetch(getAgentUrl("/pick-and-scan-folder"), {
         method: "POST",
         headers: { "Content-Type": "application/json" }
       });
@@ -2798,7 +2799,7 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
       setType("code");
       setLocalScanStep("confirm");
 
-      await fetch("/api/machine/register-workspace", {
+      await fetch(getAgentUrl("/register-workspace"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ path: data.folderPath })
@@ -2815,7 +2816,7 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
     if (!targetPath) return;
     setLocalScanning(true);
     try {
-      const res = await fetch("/api/machine/scan-project", {
+      const res = await fetch(getAgentUrl("/scan-project"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ path: targetPath })
@@ -2835,7 +2836,7 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
       setLocalScanStep("confirm");
 
       // Auto-register workspace
-      await fetch("/api/machine/register-workspace", {
+      await fetch(getAgentUrl("/register-workspace"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ path: data.folderPath || targetPath })

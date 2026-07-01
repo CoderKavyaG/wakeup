@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { getAgentUrl } from "@/lib/agentClient";
 import { useProjectStore, Project, ProjectStatus } from "@/store/useProjectStore";
 import { useNoteStore } from "@/store/useNoteStore";
 import { useTaskStore } from "@/store/useTaskStore";
@@ -319,7 +320,7 @@ export function ProjectsWidget() {
 
       // Auto-register workspace in devos-agent
       try {
-        await fetch("/api/machine/register-workspace", {
+        await fetch(getAgentUrl("/register-workspace"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ path: data.folderPath })
