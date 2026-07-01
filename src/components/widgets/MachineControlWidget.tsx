@@ -98,7 +98,15 @@ export function MachineControlWidget() {
   const [workspacePath, setWorkspacePath] = useState<string>("");
   const [isEditingPath, setIsEditingPath] = useState(false);
   const [files, setFiles] = useState<FileItem[]>([]);
-  const [ports, setPorts] = useState<{ port: number; active: boolean }[]>([]);
+  const [ports, setPorts] = useState<{ port: number; active: boolean }[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem("DEVOS_CACHE_PORTS");
+        if (cached) return JSON.parse(cached);
+      } catch {}
+    }
+    return [];
+  });
   const [pinnedPorts, setPinnedPorts] = useState<number[]>([]);
   
   // Custom Apps State
@@ -142,7 +150,15 @@ export function MachineControlWidget() {
   const [stats, setStats] = useState({ cpu: 0, ram: 0 });
   const [gitInfo, setGitInfo] = useState({ branch: "", commit: "" });
 
-  const [gitRepos, setGitRepos] = useState<any[]>([]);
+  const [gitRepos, setGitRepos] = useState<any[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const cached = localStorage.getItem("DEVOS_CACHE_REPOS");
+        if (cached) return JSON.parse(cached);
+      } catch {}
+    }
+    return [];
+  });
   const [gitReposLoading, setGitReposLoading] = useState(false);
   const [npmScripts, setNpmScripts] = useState<Record<string, string>>({});
 
@@ -179,31 +195,35 @@ export function MachineControlWidget() {
       if (!candidatePorts.includes(p)) candidatePorts.push(p);
     }
 
-    for (const port of candidatePorts) {
+    const checkPort = async (port: number) => {
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), 750);
       try {
-        const controller = new AbortController();
-        const id = setTimeout(() => controller.abort(), 600);
         const res = await fetch(`https://local.wakeup.com:${port}/stats`, {
           signal: controller.signal,
           mode: "cors"
         });
         clearTimeout(id);
-        if (res.ok) {
-          setAgentPort(port);
-          localStorage.setItem("DEVOS_AGENT_PORT", port.toString());
-          setAgentOffline(false);
-          console.log("[MachineControl] Detected agent running on port:", port);
-          return port;
-        }
+        if (res.ok) return port;
       } catch (e) {
-        // check next port
+        clearTimeout(id);
       }
+      throw new Error(`Port ${port} offline`);
+    };
+
+    try {
+      const activePort = await Promise.any(candidatePorts.map(p => checkPort(p)));
+      setAgentPort(activePort);
+      localStorage.setItem("DEVOS_AGENT_PORT", activePort.toString());
+      setAgentOffline(false);
+      console.log("[MachineControl] Detected agent running on port:", activePort);
+      return activePort;
+    } catch (e) {
+      // Default fallback
+      setAgentPort(startingPort);
+      localStorage.setItem("DEVOS_AGENT_PORT", startingPort.toString());
+      return null;
     }
-    
-    // Default fallback
-    setAgentPort(startingPort);
-    localStorage.setItem("DEVOS_AGENT_PORT", startingPort.toString());
-    return null;
   };
 
   // Load saved configurations on mount
@@ -303,7 +323,11 @@ export function MachineControlWidget() {
     setGitReposLoading(true);
     try {
       const res = await fetch(getAgentUrl("/git-status-all"));
-      if (res.ok) setGitRepos(await res.json());
+      if (res.ok) {
+        const data = await res.json();
+        setGitRepos(data);
+        localStorage.setItem("DEVOS_CACHE_REPOS", JSON.stringify(data));
+      }
     } catch {}
     setGitReposLoading(false);
   };
@@ -403,6 +427,7 @@ export function MachineControlWidget() {
           }
         });
         setPorts(merged);
+        localStorage.setItem("DEVOS_CACHE_PORTS", JSON.stringify(merged));
       }
     } catch {
       const fallback = currentPinned.map(p => ({ port: p, active: false }));
