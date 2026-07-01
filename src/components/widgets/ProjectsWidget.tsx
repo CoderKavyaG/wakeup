@@ -6,6 +6,7 @@ import { useProjectStore, Project, ProjectStatus } from "@/store/useProjectStore
 import { useNoteStore } from "@/store/useNoteStore";
 import { useTaskStore } from "@/store/useTaskStore";
 import { useBootstrapStore } from "@/store/useBootstrapStore";
+import { useProjectOSStore } from "@/store/useProjectOSStore";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -95,6 +96,13 @@ export function ProjectsWidget() {
   const [vercelTokenInput, setVercelTokenInput] = useState("");
   const [savingSettings, setSavingSettings] = useState(false);
   const [hasGithubToken, setHasGithubToken] = useState(false);
+  const [showMascot, setShowMascot] = useState(true);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setShowMascot(localStorage.getItem("devos_hide_mascot") !== "true");
+    }
+  }, []);
 
   const openSettingsDialog = async () => {
     setGithubUsernameInput(localStorage.getItem("GITHUB_USERNAME") || "coderkavyag");
@@ -1335,6 +1343,76 @@ export function ProjectsWidget() {
               </>
             )}
           </div>
+
+          {/* Mascot card at the bottom of the sidebar */}
+          {showMascot && (
+            <div className="shrink-0 mt-2 p-3 bg-white/[0.01] border border-white/[0.04] rounded-xl relative select-none">
+              {/* Close Button */}
+              <button
+                onClick={() => {
+                  setShowMascot(false);
+                  localStorage.setItem("devos_hide_mascot", "true");
+                }}
+                className="absolute top-1.5 right-1.5 text-white/30 hover:text-white/70 hover:bg-white/5 p-1 rounded transition-colors cursor-pointer z-10"
+                title="Dismiss guide"
+              >
+                <X className="w-3 h-3" />
+              </button>
+
+              <div className="flex items-center gap-3">
+                {/* Devy Cartoon Mascot SVG */}
+                <div className="shrink-0 relative">
+                  <svg className="w-14 h-16" viewBox="0 0 64 80" fill="none">
+                    {/* Hair back */}
+                    <path d="M12 25c0-12 10-15 20-15s20 3 20 15v10H12V25z" fill="#EA580C" />
+                    {/* Face */}
+                    <rect x="18" y="22" width="28" height="26" rx="14" fill="#FED7AA" />
+                    {/* Eyes */}
+                    <circle cx="27" cy="33" r="3" fill="#2563EB" />
+                    <circle cx="37" cy="33" r="3" fill="#2563EB" />
+                    <circle cx="28.5" cy="31.5" r="1.2" fill="#FFFFFF" />
+                    <circle cx="38.5" cy="31.5" r="1.2" fill="#FFFFFF" />
+                    {/* Cheeks */}
+                    <circle cx="23" cy="38" r="2.5" fill="#F43F5E" opacity="0.4" />
+                    <circle cx="41" cy="38" r="2.5" fill="#F43F5E" opacity="0.4" />
+                    {/* Smile */}
+                    <path d="M28 40q4 3 8 0" stroke="#78350F" strokeWidth="2" strokeLinecap="round" />
+                    {/* Hair front bangs */}
+                    <path d="M14 23c4-4 12-5 18-2s14 1 18 4v-4c0-10-8-13-20-13S14 13 14 21v2z" fill="#C2410C" />
+                    <path d="M16 22c5-5 12-6 16-3" stroke="#F97316" strokeWidth="2" strokeLinecap="round" />
+                    {/* Body/Shirt */}
+                    <path d="M16 48c0 0 4 6 16 6s16-6 16-6v20H16V48z" fill="#0D9488" />
+                    {/* Overalls straps */}
+                    <rect x="22" y="48" width="4" height="15" fill="#1E3A8A" />
+                    <rect x="38" y="48" width="4" height="15" fill="#1E3A8A" />
+                    <circle cx="24" cy="54" r="1.5" fill="#F59E0B" />
+                    <circle cx="40" cy="54" r="1.5" fill="#F59E0B" />
+                    {/* Arm pointing */}
+                    <path d="M44 52c4 1 8-2 10-6s1-4-1-5-6 2-7 6l-2 5z" fill="#FED7AA" />
+                  </svg>
+                  <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-green-500 border border-black animate-pulse" />
+                </div>
+
+                {/* Retro Cartoon Speech Bubble next to Devy */}
+                <div className="flex-1 min-w-0 relative">
+                  <div className="bg-white text-slate-900 text-[10px] leading-relaxed p-3 rounded-xl border-2 border-slate-900 shadow-[2px_2px_0px_rgba(0,0,0,0.95)] relative">
+                    {/* Tail pointing to Devy */}
+                    <div className="absolute top-5 -left-[7px] w-3 h-3 bg-white border-l-2 border-b-2 border-slate-900 rotate-45 transform" />
+                    <p className="font-sans">
+                      <span className="font-bold text-[#B45309]">Welcome Chief!</span> You can control your tasks and manage features in depth by clicking <span className="font-bold text-blue-600">Project OS</span> in your header!
+                    </p>
+                    <button
+                      onClick={() => useProjectOSStore.getState().open()}
+                      className="mt-1.5 text-[9px] text-[#0284C7] hover:text-[#0369A1] uppercase tracking-wider font-mono font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                    >
+                      Launch Project OS →
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
         </div>
       </div>
 

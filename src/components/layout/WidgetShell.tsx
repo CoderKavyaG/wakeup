@@ -46,9 +46,10 @@ export function WidgetShell({ title, icon, actions, onClose, children, widgetTyp
           {widgetType === 'projects' && (
             <button
               onClick={() => useProjectOSStore.getState().open()}
-              className="text-white/25 hover:text-white/70 transition-colors cursor-pointer mr-0.5"
+              className="text-white/25 hover:text-white/70 transition-colors cursor-pointer mr-0.5 relative p-0.5"
               title="Open Project OS"
             >
+              <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-3.5 h-3.5">
                 <path d="M6 2H2v12h12v-4M9 2h5v5M14 2L8 8"/>
               </svg>
