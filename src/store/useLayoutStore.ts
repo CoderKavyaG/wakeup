@@ -58,16 +58,33 @@ const defaultWidgets: WidgetInstance[] = [
   { id: "machine-1", type: "machine" },
 ];
 
+const getCachedLayout = () => {
+  if (typeof window !== "undefined") {
+    try {
+      const cached = localStorage.getItem("devos_saved_layout");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed && (parsed.layouts || parsed.widgets)) {
+          return parsed;
+        }
+      }
+    } catch {}
+  }
+  return null;
+};
+
+const cachedLayoutData = getCachedLayout();
+
 export const useLayoutStore = create<LayoutState>((set, get) => ({
-  layouts: defaultLayouts,
-  widgets: defaultWidgets,
+  layouts: cachedLayoutData?.layouts || defaultLayouts,
+  widgets: cachedLayoutData?.widgets || defaultWidgets,
   loading: false,
   error: null,
   isLocked: true,
   toggleLock: () => set((state) => ({ isLocked: !state.isLocked })),
   showTips: false,
   toggleTips: () => set((state) => ({ showTips: !state.showTips })),
-  savedLayout: typeof window !== "undefined" ? JSON.parse(localStorage.getItem("devos_saved_layout") || "null") : null,
+  savedLayout: cachedLayoutData,
 
 
   fetchLayout: async () => {
@@ -89,6 +106,9 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
           widgets,
           loading: false
         });
+        if (typeof window !== "undefined") {
+          localStorage.setItem("devos_saved_layout", JSON.stringify({ layouts, widgets }));
+        }
       } else {
         // Create initial default on backend
         await fetch("/api/layouts", {
@@ -106,6 +126,9 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
 
   setLayouts: async (layouts) => {
     set({ layouts });
+    if (typeof window !== "undefined") {
+      localStorage.setItem("devos_saved_layout", JSON.stringify({ layouts, widgets: get().widgets }));
+    }
 
     try {
       const res = await fetch("/api/layouts", {
@@ -153,6 +176,9 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
       widgets: [...previousWidgets, newWidget],
       layouts: currentLayouts
     });
+    if (typeof window !== "undefined") {
+      localStorage.setItem("devos_saved_layout", JSON.stringify({ layouts: currentLayouts, widgets: [...previousWidgets, newWidget] }));
+    }
 
     try {
       const res = await fetch("/api/layouts", {
@@ -181,6 +207,9 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
       widgets: updatedWidgets,
       layouts: updatedLayouts
     });
+    if (typeof window !== "undefined") {
+      localStorage.setItem("devos_saved_layout", JSON.stringify({ layouts: updatedLayouts, widgets: updatedWidgets }));
+    }
 
     try {
       const res = await fetch("/api/layouts", {
@@ -201,6 +230,9 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
       layouts: defaultLayouts,
       widgets: defaultWidgets
     });
+    if (typeof window !== "undefined") {
+      localStorage.setItem("devos_saved_layout", JSON.stringify({ layouts: defaultLayouts, widgets: defaultWidgets }));
+    }
 
     try {
       await fetch("/api/layouts", {
@@ -219,6 +251,9 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
       layouts: { lg: [] },
       widgets: []
     });
+    if (typeof window !== "undefined") {
+      localStorage.setItem("devos_saved_layout", JSON.stringify({ layouts: { lg: [] }, widgets: [] }));
+    }
 
     try {
       await fetch("/api/layouts", {
