@@ -534,20 +534,22 @@ app.get('/git-status-all', async (req, res) => {
     let branch = '', uncommitted = 0, ahead = 0, lastCommit = '';
     
     if (fs.existsSync(path.join(targetPath, '.git'))) {
-      branch = await execPromise('git branch --show-current');
+      const devNull = os.platform() === 'win32' ? 'nul' : '/dev/null';
+      const [branchVal, statusOutput, aheadOutput, lastCommitVal] = await Promise.all([
+        execPromise('git branch --show-current'),
+        execPromise('git status --porcelain'),
+        execPromise(`git log origin/HEAD..HEAD --oneline 2>${devNull}`),
+        execPromise('git log -1 --pretty=%s')
+      ]);
       
-      const statusOutput = await execPromise('git status --porcelain');
+      branch = branchVal;
       if (statusOutput) {
         uncommitted = statusOutput.split('\n').filter(l => l.trim()).length;
       }
-      
-      const devNull = os.platform() === 'win32' ? 'nul' : '/dev/null';
-      const aheadOutput = await execPromise(`git log origin/HEAD..HEAD --oneline 2>${devNull}`);
       if (aheadOutput) {
         ahead = aheadOutput.split('\n').filter(l => l.trim()).length;
       }
-      
-      lastCommit = await execPromise('git log -1 --pretty=%s');
+      lastCommit = lastCommitVal;
     }
 
     let npmScripts = {};
