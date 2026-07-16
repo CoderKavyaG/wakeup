@@ -936,6 +936,20 @@ export function ProjectsWidget() {
                 {showStaleOnly ? "Stale" : "Active"}
               </button>
             )}
+            {!showMascot && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="w-6 h-6 hover:bg-white/5 text-amber-400/80 hover:text-amber-400 shrink-0"
+                onClick={() => {
+                  setShowMascot(true);
+                  localStorage.removeItem("devos_hide_mascot");
+                }}
+                title="Show Onboarding Mascot"
+              >
+                <HelpCircle className="w-3.5 h-3.5" />
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="icon"
@@ -1843,6 +1857,28 @@ export function ProjectsWidget() {
                 </p>
               </div>
             </div>
+
+            <div className="border-t border-white/5 pt-4 space-y-2">
+              <label className="text-xs font-semibold text-muted-foreground flex items-center justify-between">
+                <span>Onboarding Guide Mascot</span>
+              </label>
+              <div className="flex items-center justify-between bg-white/[0.01] border border-white/[0.04] rounded-lg p-3">
+                <span className="text-[10px] text-white/40">Reset Devy the mascot to show up on the dashboard.</span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-6 text-[9px] uppercase tracking-wider font-bold border-white/10 hover:bg-white/5 bg-transparent"
+                  onClick={() => {
+                    setShowMascot(true);
+                    localStorage.removeItem("devos_hide_mascot");
+                  }}
+                >
+                  Reveal Mascot
+                </Button>
+              </div>
+            </div>
+
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsSettingsOpen(false)} className="border-white/10 bg-transparent">Cancel</Button>
