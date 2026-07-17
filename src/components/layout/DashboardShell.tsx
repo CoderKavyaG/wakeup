@@ -111,7 +111,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               Desktop Workspace Recommended
             </h2>
             <p className="text-xs text-white/60 leading-relaxed">
-              DevOS is a developer command center designed for larger screen dimensions. It relies on full-width widget layouts and interactive tiling that do not support mobile layouts.
+              Wakeup is a developer command center designed for larger screen dimensions. It relies on full-width widget layouts and interactive tiling that do not support mobile layouts.
             </p>
           </div>
 
@@ -201,7 +201,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           )}
           <div className="flex items-center gap-2">
             <h1 className="text-sm font-semibold tracking-tight text-foreground leading-none">
-              {session?.user?.name || "DevOS"}
+              {session?.user?.name || "Wakeup"}
             </h1>
             <span className="w-1 h-1 rounded-full bg-white/20"></span>
             <p className="text-[10px] text-muted-foreground font-mono uppercase tracking-wider">

@@ -40,8 +40,10 @@ export async function POST(req: NextRequest) {
     const chatId = message.chat.id;
     const text = message.text.trim();
 
-    if (text.startsWith("DEVOS-")) {
-      const shortId = text.replace("DEVOS-", "").trim();
+    if (text.startsWith("WAKEUP-") || text.startsWith("DEVOS-")) {
+      const isWakeup = text.startsWith("WAKEUP-");
+      const prefix = isWakeup ? "WAKEUP-" : "DEVOS-";
+      const shortId = text.replace(prefix, "").trim();
       let user = null;
       if (shortId.length >= 8) {
         user = await prisma.user.findFirst({
@@ -56,10 +58,10 @@ export async function POST(req: NextRequest) {
         });
         await sendTelegramMessage(
           chatId,
-          "✅ Telegram linked to DevOS! Now send me anything — tasks, ideas, notes — and I'll save it for you."
+          "✅ Telegram linked to Wakeup! Now send me anything — tasks, ideas, notes — and I'll save it for you."
         );
       } else {
-        await sendTelegramMessage(chatId, "❌ Invalid link code. Please check your DevOS settings.");
+        await sendTelegramMessage(chatId, "❌ Invalid link code. Please check your Wakeup settings.");
       }
       return Response.json({ ok: true });
     }
@@ -68,7 +70,7 @@ export async function POST(req: NextRequest) {
     if (!userId) {
       await sendTelegramMessage(
         chatId,
-        "❌ This Telegram account isn't linked to a DevOS account. Send your linkage code (DEVOS-...) or link it in DevOS → Settings."
+        "❌ This Telegram account isn't linked to a Wakeup account. Send your linkage code (WAKEUP-...) or link it in Wakeup → Settings."
       );
       return Response.json({ ok: true });
     }
@@ -240,14 +242,14 @@ export async function POST(req: NextRequest) {
           : "Global mode";
         await sendTelegramMessage(
           chatId,
-          `<b>DevOS Status Summary:</b>\n\nMode: ${statusLock}\nOpen Tasks: ${openTasks}\nProjects: ${projectsCount}\nIdeas: ${ideasCount}\nNotes/Thoughts: ${notesCount}`
+          `<b>Wakeup Status Summary:</b>\n\nMode: ${statusLock}\nOpen Tasks: ${openTasks}\nProjects: ${projectsCount}\nIdeas: ${ideasCount}\nNotes/Thoughts: ${notesCount}`
         );
         return Response.json({ ok: true });
       }
 
       await sendTelegramMessage(
         chatId,
-        `<b>Available Commands:</b>\n\n/projects — Show project phases\n/indevelopment — Projects in development\n/launched — Launched projects\n/sketching — Projects in sketching/prototyping\n/inplanning — Projects in planning/ideas\n/today — List tasks due today\n/ideas — List recent ideas\n/notes — List recent notes/thoughts\n/status — DevOS workspace status\n/clearideas — Delete all ideas\n/done — Unlock active project`
+        `<b>Available Commands:</b>\n\n/projects — Show project phases\n/indevelopment — Projects in development\n/launched — Launched projects\n/sketching — Projects in sketching/prototyping\n/inplanning — Projects in planning/ideas\n/today — List tasks due today\n/ideas — List recent ideas\n/notes — List recent notes/thoughts\n/status — Wakeup workspace status\n/clearideas — Delete all ideas\n/done — Unlock active project`
       );
       return Response.json({ ok: true });
     }

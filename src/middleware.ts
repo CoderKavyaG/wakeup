@@ -57,21 +57,19 @@ export default auth(async (req) => {
   }
 
   // 3. Page Routes Authentication Checks
-  const isPublicRoute = nextUrl.pathname === "/login";
+  const isPublicRoute = nextUrl.pathname === "/";
 
-  if (isPublicRoute) {
-    if (isLoggedIn) {
-      return Response.redirect(new URL("/", nextUrl));
-    }
-    return;
+  if (isLoggedIn && nextUrl.pathname === "/") {
+    return Response.redirect(new URL("/dashboard", nextUrl));
   }
 
-  if (!isLoggedIn) {
-    return Response.redirect(new URL("/login", nextUrl));
+  if (!isPublicRoute && !isLoggedIn) {
+    return Response.redirect(new URL("/", nextUrl));
   }
 });
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp|mp4|mp3|pdf|woff|woff2|ttf|otf)).*)",
+  ],
 };
-

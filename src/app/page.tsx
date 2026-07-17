@@ -1,19 +1,29 @@
-"use client";
+import React from "react";
+import { GrainOverlay } from "@/components/ui/textures/GrainOverlay";
+import { ScanlineBg } from "@/components/ui/textures/ScanlineBg";
+import { MarketingNav } from "@/components/layout/MarketingNav";
+import { MarketingHero } from "@/components/layout/MarketingHero";
+import { LandingBento } from "@/components/layout/LandingBento";
+import { LandingFlowAndSecurity } from "@/components/layout/LandingFlowAndSecurity";
+import { SeeItInAction } from "@/components/layout/SeeItInAction";
+import { FAQSection } from "@/components/layout/FAQSection";
+import { MarketingFooter } from "@/components/layout/MarketingFooter";
 
-import React, { useEffect } from "react";
-import { DashboardShell } from "@/components/layout/DashboardShell";
-import { GridWorkspace } from "@/components/layout/GridWorkspace";
-import { useBootstrapStore } from "@/store/useBootstrapStore";
-
-export default function Home() {
-  useEffect(() => {
-    // Single bootstrap call replaces individual fetchTasks/fetchNotes/fetchProjects/fetchUrls/fetchLayout
-    useBootstrapStore.getState().bootstrap();
-  }, []);
-
+export default function MarketingPage() {
   return (
-    <DashboardShell>
-      <GridWorkspace />
-    </DashboardShell>
+    <main className="light-landing relative min-h-screen w-full bg-background text-foreground overflow-x-hidden">
+      {/* Background Visual Texture Primitives (Rendered once at page root) */}
+      <ScanlineBg />
+      <GrainOverlay />
+
+      {/* Page Sections */}
+      <MarketingNav />
+      <MarketingHero />
+      <LandingBento />
+      <LandingFlowAndSecurity />
+      <SeeItInAction />
+      <FAQSection />
+      <MarketingFooter />
+    </main>
   );
 }
