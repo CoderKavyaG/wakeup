@@ -1836,12 +1836,12 @@ export function ProjectsWidget() {
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] text-white/40 font-medium">Your Link Code:</span>
                   <code className="text-xs font-mono font-bold text-amber-400 bg-white/5 px-1.5 py-0.5 rounded border border-white/5 select-all">
-                    DEVOS-{userId ? userId.slice(0, 8) : 'unknown'}
+                    WAKEUP-{userId ? userId.slice(0, 8) : 'unknown'}
                   </code>
                 </div>
                 <p className="text-[10px] text-white/40 leading-relaxed">
                   {telegramLinked 
-                    ? "Connected! You can send messages directly to @AssistmeOs_Bot to capture tasks, ideas, and notes onto your DevOS dashboard instantly."
+                    ? "Connected! You can send messages directly to @AssistmeOs_Bot to capture tasks, ideas, and notes onto your Wakeup dashboard instantly."
                     : "Message this code to the bot @AssistmeOs_Bot to link your accounts and start capturing tasks, ideas, and notes on the go."}
                 </p>
               </div>
