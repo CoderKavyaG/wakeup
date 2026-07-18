@@ -11,7 +11,7 @@ export interface AgentResponse {
 
 function getAgentSecret(): string | null {
   try {
-    const secretPath = path.join(process.cwd(), "devos-agent", ".agent-secret");
+    const secretPath = path.join(process.cwd(), "wakeup-agent", ".agent-secret");
     return fs.readFileSync(secretPath, "utf-8").trim();
   } catch {
     return null;
@@ -28,7 +28,7 @@ export function agentFetch(
 ): Promise<AgentResponse> {
   let activePort = 3131;
   try {
-    const portFilePath = path.join(process.cwd(), "devos-agent", "active-port.json");
+    const portFilePath = path.join(process.cwd(), "wakeup-agent", "active-port.json");
     if (fs.existsSync(portFilePath)) {
       const content = fs.readFileSync(portFilePath, "utf8");
       const data = JSON.parse(content);
@@ -49,7 +49,7 @@ export function agentFetch(
     const secret = getAgentSecret();
     const mergedHeaders: Record<string, string> = {
       Accept: "application/json",
-      "x-devos-agent-secret": secret || "",
+      "x-wakeup-agent-secret": secret || "",
       ...(options.headers || {}),
     };
 

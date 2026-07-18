@@ -447,7 +447,7 @@ export function CockpitCommand() {
     }
 
     if (lower === "help" || lower === "tour") {
-      localStorage.removeItem("devos_onboarded");
+      localStorage.removeItem("wakeup_onboarded");
       window.dispatchEvent(new Event("restart_onboarding"));
       setConfirmation(`✓ Restarting onboarding tour...`);
       setInput("");
@@ -500,7 +500,7 @@ export function CockpitCommand() {
         }
       } else {
         setLastQuery(val);
-        setStreamedAnswer("Design review is only available in the DevOS desktop app because it requires screen capture capabilities. Please run DevOS via Electron to use this feature.");
+        setStreamedAnswer("Design review is only available in the Wakeup desktop app because it requires screen capture capabilities. Please run Wakeup via Electron to use this feature.");
         setAnswerDone(true);
       }
       return;
@@ -525,8 +525,8 @@ export function CockpitCommand() {
       if (res.ok) {
         setConfirmation(
           rating === "up"
-            ? "✓ Thumbs up recorded! DevOS has added this to its positive learning context."
-            : "✓ Thumbs down recorded! DevOS will avoid this style or content in the future."
+            ? "✓ Thumbs up recorded! Wakeup has added this to its positive learning context."
+            : "✓ Thumbs down recorded! Wakeup will avoid this style or content in the future."
         );
         setTimeout(() => setConfirmation(null), 4000);
       }
@@ -881,7 +881,7 @@ export function CockpitCommand() {
                   <span><kbd className="border border-border/30 px-1 rounded">↵</kbd> run</span>
                   <span><kbd className="border border-border/30 px-1 rounded">esc</kbd> close</span>
                 </div>
-                <span className="text-[9px]">DevOS Cockpit</span>
+                <span className="text-[9px]">Wakeup Cockpit</span>
               </div>
             </motion.div>
           </motion.div>

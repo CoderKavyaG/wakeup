@@ -30,7 +30,7 @@ export async function GET(request: Request) {
     const response = await fetch(targetUrl.href, {
       signal: controller.signal,
       headers: {
-        "User-Agent": "DevOS/1.0 (Meta Fetcher)",
+        "User-Agent": "Wakeup/1.0 (Meta Fetcher)",
       },
     });
 

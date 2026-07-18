@@ -100,7 +100,7 @@ export function OnboardingKeysModal() {
                   <span>Cognitive Core Setup</span>
                 </div>
                 <h2 className="text-2xl font-semibold tracking-tight text-white">
-                  Initialize DevOS AI Settings
+                  Initialize Wakeup AI Settings
                 </h2>
                 <p className="text-sm text-white/60 leading-relaxed">
                   Provide your own API credentials below. Plaintext keys are encrypted using AES-256-GCM and stored in Neon PostgreSQL. They are never sent back in client API calls.
@@ -180,7 +180,7 @@ export function OnboardingKeysModal() {
               <div className="flex items-start gap-2 text-[10px] text-white/40 leading-relaxed font-mono mt-1">
                 <Lock className="w-3.5 h-3.5 shrink-0 mt-0.5 text-white/30" />
                 <span>
-                  CRYPTO LAYER: AES-256-GCM symmetric database-level sealing. DevOS respects your privacy.
+                  CRYPTO LAYER: AES-256-GCM symmetric database-level sealing. Wakeup respects your privacy.
                 </span>
               </div>
 

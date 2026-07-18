@@ -10,7 +10,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const agentDir = "C:\\Users\\Kavya\\Projects\\wakeup\\devos-agent";
+    const agentDir = "C:\\Users\\Kavya\\Projects\\wakeup\\wakeup-agent";
     
     // Spawn the agent in the background detached so it persists
     const method = "spa" + "wn";

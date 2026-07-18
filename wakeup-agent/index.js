@@ -29,7 +29,7 @@ app.use(express.json());
 
 // Middleware: verify every incoming request
 app.use((req, res, next) => {
-  const provided = req.headers['x-devos-agent-secret'];
+  const provided = req.headers['x-wakeup-agent-secret'];
   if (provided !== AGENT_SECRET) {
     return res.status(403).json({ error: 'forbidden' });
   }
@@ -47,7 +47,7 @@ try {
     cert: fs.readFileSync(path.join(certsPath, 'local.crt'))
   };
 } catch (e) {
-  console.error("❌ Failed to load SSL certificates. Make sure local.key and local.crt exist in devos-agent/certs/.", e);
+  console.error("❌ Failed to load SSL certificates. Make sure local.key and local.crt exist in wakeup-agent/certs/.", e);
   process.exit(1);
 }
 
@@ -691,7 +691,7 @@ wss.on('connection', (ws, req) => {
   });
 
   if (ws.readyState === ws.OPEN) {
-    ws.send(`\r\n*** Connected to DevOS Terminal (${process.platform === 'win32' ? 'Powershell' : 'Bash'}) (CWD: ${cwd}) ***\r\n\r\n`);
+    ws.send(`\r\n*** Connected to Wakeup Terminal (${process.platform === 'win32' ? 'Powershell' : 'Bash'}) (CWD: ${cwd}) ***\r\n\r\n`);
   }
 
   pty.on('error', (err) => {
@@ -790,7 +790,7 @@ app.post('/generate-context', async (req, res) => {
 
 function startServer(port) {
   server.listen(port, () => {
-    console.log(`⚡ DevOS Agent secure loopback running on https://local.wakeup.com:${port}`);
+    console.log(`⚡ Wakeup Agent secure loopback running on https://local.wakeup.com:${port}`);
     // Write active port to active-port.json
     try {
       const portFilePath = path.join(__dirname, 'active-port.json');

@@ -29,6 +29,6 @@ export async function POST(request: Request) {
     return NextResponse.json(data);
   } catch (error: any) {
     console.error("[API Machine Launch] Error:", error);
-    return NextResponse.json({ error: error.message || "DevOS Agent is offline." }, { status: 503 });
+    return NextResponse.json({ error: error.message || "Wakeup Agent is offline." }, { status: 503 });
   }
 }

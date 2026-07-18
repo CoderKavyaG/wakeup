@@ -69,7 +69,7 @@ export async function POST(request: Request) {
     if (q.startsWith("review design")) {
       if (!screenshot) {
         return Response.json({
-          response: "Design review requires an Electron screen capture. Please run DevOS as a desktop app."
+          response: "Design review requires an Electron screen capture. Please run Wakeup as a desktop app."
         });
       }
 
@@ -100,7 +100,7 @@ export async function POST(request: Request) {
           {
             role: "user",
             content: [
-              { type: "text", text: "You are the DevOS Design Review Assistant. Critique this design layout carefully. Analyze margins, color harmony, typography sizes, alignments, and visual hierarchy. List up to 3 dense, concrete, actionable visual styling recommendations for Kavya. Keep the response concise, constructive, and under 400 tokens." },
+              { type: "text", text: "You are the Wakeup Design Review Assistant. Critique this design layout carefully. Analyze margins, color harmony, typography sizes, alignments, and visual hierarchy. List up to 3 dense, concrete, actionable visual styling recommendations for Kavya. Keep the response concise, constructive, and under 400 tokens." },
               { type: "image", image: imgUrl }
             ]
           }
@@ -171,7 +171,7 @@ export async function POST(request: Request) {
 
       const filesContent = files.map((f: any) => `### FILE: ${f.path}\n\`\`\`typescript\n${f.content}\n\`\`\`${f.truncated ? "\n[... truncated ...]" : ""}`).join("\n\n");
 
-      const prompt = `You are a Senior React/Next.js/TypeScript Engineer auditing code for DevOS.
+      const prompt = `You are a Senior React/Next.js/TypeScript Engineer auditing code for Wakeup.
 Auditee: Kavya (student developer building her personal OS).
 Task: Critique the code below based on the coding standards in Claude.md (if provided). Focus on bug risks, React state anti-patterns, style guide violations, and tailwind/styling issues.
 Guidelines:
@@ -351,7 +351,7 @@ Provide the audit review:`;
       return `  User: "${parts[0]}"\n  AI Response (Avoid): "${parts[1]}"`;
     }).join("\n---\n");
 
-    const systemPrompt = `You are the AI brain of DevOS — ${userName}'s personal developer operating system.
+    const systemPrompt = `You are the AI brain of Wakeup — ${userName}'s personal developer operating system.
 ${userName} is a developer, building multiple projects simultaneously.
 You have live access to their workspace data. Be specific, direct, and actionable.
 Never give generic advice. Always reference actual project names, task titles, or commit messages.

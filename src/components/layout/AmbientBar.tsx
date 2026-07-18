@@ -102,7 +102,7 @@ function SessionBriefingInline() {
   const [isFading, setIsFading] = useState(false);
 
   useEffect(() => {
-    const lastVisit = localStorage.getItem("devos_last_visit");
+    const lastVisit = localStorage.getItem("wakeup_last_visit");
     const now = Date.now();
     const gap = lastVisit ? now - parseInt(lastVisit) : Infinity;
 
@@ -162,7 +162,7 @@ function SessionBriefingInline() {
   }, [briefText, show]);
 
   const handleDismiss = async () => {
-    localStorage.setItem("devos_last_visit", Date.now().toString());
+    localStorage.setItem("wakeup_last_visit", Date.now().toString());
     setIsFading(true);
     setTimeout(() => {
       setShow(false);

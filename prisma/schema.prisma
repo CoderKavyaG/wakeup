@@ -7,7 +7,7 @@ generator client {
 }
 
 // ==========================================
-// DEVOS MODELS (PHASE 2)
+// WAKEUP MODELS (PHASE 2)
 // ==========================================
 
 model Project {

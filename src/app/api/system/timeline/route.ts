@@ -172,7 +172,7 @@ export async function GET() {
     if (!telegramLink) {
       diagnostics.push({
         id: "telegram",
-        message: `Telegram Bot: Unlinked. Use code DEVOS-${userId.slice(0, 8)} in @AssistmeOs_Bot to link your phone.`
+        message: `Telegram Bot: Unlinked. Use code WAKEUP-${userId.slice(0, 8)} in @AssistmeOs_Bot to link your phone.`
       });
     }
 

@@ -14,7 +14,7 @@ const apiLimiter = new Ratelimit({
   redis,
   limiter: Ratelimit.slidingWindow(20, "60 s"),
   analytics: true,
-  prefix: "devos_ratelimit",
+  prefix: "wakeup_ratelimit",
 });
 
 export default auth(async (req) => {

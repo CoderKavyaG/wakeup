@@ -64,7 +64,7 @@ export const useBootstrapStore = create<BootstrapState>((set, get) => ({
         const migrationOrderedIds: string[] = [];
 
         phases.forEach(phase => {
-          const stored = localStorage.getItem(`devos_curated_${phase}`);
+          const stored = localStorage.getItem(`wakeup_curated_${phase}`);
           if (stored) {
             hasMigrationData = true;
             try {
@@ -85,7 +85,7 @@ export const useBootstrapStore = create<BootstrapState>((set, get) => ({
             console.error("Curation migration failed:", err);
           }
           phases.forEach(phase => {
-            localStorage.removeItem(`devos_curated_${phase}`);
+            localStorage.removeItem(`wakeup_curated_${phase}`);
           });
         }
       }

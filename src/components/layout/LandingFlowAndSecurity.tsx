@@ -59,7 +59,7 @@ export function LandingFlowAndSecurity() {
     {
       number: "05",
       label: "Dashboard Ready",
-      cmd: "systemctl start devos",
+      cmd: "systemctl start wakeup",
       desc: "Boom! Your personalized developer dashboard cockpit is up and ready for system control.",
       icon: User // Swapped for mascot later
     }
@@ -450,7 +450,7 @@ export function LandingFlowAndSecurity() {
                     </div>
                   </div>
 
-                  <h4 className="text-sm font-extrabold text-zinc-800 font-poppins font-sans pt-2">DevOS Ready to Launch!</h4>
+                  <h4 className="text-sm font-extrabold text-zinc-800 font-poppins font-sans pt-2">Wakeup Ready to Launch!</h4>
                   <p className="text-[11px] text-zinc-500 font-poppins max-w-xs">Your local desktop workstation is connected and synced. Start commanding.</p>
                   
                   <button
@@ -479,7 +479,7 @@ export function LandingFlowAndSecurity() {
                 <span className="w-1.5 h-1.5 rounded-full bg-[#3b53e9]" /> SECURE BY DESIGN
               </span>
               <h2 className="text-2xl font-extrabold tracking-tight text-[#1F1F1F] font-poppins leading-tight">
-                DevOS controls physical machines. Security is absolute.
+                Wakeup controls physical machines. Security is absolute.
               </h2>
               <p className="text-xs text-[#6B7280] font-poppins leading-relaxed">
                 Wakeup establishes zero cloud storage buffers, meaning credentials and commands bypass external platforms entirely, running directly inside local scopes.

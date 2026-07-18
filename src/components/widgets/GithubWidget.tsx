@@ -98,7 +98,7 @@ export function GithubWidget() {
       const res = await fetch(`/api/github?username=${user}`);
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || "Failed to load GitHub data from DevOS backend");
+        throw new Error(errData.error || "Failed to load GitHub data from Wakeup backend");
       }
       const data = await res.json();
       

@@ -101,7 +101,7 @@ export function MachineControlWidget() {
   const [ports, setPorts] = useState<{ port: number; active: boolean }[]>(() => {
     if (typeof window !== "undefined") {
       try {
-        const cached = localStorage.getItem("DEVOS_CACHE_PORTS");
+        const cached = localStorage.getItem("WAKEUP_CACHE_PORTS");
         if (cached) return JSON.parse(cached);
       } catch {}
     }
@@ -153,7 +153,7 @@ export function MachineControlWidget() {
   const [gitRepos, setGitRepos] = useState<any[]>(() => {
     if (typeof window !== "undefined") {
       try {
-        const cached = localStorage.getItem("DEVOS_CACHE_REPOS");
+        const cached = localStorage.getItem("WAKEUP_CACHE_REPOS");
         if (cached) return JSON.parse(cached);
       } catch {}
     }
@@ -214,14 +214,14 @@ export function MachineControlWidget() {
     try {
       const activePort = await Promise.any(candidatePorts.map(p => checkPort(p)));
       setAgentPort(activePort);
-      localStorage.setItem("DEVOS_AGENT_PORT", activePort.toString());
+      localStorage.setItem("WAKEUP_AGENT_PORT", activePort.toString());
       setAgentOffline(false);
       console.log("[MachineControl] Detected agent running on port:", activePort);
       return activePort;
     } catch (e) {
       // Default fallback
       setAgentPort(startingPort);
-      localStorage.setItem("DEVOS_AGENT_PORT", startingPort.toString());
+      localStorage.setItem("WAKEUP_AGENT_PORT", startingPort.toString());
       return null;
     }
   };
@@ -238,10 +238,10 @@ export function MachineControlWidget() {
       }
     }
     
-    let saved = localStorage.getItem("DEVOS_WORKSPACE");
+    let saved = localStorage.getItem("WAKEUP_WORKSPACE");
     if (!saved) {
       saved = "C:\\Users\\Kavya\\Projects\\wakeup";
-      localStorage.setItem("DEVOS_WORKSPACE", saved);
+      localStorage.setItem("WAKEUP_WORKSPACE", saved);
     }
     setWorkspacePath(saved);
     fetchFiles(saved);
@@ -253,7 +253,7 @@ export function MachineControlWidget() {
       body: JSON.stringify({ path: saved })
     }).then(() => fetchGitRepos());
     
-    const savedApps = localStorage.getItem("DEVOS_CUSTOM_APPS");
+    const savedApps = localStorage.getItem("WAKEUP_CUSTOM_APPS");
     if (savedApps) {
       try { setCustomApps(JSON.parse(savedApps)); } catch {}
     } else {
@@ -266,26 +266,26 @@ export function MachineControlWidget() {
         { id: "6", name: "Discord", command: "Discord" }
       ];
       setCustomApps(defaultApps);
-      localStorage.setItem("DEVOS_CUSTOM_APPS", JSON.stringify(defaultApps));
+      localStorage.setItem("WAKEUP_CUSTOM_APPS", JSON.stringify(defaultApps));
     }
 
     // Load Pinned Ports
-    const savedPinned = localStorage.getItem("DEVOS_PINNED_PORTS");
+    const savedPinned = localStorage.getItem("WAKEUP_PINNED_PORTS");
     if (savedPinned) {
       try { setPinnedPorts(JSON.parse(savedPinned)); } catch {}
     } else {
       const defaultPins = [3000, 3001, 8000];
       setPinnedPorts(defaultPins);
-      localStorage.setItem("DEVOS_PINNED_PORTS", JSON.stringify(defaultPins));
+      localStorage.setItem("WAKEUP_PINNED_PORTS", JSON.stringify(defaultPins));
     }
 
     // Load Launch Preferences
-    setBrowserPref(localStorage.getItem("DEVOS_BROWSER_PREF") || "default");
-    setMusicPref(localStorage.getItem("DEVOS_MUSIC_PREF") || "ytmusic");
-    setAiPref(localStorage.getItem("DEVOS_AI_PREF") || "chatgpt");
+    setBrowserPref(localStorage.getItem("WAKEUP_BROWSER_PREF") || "default");
+    setMusicPref(localStorage.getItem("WAKEUP_MUSIC_PREF") || "ytmusic");
+    setAiPref(localStorage.getItem("WAKEUP_AI_PREF") || "chatgpt");
 
     // Load Saved Links
-    const savedLinksData = localStorage.getItem("DEVOS_SAVED_LINKS") || localStorage.getItem("DEVOS_SAVED_CHATS");
+    const savedLinksData = localStorage.getItem("WAKEUP_SAVED_LINKS") || localStorage.getItem("WAKEUP_SAVED_CHATS");
     if (savedLinksData) {
       try { setSavedLinks(JSON.parse(savedLinksData)); } catch {}
     } else {
@@ -295,7 +295,7 @@ export function MachineControlWidget() {
         { id: "3", name: "GitHub Dashboard", url: "https://github.com", platform: "github" }
       ];
       setSavedLinks(defaultLinks);
-      localStorage.setItem("DEVOS_SAVED_LINKS", JSON.stringify(defaultLinks));
+      localStorage.setItem("WAKEUP_SAVED_LINKS", JSON.stringify(defaultLinks));
     }
 
     initAgentConnection().then(() => fetchPorts());
@@ -326,7 +326,7 @@ export function MachineControlWidget() {
       if (res.ok) {
         const data = await res.json();
         setGitRepos(data);
-        localStorage.setItem("DEVOS_CACHE_REPOS", JSON.stringify(data));
+        localStorage.setItem("WAKEUP_CACHE_REPOS", JSON.stringify(data));
       }
     } catch {}
     setGitReposLoading(false);
@@ -404,7 +404,7 @@ export function MachineControlWidget() {
     // Get fresh pins
     let currentPinned: number[] = [];
     try {
-      const savedPinned = localStorage.getItem("DEVOS_PINNED_PORTS");
+      const savedPinned = localStorage.getItem("WAKEUP_PINNED_PORTS");
       if (savedPinned) currentPinned = JSON.parse(savedPinned);
     } catch {}
 
@@ -427,7 +427,7 @@ export function MachineControlWidget() {
           }
         });
         setPorts(merged);
-        localStorage.setItem("DEVOS_CACHE_PORTS", JSON.stringify(merged));
+        localStorage.setItem("WAKEUP_CACHE_PORTS", JSON.stringify(merged));
       }
     } catch {
       const fallback = currentPinned.map(p => ({ port: p, active: false }));
@@ -439,7 +439,7 @@ export function MachineControlWidget() {
 
   const handleSaveWorkspace = (pathVal?: string) => {
     const targetPath = pathVal || workspacePath;
-    localStorage.setItem("DEVOS_WORKSPACE", targetPath);
+    localStorage.setItem("WAKEUP_WORKSPACE", targetPath);
     setIsEditingPath(false);
     fetchFiles(targetPath);
     
@@ -533,7 +533,7 @@ export function MachineControlWidget() {
     };
     const updated = [...customApps, newApp];
     setCustomApps(updated);
-    localStorage.setItem("DEVOS_CUSTOM_APPS", JSON.stringify(updated));
+    localStorage.setItem("WAKEUP_CUSTOM_APPS", JSON.stringify(updated));
     setNewAppName("");
     setNewAppCommand("");
     setIsAddingApp(false);
@@ -542,7 +542,7 @@ export function MachineControlWidget() {
   const handleDeleteApp = (id: string) => {
     const updated = customApps.filter(app => app.id !== id);
     setCustomApps(updated);
-    localStorage.setItem("DEVOS_CUSTOM_APPS", JSON.stringify(updated));
+    localStorage.setItem("WAKEUP_CUSTOM_APPS", JSON.stringify(updated));
   };
 
   const handleAddLink = () => {
@@ -559,8 +559,8 @@ export function MachineControlWidget() {
     };
     const updated = [...savedLinks, newLink];
     setSavedLinks(updated);
-    localStorage.setItem("DEVOS_SAVED_LINKS", JSON.stringify(updated));
-    localStorage.setItem("DEVOS_SAVED_CHATS", JSON.stringify(updated));
+    localStorage.setItem("WAKEUP_SAVED_LINKS", JSON.stringify(updated));
+    localStorage.setItem("WAKEUP_SAVED_CHATS", JSON.stringify(updated));
     setNewLinkName("");
     setNewLinkUrl("");
     setNewLinkPlatform("other");
@@ -570,8 +570,8 @@ export function MachineControlWidget() {
   const handleDeleteLink = (id: string) => {
     const updated = savedLinks.filter(link => link.id !== id);
     setSavedLinks(updated);
-    localStorage.setItem("DEVOS_SAVED_LINKS", JSON.stringify(updated));
-    localStorage.setItem("DEVOS_SAVED_CHATS", JSON.stringify(updated));
+    localStorage.setItem("WAKEUP_SAVED_LINKS", JSON.stringify(updated));
+    localStorage.setItem("WAKEUP_SAVED_CHATS", JSON.stringify(updated));
   };
 
   const handleTogglePin = (portNum: number) => {
@@ -582,7 +582,7 @@ export function MachineControlWidget() {
       updated = [...pinnedPorts, portNum];
     }
     setPinnedPorts(updated);
-    localStorage.setItem("DEVOS_PINNED_PORTS", JSON.stringify(updated));
+    localStorage.setItem("WAKEUP_PINNED_PORTS", JSON.stringify(updated));
     
     setPorts(prev => {
       const isStillInList = updated.includes(portNum) || prev.some(p => p.port === portNum && p.active);
@@ -706,11 +706,11 @@ export function MachineControlWidget() {
               <span className="truncate">
                 {activePlatformTab === "win" 
                   ? (runMode === "standard" 
-                      ? "irm https://raw.githubusercontent.com/CoderKavyaG/wakeup/main/devos-agent/install.ps1 | iex" 
-                      : "powershell -WindowStyle Hidden -Command \"irm https://raw.githubusercontent.com/CoderKavyaG/wakeup/main/devos-agent/install.ps1 | iex\"")
+                      ? "irm https://raw.githubusercontent.com/CoderKavyaG/wakeup/main/wakeup-agent/install.ps1 | iex" 
+                      : "powershell -WindowStyle Hidden -Command \"irm https://raw.githubusercontent.com/CoderKavyaG/wakeup/main/wakeup-agent/install.ps1 | iex\"")
                   : (runMode === "standard" 
-                      ? "curl -fsSL https://raw.githubusercontent.com/CoderKavyaG/wakeup/main/devos-agent/install.sh | bash" 
-                      : "nohup bash -c \"curl -fsSL https://raw.githubusercontent.com/CoderKavyaG/wakeup/main/devos-agent/install.sh | bash\" > /dev/null 2>&1 &")
+                      ? "curl -fsSL https://raw.githubusercontent.com/CoderKavyaG/wakeup/main/wakeup-agent/install.sh | bash" 
+                      : "nohup bash -c \"curl -fsSL https://raw.githubusercontent.com/CoderKavyaG/wakeup/main/wakeup-agent/install.sh | bash\" > /dev/null 2>&1 &")
                 }
               </span>
               <button 
@@ -718,12 +718,12 @@ export function MachineControlWidget() {
                   let cmd = "";
                   if (activePlatformTab === "win") {
                     cmd = runMode === "standard" 
-                      ? "irm https://raw.githubusercontent.com/CoderKavyaG/wakeup/main/devos-agent/install.ps1 | iex" 
-                      : "powershell -WindowStyle Hidden -Command \"irm https://raw.githubusercontent.com/CoderKavyaG/wakeup/main/devos-agent/install.ps1 | iex\"";
+                      ? "irm https://raw.githubusercontent.com/CoderKavyaG/wakeup/main/wakeup-agent/install.ps1 | iex" 
+                      : "powershell -WindowStyle Hidden -Command \"irm https://raw.githubusercontent.com/CoderKavyaG/wakeup/main/wakeup-agent/install.ps1 | iex\"";
                   } else {
                     cmd = runMode === "standard" 
-                      ? "curl -fsSL https://raw.githubusercontent.com/CoderKavyaG/wakeup/main/devos-agent/install.sh | bash" 
-                      : "nohup bash -c \"curl -fsSL https://raw.githubusercontent.com/CoderKavyaG/wakeup/main/devos-agent/install.sh | bash\" > /dev/null 2>&1 &";
+                      ? "curl -fsSL https://raw.githubusercontent.com/CoderKavyaG/wakeup/main/wakeup-agent/install.sh | bash" 
+                      : "nohup bash -c \"curl -fsSL https://raw.githubusercontent.com/CoderKavyaG/wakeup/main/wakeup-agent/install.sh | bash\" > /dev/null 2>&1 &";
                   }
                   navigator.clipboard.writeText(cmd);
                 }} 
@@ -745,7 +745,7 @@ export function MachineControlWidget() {
               ⚠️ Browser SSL Security Action Required
             </span>
             <p>
-              Since DevOS is a secure HTTPS app, browsers block connections to your local machine until you authorize the agent's self-signed certificate:
+              Since Wakeup is a secure HTTPS app, browsers block connections to your local machine until you authorize the agent's self-signed certificate:
             </p>
             <ol className="list-decimal list-inside space-y-1 pl-1 font-sans font-medium text-amber-300">
               <li>
@@ -1000,7 +1000,7 @@ export function MachineControlWidget() {
                       value={browserPref}
                       onChange={(e) => {
                         setBrowserPref(e.target.value);
-                        localStorage.setItem("DEVOS_BROWSER_PREF", e.target.value);
+                        localStorage.setItem("WAKEUP_BROWSER_PREF", e.target.value);
                       }}
                       className="bg-[#131316] border border-white/10 rounded px-1.5 py-1 text-[10px] text-white focus:outline-none focus:border-primary/50 cursor-pointer h-7 transition-colors hover:border-white/20"
                     >
@@ -1017,7 +1017,7 @@ export function MachineControlWidget() {
                       value={musicPref}
                       onChange={(e) => {
                         setMusicPref(e.target.value);
-                        localStorage.setItem("DEVOS_MUSIC_PREF", e.target.value);
+                        localStorage.setItem("WAKEUP_MUSIC_PREF", e.target.value);
                       }}
                       className="bg-[#131316] border border-white/10 rounded px-1.5 py-1 text-[10px] text-white focus:outline-none focus:border-primary/50 cursor-pointer h-7 transition-colors hover:border-white/20"
                     >

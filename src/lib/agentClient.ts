@@ -1,6 +1,6 @@
 export function getAgentPort(): number {
   if (typeof window !== "undefined") {
-    return parseInt(localStorage.getItem("DEVOS_AGENT_PORT") || "3131", 10);
+    return parseInt(localStorage.getItem("WAKEUP_AGENT_PORT") || "3131", 10);
   }
   return 3131;
 }

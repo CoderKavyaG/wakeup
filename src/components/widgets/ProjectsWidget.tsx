@@ -63,7 +63,7 @@ export function ProjectsWidget() {
     if (typeof window === "undefined") return null;
     const phases = ["launched", "in_development", "sketching", "idea"];
     for (const phase of phases) {
-      const stored = localStorage.getItem(`devos_curated_${phase}`);
+      const stored = localStorage.getItem(`wakeup_curated_${phase}`);
       if (stored) {
         try {
           const list = JSON.parse(stored) as string[];
@@ -100,7 +100,7 @@ export function ProjectsWidget() {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      setShowMascot(localStorage.getItem("devos_hide_mascot") !== "true");
+      setShowMascot(localStorage.getItem("wakeup_hide_mascot") !== "true");
     }
   }, []);
 
@@ -326,7 +326,7 @@ export function ProjectsWidget() {
 
       const newTags = data.tags || [];
 
-      // Auto-register workspace in devos-agent
+      // Auto-register workspace in wakeup-agent
       try {
         await fetch(getAgentUrl("/register-workspace"), {
           method: "POST",
@@ -823,9 +823,9 @@ export function ProjectsWidget() {
   useEffect(() => {
     if (!loaded) return;
     if (!hasGithubToken && !vercel?.hasToken) {
-      const prompted = localStorage.getItem("devos_integrations_prompted");
+      const prompted = localStorage.getItem("wakeup_integrations_prompted");
       if (!prompted) {
-        localStorage.setItem("devos_integrations_prompted", "true");
+        localStorage.setItem("wakeup_integrations_prompted", "true");
         openSettingsDialog();
       }
     }
@@ -860,7 +860,7 @@ export function ProjectsWidget() {
       const res = await fetch("/api/github/issues/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ repo, title: issueTitle, body: `**Reported via DevOS Brain Dump**\n\n${note.content}\n\n---\n*Auto-created from project note — ${new Date().toLocaleDateString()}*` })
+        body: JSON.stringify({ repo, title: issueTitle, body: `**Reported via Wakeup Brain Dump**\n\n${note.content}\n\n---\n*Auto-created from project note — ${new Date().toLocaleDateString()}*` })
       });
       if (res.ok) {
         const data = await res.json();
@@ -932,7 +932,7 @@ export function ProjectsWidget() {
                 className="w-6 h-6 hover:bg-white/5 text-amber-400/80 hover:text-amber-400 shrink-0"
                 onClick={() => {
                   setShowMascot(true);
-                  localStorage.removeItem("devos_hide_mascot");
+                  localStorage.removeItem("wakeup_hide_mascot");
                 }}
                 title="Show Onboarding Mascot"
               >
@@ -989,7 +989,7 @@ export function ProjectsWidget() {
                           Personal Access Token
                         </label>
                         <a
-                          href="https://github.com/settings/tokens/new?scopes=repo,read:org&description=DevOS%20Token"
+                          href="https://github.com/settings/tokens/new?scopes=repo,read:org&description=Wakeup%20Token"
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-amber-400 hover:text-amber-300 transition-colors text-[9px] uppercase font-mono tracking-wider font-bold hover:underline"
@@ -1011,7 +1011,7 @@ export function ProjectsWidget() {
                               <HelpCircle className="w-3.5 h-3.5 text-white/30 hover:text-white cursor-help transition-colors" />
                             </TooltipTrigger>
                             <TooltipContent className="bg-[#0f0f11] border border-white/10 text-xs text-white max-w-xs p-2.5 rounded-lg shadow-xl leading-normal font-sans" side="top" align="end">
-                              Make sure you select <b>repo</b> scopes so DevOS can read your commits and project info.
+                              Make sure you select <b>repo</b> scopes so Wakeup can read your commits and project info.
                             </TooltipContent>
                           </Tooltip>
                         </div>
@@ -1354,7 +1354,7 @@ export function ProjectsWidget() {
               <button
                 onClick={() => {
                   setShowMascot(false);
-                  localStorage.setItem("devos_hide_mascot", "true");
+                  localStorage.setItem("wakeup_hide_mascot", "true");
                 }}
                 className="absolute top-1.5 right-1.5 text-white/30 hover:text-white/70 hover:bg-white/5 p-1 rounded transition-colors cursor-pointer z-10"
                 title="Dismiss guide"
@@ -1860,7 +1860,7 @@ export function ProjectsWidget() {
                   className="h-6 text-[9px] uppercase tracking-wider font-bold border-white/10 hover:bg-white/5 bg-transparent"
                   onClick={() => {
                     setShowMascot(true);
-                    localStorage.removeItem("devos_hide_mascot");
+                    localStorage.removeItem("wakeup_hide_mascot");
                   }}
                 >
                   Reveal Mascot

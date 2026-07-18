@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     /*
     const userCount = await prisma.user.count();
     if (userCount > 0) {
-      return NextResponse.json({ error: "Registration is locked. DevOS already has an owner." }, { status: 403 });
+      return NextResponse.json({ error: "Registration is locked. Wakeup already has an owner." }, { status: 403 });
     }
     */
 

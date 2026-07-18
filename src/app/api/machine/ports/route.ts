@@ -25,6 +25,6 @@ export async function GET(request: Request) {
     return NextResponse.json(data);
   } catch (error: any) {
     console.error("[API Machine Ports] Error:", error);
-    return NextResponse.json({ error: error.message || "DevOS Agent is offline." }, { status: 503 });
+    return NextResponse.json({ error: error.message || "Wakeup Agent is offline." }, { status: 503 });
   }
 }

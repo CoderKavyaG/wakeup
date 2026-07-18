@@ -5,9 +5,9 @@ const IV_LENGTH = 12;
 const KEY_LENGTH = 32;
 
 const getEncryptionKey = (): Buffer => {
-  const secret = process.env.ENCRYPTION_KEY || process.env.AUTH_SECRET || "default_super_secret_devos_key_32_bytes";
+  const secret = process.env.ENCRYPTION_KEY || process.env.AUTH_SECRET || "default_super_secret_wakeup_key_32_bytes";
   // Derives a key of 32 bytes using a fixed salt and PBKDF2
-  return crypto.pbkdf2Sync(secret, "devos-salt", 100000, KEY_LENGTH, "sha256");
+  return crypto.pbkdf2Sync(secret, "wakeup-salt", 100000, KEY_LENGTH, "sha256");
 };
 
 export function encrypt(text: string): string {

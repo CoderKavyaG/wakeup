@@ -30,7 +30,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           
           /*
           if (!existingUser && userCount > 0) {
-            console.log(`Rejecting Google sign-in for ${user.email} - DevOS owner already registered.`);
+            console.log(`Rejecting Google sign-in for ${user.email} - Wakeup owner already registered.`);
             return false;
           }
           */

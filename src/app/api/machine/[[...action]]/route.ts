@@ -30,7 +30,7 @@ export async function GET(request: Request) {
     return NextResponse.json(data);
   } catch (error) {
     console.error("[API Machine GET] Error:", error);
-    return NextResponse.json({ error: "DevOS Agent is offline." }, { status: 503 });
+    return NextResponse.json({ error: "Wakeup Agent is offline." }, { status: 503 });
   }
 }
 
@@ -64,7 +64,7 @@ export async function POST(request: Request) {
     return NextResponse.json(data);
   } catch (error) {
     console.error("[API Machine POST] Error:", error);
-    return NextResponse.json({ error: "DevOS Agent is offline." }, { status: 503 });
+    return NextResponse.json({ error: "Wakeup Agent is offline." }, { status: 503 });
   }
 }
 

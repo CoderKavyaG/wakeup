@@ -15,7 +15,7 @@ export async function POST(req: Request) {
   try {
     let activePort = 3131;
     try {
-      const portFilePath = path.join(process.cwd(), "devos-agent", "active-port.json");
+      const portFilePath = path.join(process.cwd(), "wakeup-agent", "active-port.json");
       if (fs.existsSync(portFilePath)) {
         const content = fs.readFileSync(portFilePath, "utf8");
         const data = JSON.parse(content);
@@ -39,7 +39,7 @@ export async function POST(req: Request) {
       
       // Wait for process to die, then start new agent
       setTimeout(() => {
-        const agentDir = "C:\\Users\\Kavya\\Projects\\wakeup\\devos-agent";
+        const agentDir = "C:\\Users\\Kavya\\Projects\\wakeup\\wakeup-agent";
         const method = "spa" + "wn";
         const spawnFn = (cp as any)[method];
         const script = ['index', 'js'].join('.');

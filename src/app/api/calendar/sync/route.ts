@@ -16,14 +16,14 @@ interface CalendarEvent {
 // Generate iCalendar format (.ics)
 function generateICS(events: CalendarEvent[]): string {
   const now = new Date();
-  const uid = `wakeup-${Date.now()}@devos`;
+  const uid = `wakeup-${Date.now()}@wakeup`;
 
   let ics = `BEGIN:VCALENDAR
 VERSION:2.0
-PRODID:-//DevOS//Calendar//EN
+PRODID:-//Wakeup//Calendar//EN
 CALSCALE:GREGORIAN
 METHOD:PUBLISH
-X-WR-CALNAME:DevOS Calendar
+X-WR-CALNAME:Wakeup Calendar
 X-WR-TIMEZONE:UTC
 CREATED:${formatDateISO8601(now)}
 LAST-MODIFIED:${formatDateISO8601(now)}
@@ -151,7 +151,7 @@ export async function GET(request: Request) {
       return new NextResponse(ics, {
         headers: {
           "Content-Type": "text/calendar",
-          "Content-Disposition": "attachment; filename=devos-calendar.ics",
+          "Content-Disposition": "attachment; filename=wakeup-calendar.ics",
         },
       });
     }

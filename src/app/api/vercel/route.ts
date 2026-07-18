@@ -7,7 +7,7 @@ const VERCEL_API = 'https://api.vercel.com';
 
 // GET /api/vercel?type=deployments — last 10 deployments across all projects
 // GET /api/vercel?type=analytics&projectId=X — visit stats for a specific project
-// GET /api/vercel?type=projects — list all Vercel projects (to match with DevOS projects)
+// GET /api/vercel?type=projects — list all Vercel projects (to match with Wakeup projects)
 export async function GET(req: Request) {
   const session = await auth();
   if (!session?.user?.id) {

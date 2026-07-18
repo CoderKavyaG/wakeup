@@ -282,7 +282,7 @@ export default function ProjectOSCommandPalette({
     items.push({
       id: "global-signout",
       title: "Sign Out",
-      subtitle: "Sign out of your DevOS session",
+      subtitle: "Sign out of your Wakeup session",
       category: "System",
       icon: <LogOut className="w-3.5 h-3.5 text-red-400" />,
       action: () => {

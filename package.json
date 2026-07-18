@@ -3,13 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "main": "electron/main.js",
-  "bin": "./devos-agent/index.js",
+  "bin": "./wakeup-agent/index.js",
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
-    "agent": "node devos-agent/index.js",
+    "agent": "node wakeup-agent/index.js",
     "electron": "electron .",
     "electron:dev": "concurrently \"npm run dev\" \"npm run agent\" \"wait-on http://localhost:3000 && electron .\"",
     "electron:build": "next build && electron-builder",
@@ -67,15 +67,15 @@
     "wait-on": "^9.0.10"
   },
   "build": {
-    "appId": "com.kavya.devos",
-    "productName": "DevOS",
+    "appId": "com.kavya.wakeup",
+    "productName": "Wakeup",
     "directories": {
       "output": "dist"
     },
     "files": [
       "electron/**/*",
       ".next/**/*",
-      "devos-agent/**/*",
+      "wakeup-agent/**/*",
       "public/**/*",
       "package.json"
     ],

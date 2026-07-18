@@ -49,7 +49,7 @@ export async function POST(req: Request) {
     }
 
     const voicePrompt = `You are generating a post for Kavya's developer profile.
-Kavya is a student developer from India building "DevOS" (a personal developer OS / cockpit).
+Kavya is a student developer from India building "Wakeup" (a personal developer OS / cockpit).
 Kavya's voice guidelines:
 - Technical, authentic, and direct.
 - Avoid marketing buzzwords, emojis (max 1 subtle emoji if appropriate, but generally none), and corporate speak.

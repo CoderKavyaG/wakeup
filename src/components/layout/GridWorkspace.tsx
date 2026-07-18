@@ -126,7 +126,7 @@ export function GridWorkspace() {
               <span className="w-2.5 h-2.5 rounded-full bg-yellow-500/80" />
               <span className="w-2.5 h-2.5 rounded-full bg-green-500/80" />
             </div>
-            <span className="text-[10px] text-white/35 font-mono uppercase tracking-wider">DevOS Core Console</span>
+            <span className="text-[10px] text-white/35 font-mono uppercase tracking-wider">Wakeup Core Console</span>
             <div className="w-10" />
           </div>
 
@@ -134,7 +134,7 @@ export function GridWorkspace() {
           <div className="p-6 space-y-4 text-xs text-left min-h-[220px]">
             <div className="space-y-1.5 min-h-[70px]">
               <p className="text-[#5B8DEF] font-bold">
-                <TerminalTypewriter text="devos-kernel v1.0.4 initialized" onComplete={() => setSequenceIndex(1)} />
+                <TerminalTypewriter text="wakeup-kernel v1.0.4 initialized" onComplete={() => setSequenceIndex(1)} />
               </p>
               {sequenceIndex >= 1 && (
                 <p className="text-white/40">
@@ -163,7 +163,7 @@ export function GridWorkspace() {
                 <div className="h-px bg-white/[0.05] my-2" />
 
                 <div className="space-y-3 leading-relaxed">
-                  <p className="text-white/80 font-bold text-sm">Welcome to DevOS Dashboard Command Center</p>
+                  <p className="text-white/80 font-bold text-sm">Welcome to Wakeup Dashboard Command Center</p>
                   <p className="text-white/50">
                     To build your layout, open the Cockpit overlay panel. You can search files, add system diagnostics widgets, track notes, and monitor running ports.
                   </p>
@@ -187,7 +187,7 @@ export function GridWorkspace() {
 
           {/* Terminal Status Bar */}
           <div className="h-6 bg-[#08080b] border-t border-white/[0.05] px-4 flex items-center justify-between text-[9px] text-white/30 shrink-0">
-            <span>root@devos:~#</span>
+            <span>root@wakeup:~#</span>
             <span>UTF-8</span>
           </div>
         </motion.div>

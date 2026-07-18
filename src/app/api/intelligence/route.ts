@@ -128,7 +128,7 @@ export async function POST(request: Request) {
 
     const userName = session.user.name?.split(" ")[0] || "Developer";
 
-    const systemPrompt = `You are the AI brain of DevOS — ${userName}'s personal developer operating system.
+    const systemPrompt = `You are the AI brain of Wakeup — ${userName}'s personal developer operating system.
 ${userName} is a developer building multiple projects simultaneously.
 You have live access to their workspace data. Be specific, direct, and actionable.
 Write ONE sentence telling ${userName} what to focus on today. Name a project or task explicitly.

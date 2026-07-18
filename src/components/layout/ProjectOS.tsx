@@ -2731,7 +2731,7 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
   // Browse folder — two strategies:
   // 1. Chrome/Edge: use browser's showDirectoryPicker() API (gets folder name only, user confirms path)
   // 2. Brave/Firefox/other: call agent's pick-and-scan-folder which runs the native Windows folder
-  //    picker dialog on the user's local machine via the DevOS agent (PowerShell FolderBrowserDialog).
+  //    picker dialog on the user's local machine via the Wakeup agent (PowerShell FolderBrowserDialog).
   //    This works because ClientBootstrap routes /api/machine/* directly to local.wakeup.com:3131.
   const handleBrowseFolder = async () => {
     // --- Strategy 1: Browser File System Access API (Chrome/Edge) ---
@@ -2739,7 +2739,7 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
       try {
         const dirHandle = await (window as any).showDirectoryPicker({ mode: "read" });
         const folderName = dirHandle.name;
-        const savedWorkspace = localStorage.getItem("DEVOS_WORKSPACE") || "";
+        const savedWorkspace = localStorage.getItem("WAKEUP_WORKSPACE") || "";
         let basePath = "C:\\Users\\Kavya\\Projects";
         if (savedWorkspace) {
           const sep = savedWorkspace.includes("\\") ? "\\" : "/";
@@ -2758,7 +2758,7 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
     }
 
     // --- Strategy 2: Agent-side native folder picker (Brave / Firefox / blocked browsers) ---
-    // This calls picker.ps1 on the user's local machine via the DevOS agent.
+    // This calls picker.ps1 on the user's local machine via the Wakeup agent.
     setLocalScanning(true);
     try {
       const res = await fetch(getAgentUrl("/pick-and-scan-folder"), {
@@ -2770,7 +2770,7 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
         const err = await res.json().catch(() => ({}));
         if (err.error === "No folder selected") return; // user closed dialog
         if (res.status === 503) {
-          alert("DevOS Agent is offline. Make sure you've run the install command in your terminal first:\n\nirm https://raw.githubusercontent.com/CoderKavyaG/wakeup/main/devos-agent/install.ps1 | iex");
+          alert("Wakeup Agent is offline. Make sure you've run the install command in your terminal first:\n\nirm https://raw.githubusercontent.com/CoderKavyaG/wakeup/main/wakeup-agent/install.ps1 | iex");
           return;
         }
         throw new Error(err.error || "Folder picker failed");
@@ -2831,7 +2831,7 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
     } catch (e: any) {
       const msg = e.message || "Unknown error";
       if (msg.includes("offline") || msg.includes("503") || msg.includes("Agent")) {
-        alert("DevOS Agent is offline. Make sure you've run the install command in your terminal first.");
+        alert("Wakeup Agent is offline. Make sure you've run the install command in your terminal first.");
       } else {
         alert(`Scan failed: ${msg}`);
       }
@@ -2996,7 +2996,7 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
                   <textarea
                     value={description}
                     onChange={e => setDescription(e.target.value)}
-                    placeholder="Tell DevOS what this project is about..."
+                    placeholder="Tell Wakeup what this project is about..."
                     className="w-full bg-black/40 border border-white/10 rounded-lg text-xs text-white p-3 focus:outline-none focus:ring-1 focus:ring-amber-500/30 placeholder:text-white/20 h-16 resize-none"
                   />
                 </div>
@@ -3242,7 +3242,7 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
                       </button>
 
                       <p className="text-[9px] text-white/20 font-mono">
-                        Tip: Make sure the DevOS agent is running in your terminal first.
+                        Tip: Make sure the Wakeup agent is running in your terminal first.
                       </p>
                     </div>
                   </div>
@@ -3370,7 +3370,7 @@ export function ProjectOS() {
     : null;
 
   const syncCuratedList = async (phase: string, newList: string[]) => {
-    localStorage.setItem(`devos_curated_${phase}`, JSON.stringify(newList));
+    localStorage.setItem(`wakeup_curated_${phase}`, JSON.stringify(newList));
     if (phase === "launched") setCuratedLaunched(newList);
     else if (phase === "in_development") setCuratedInDev(newList);
     else if (phase === "sketching") setCuratedSketching(newList);
@@ -3378,7 +3378,7 @@ export function ProjectOS() {
 
     const getStoredList = (ph: string) => {
       if (ph === phase) return newList;
-      const stored = localStorage.getItem(`devos_curated_${ph}`);
+      const stored = localStorage.getItem(`wakeup_curated_${ph}`);
       if (stored) {
         try { return JSON.parse(stored) as string[]; } catch { }
       }
@@ -3401,10 +3401,10 @@ export function ProjectOS() {
         body: JSON.stringify({ orderedIds })
       });
       if (res.ok) {
-        localStorage.removeItem(`devos_curated_launched`);
-        localStorage.removeItem(`devos_curated_in_development`);
-        localStorage.removeItem(`devos_curated_sketching`);
-        localStorage.removeItem(`devos_curated_idea`);
+        localStorage.removeItem(`wakeup_curated_launched`);
+        localStorage.removeItem(`wakeup_curated_in_development`);
+        localStorage.removeItem(`wakeup_curated_sketching`);
+        localStorage.removeItem(`wakeup_curated_idea`);
         setCuratedLaunched([]);
         setCuratedInDev([]);
         setCuratedSketching([]);
@@ -3417,7 +3417,7 @@ export function ProjectOS() {
   };
 
   const handleHideProject = (projectId: string, phase: string) => {
-    const key = `devos_curated_${phase}`;
+    const key = `wakeup_curated_${phase}`;
     const stored = localStorage.getItem(key);
     if (stored) {
       try {
@@ -3434,7 +3434,7 @@ export function ProjectOS() {
 
       // Clean up curated lists from localStorage
       ["launched", "in_development", "sketching", "idea"].forEach(phaseId => {
-        const key = `devos_curated_${phaseId}`;
+        const key = `wakeup_curated_${phaseId}`;
         const stored = localStorage.getItem(key);
         if (stored) {
           try {
@@ -3473,7 +3473,7 @@ export function ProjectOS() {
       useProjectStore.getState().updateProject(project.id, { phase: newPhase as any });
 
       // Remove from old curation list
-      const oldKey = `devos_curated_${oldPhase}`;
+      const oldKey = `wakeup_curated_${oldPhase}`;
       const oldStored = localStorage.getItem(oldKey);
       let oldList: string[] = [];
       if (oldStored) {
@@ -3484,7 +3484,7 @@ export function ProjectOS() {
       }
 
       // Add to new curation list
-      const newKey = `devos_curated_${newPhase}`;
+      const newKey = `wakeup_curated_${newPhase}`;
       const newStored = localStorage.getItem(newKey);
       let newList: string[] = [];
       if (newStored) {
@@ -3509,17 +3509,17 @@ export function ProjectOS() {
 
   const loadCurationLists = () => {
     if (typeof window !== "undefined") {
-      const migrationKey = "devos_curated_migrated_v5";
+      const migrationKey = "wakeup_curated_migrated_v5";
       if (!localStorage.getItem(migrationKey)) {
-        localStorage.setItem("devos_curated_launched", JSON.stringify([]));
-        localStorage.setItem("devos_curated_in_development", JSON.stringify([]));
-        localStorage.setItem("devos_curated_sketching", JSON.stringify([]));
-        localStorage.setItem("devos_curated_idea", JSON.stringify([]));
+        localStorage.setItem("wakeup_curated_launched", JSON.stringify([]));
+        localStorage.setItem("wakeup_curated_in_development", JSON.stringify([]));
+        localStorage.setItem("wakeup_curated_sketching", JSON.stringify([]));
+        localStorage.setItem("wakeup_curated_idea", JSON.stringify([]));
         localStorage.setItem(migrationKey, "true");
       }
 
       const getStoredList = (phase: string) => {
-        const stored = localStorage.getItem(`devos_curated_${phase}`);
+        const stored = localStorage.getItem(`wakeup_curated_${phase}`);
         if (stored) {
           try { return JSON.parse(stored) as string[]; } catch { return []; }
         }
@@ -3534,19 +3534,19 @@ export function ProjectOS() {
       // Initialize lists if they do not exist to empty
       if (launched === null) {
         launched = [];
-        localStorage.setItem("devos_curated_launched", JSON.stringify(launched));
+        localStorage.setItem("wakeup_curated_launched", JSON.stringify(launched));
       }
       if (inDev === null) {
         inDev = [];
-        localStorage.setItem("devos_curated_in_development", JSON.stringify(inDev));
+        localStorage.setItem("wakeup_curated_in_development", JSON.stringify(inDev));
       }
       if (sketching === null) {
         sketching = [];
-        localStorage.setItem("devos_curated_sketching", JSON.stringify(sketching));
+        localStorage.setItem("wakeup_curated_sketching", JSON.stringify(sketching));
       }
       if (idea === null) {
         idea = [];
-        localStorage.setItem("devos_curated_idea", JSON.stringify(idea));
+        localStorage.setItem("wakeup_curated_idea", JSON.stringify(idea));
       }
 
       setCuratedLaunched(launched);
@@ -3576,7 +3576,7 @@ export function ProjectOS() {
     projects.forEach(p => {
       if (!currentCuratedIds.has(p.id)) {
         const resolvedPhase = (p.phase === "idea" && p.type !== "idea") ? "in_development" : p.phase;
-        const key = `devos_curated_${resolvedPhase}`;
+        const key = `wakeup_curated_${resolvedPhase}`;
         const stored = localStorage.getItem(key);
         let list: string[] = [];
         if (stored) {
@@ -3604,7 +3604,7 @@ export function ProjectOS() {
       // Find if this project is currently curated in a phase that doesn't match its DB phase
       PHASES.forEach(phaseObj => {
         if (resolvedPhase !== phaseObj.id) {
-          const key = `devos_curated_${phaseObj.id}`;
+          const key = `wakeup_curated_${phaseObj.id}`;
           const stored = localStorage.getItem(key);
           if (stored) {
             try {
@@ -3616,7 +3616,7 @@ export function ProjectOS() {
                 modified = true;
 
                 // Add to correct phase list
-                const correctKey = `devos_curated_${resolvedPhase}`;
+                const correctKey = `wakeup_curated_${resolvedPhase}`;
                 const correctStored = localStorage.getItem(correctKey);
                 let correctList = correctStored ? JSON.parse(correctStored) : [];
                 if (!correctList.includes(p.id)) {
@@ -3730,7 +3730,7 @@ export function ProjectOS() {
       useProjectStore.getState().updateProject(project.id, { phase: newPhase as any });
 
       // Remove from old curation list
-      const oldKey = `devos_curated_${oldPhase}`;
+      const oldKey = `wakeup_curated_${oldPhase}`;
       const oldStored = localStorage.getItem(oldKey);
       let oldList: string[] = [];
       if (oldStored) {
@@ -3741,7 +3741,7 @@ export function ProjectOS() {
       }
 
       // Add to new curation list
-      const newKey = `devos_curated_${newPhase}`;
+      const newKey = `wakeup_curated_${newPhase}`;
       const newStored = localStorage.getItem(newKey);
       let newList: string[] = [];
       if (newStored) {
@@ -3786,7 +3786,7 @@ export function ProjectOS() {
           <div className="flex items-center gap-1.5">
             <button onClick={close} className="flex items-center gap-1.5 text-white/40 hover:text-white/70 transition-colors mr-2 cursor-pointer text-xs font-semibold">
               <ArrowLeft className="w-3.5 h-3.5" />
-              <span>DevOS</span>
+              <span>Wakeup</span>
             </button>
             <span className="text-white/20 text-xs">/</span>
             <button onClick={() => selectProject(null)} className="text-xs text-white/50 hover:text-white font-medium cursor-pointer">
@@ -4375,7 +4375,7 @@ export function ProjectOS() {
           }}
           defaultPhase={selectedDefaultPhase}
           onSaveSuccess={(newProj) => {
-            const key = `devos_curated_${newProj.phase}`;
+            const key = `wakeup_curated_${newProj.phase}`;
             const stored = localStorage.getItem(key);
             let list: string[] = [];
             if (stored) {

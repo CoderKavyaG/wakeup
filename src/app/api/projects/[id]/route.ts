@@ -10,7 +10,7 @@ async function fetchOGImage(url: string): Promise<string | null> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 6000);
     const res = await fetch(url, {
-      headers: { "User-Agent": "DevOS/1.0" },
+      headers: { "User-Agent": "Wakeup/1.0" },
       signal: controller.signal,
     });
     clearTimeout(timeout);

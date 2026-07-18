@@ -36,7 +36,7 @@ function startAgent() {
     console.log('[Electron] Running in development mode. Skipping Agent spawn.');
     return;
   }
-  const agentProcess = spawn('node', ['devos-agent/index.js'], {
+  const agentProcess = spawn('node', ['wakeup-agent/index.js'], {
     cwd: path.join(__dirname, '..'),
     windowsHide: true
   })
@@ -89,12 +89,12 @@ function createTray() {
   const icon = nativeImage.createFromPath(path.join(__dirname, 'icon.png'))
   tray = new Tray(icon.resize({ width: 16, height: 16 }))
   const menu = Menu.buildFromTemplate([
-    { label: 'Open DevOS', click: () => { if (mainWindow) mainWindow.focus(); else createWindow() } },
+    { label: 'Open Wakeup', click: () => { if (mainWindow) mainWindow.focus(); else createWindow() } },
     { label: 'Restart', click: () => { app.relaunch(); app.exit(0) } },
     { type: 'separator' },
     { label: 'Quit', click: () => { app.quit() } }
   ])
-  tray.setToolTip('DevOS')
+  tray.setToolTip('Wakeup')
   tray.setContextMenu(menu)
   tray.on('click', () => { if (mainWindow) mainWindow.focus() })
 }

@@ -61,7 +61,7 @@ const defaultWidgets: WidgetInstance[] = [
 const getCachedLayout = () => {
   if (typeof window !== "undefined") {
     try {
-      const cached = localStorage.getItem("devos_saved_layout");
+      const cached = localStorage.getItem("wakeup_saved_layout");
       if (cached) {
         const parsed = JSON.parse(cached);
         if (parsed && (parsed.layouts || parsed.widgets)) {
@@ -107,7 +107,7 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
           loading: false
         });
         if (typeof window !== "undefined") {
-          localStorage.setItem("devos_saved_layout", JSON.stringify({ layouts, widgets }));
+          localStorage.setItem("wakeup_saved_layout", JSON.stringify({ layouts, widgets }));
         }
       } else {
         // Create initial default on backend
@@ -127,7 +127,7 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
   setLayouts: async (layouts) => {
     set({ layouts });
     if (typeof window !== "undefined") {
-      localStorage.setItem("devos_saved_layout", JSON.stringify({ layouts, widgets: get().widgets }));
+      localStorage.setItem("wakeup_saved_layout", JSON.stringify({ layouts, widgets: get().widgets }));
     }
 
     try {
@@ -177,7 +177,7 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
       layouts: currentLayouts
     });
     if (typeof window !== "undefined") {
-      localStorage.setItem("devos_saved_layout", JSON.stringify({ layouts: currentLayouts, widgets: [...previousWidgets, newWidget] }));
+      localStorage.setItem("wakeup_saved_layout", JSON.stringify({ layouts: currentLayouts, widgets: [...previousWidgets, newWidget] }));
     }
 
     try {
@@ -208,7 +208,7 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
       layouts: updatedLayouts
     });
     if (typeof window !== "undefined") {
-      localStorage.setItem("devos_saved_layout", JSON.stringify({ layouts: updatedLayouts, widgets: updatedWidgets }));
+      localStorage.setItem("wakeup_saved_layout", JSON.stringify({ layouts: updatedLayouts, widgets: updatedWidgets }));
     }
 
     try {
@@ -231,7 +231,7 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
       widgets: defaultWidgets
     });
     if (typeof window !== "undefined") {
-      localStorage.setItem("devos_saved_layout", JSON.stringify({ layouts: defaultLayouts, widgets: defaultWidgets }));
+      localStorage.setItem("wakeup_saved_layout", JSON.stringify({ layouts: defaultLayouts, widgets: defaultWidgets }));
     }
 
     try {
@@ -252,7 +252,7 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
       widgets: []
     });
     if (typeof window !== "undefined") {
-      localStorage.setItem("devos_saved_layout", JSON.stringify({ layouts: { lg: [] }, widgets: [] }));
+      localStorage.setItem("wakeup_saved_layout", JSON.stringify({ layouts: { lg: [] }, widgets: [] }));
     }
 
     try {
@@ -270,7 +270,7 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
   saveCurrentLayout: () => {
     const current = { layouts: get().layouts, widgets: get().widgets };
     if (typeof window !== "undefined") {
-      localStorage.setItem("devos_saved_layout", JSON.stringify(current));
+      localStorage.setItem("wakeup_saved_layout", JSON.stringify(current));
     }
     set({ savedLayout: current });
   },

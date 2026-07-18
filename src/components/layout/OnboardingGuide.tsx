@@ -34,12 +34,12 @@ export function OnboardingGuide() {
 
     if (typeof window !== "undefined") {
       if (localStorage.getItem("wakeup_onboarded") === "true") {
-        localStorage.setItem("devos_onboarded", "true");
+        localStorage.setItem("wakeup_onboarded", "true");
         localStorage.removeItem("wakeup_onboarded");
       }
     }
 
-    const onboarded = localStorage.getItem("devos_onboarded");
+    const onboarded = localStorage.getItem("wakeup_onboarded");
     const hasNoData = projects.length === 0 && tasks.length === 0;
 
     if (!onboarded && hasNoData) {
@@ -65,7 +65,7 @@ export function OnboardingGuide() {
     {
       id: 1,
       targetId: null,
-      title: "This is DevOS. Your personal developer OS.",
+      title: "This is Wakeup. Your personal developer OS.",
       subtext: "Not a dashboard. An operating system. Let's set it up in 2 minutes.",
       buttonText: "Let's go →",
       showSkip: true,
@@ -89,7 +89,7 @@ export function OnboardingGuide() {
       id: 3,
       targetId: "projects-widget",
       title: "Add your first project",
-      subtext: "Connect your GitHub to see all your repos here. Your projects become the brain of DevOS — health scores, commits, and infrastructure links.",
+      subtext: "Connect your GitHub to see all your repos here. Your projects become the brain of Wakeup — health scores, commits, and infrastructure links.",
       buttonText: "Connect GitHub",
       showSkip: true,
       action: () => {
@@ -111,7 +111,7 @@ export function OnboardingGuide() {
       id: 4,
       targetId: "machine-control-widget",
       title: "Set up your workspace",
-      subtext: "DevOS can see your local machine. Paste any project folder path to track its git status, run npm scripts, and monitor ports.",
+      subtext: "Wakeup can see your local machine. Paste any project folder path to track its git status, run npm scripts, and monitor ports.",
       buttonText: "Nice →",
       showSkip: true,
       action: () => {
@@ -142,7 +142,7 @@ export function OnboardingGuide() {
       id: 6,
       targetId: null,
       title: "You're in",
-      subtext: "DevOS is ready. It learns as you work. The more you use it, the smarter it gets.",
+      subtext: "Wakeup is ready. It learns as you work. The more you use it, the smarter it gets.",
       buttonText: "Start building →",
       showSkip: false,
     },
@@ -205,7 +205,7 @@ export function OnboardingGuide() {
   };
 
   const handleComplete = () => {
-    localStorage.setItem("devos_onboarded", "true");
+    localStorage.setItem("wakeup_onboarded", "true");
     setVisible(false);
   };
 

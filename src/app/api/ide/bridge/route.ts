@@ -17,7 +17,7 @@ interface IDEResponse {
   message?: string;
 }
 
-// IDE Bridge - Enables VS Code and other IDEs to communicate with DevOS
+// IDE Bridge - Enables VS Code and other IDEs to communicate with Wakeup
 export async function POST(request: Request) {
   try {
     const body: IDECommand = await request.json();
