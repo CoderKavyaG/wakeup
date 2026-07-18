@@ -30,14 +30,13 @@ export async function GET(request: Request) {
     const days = parseInt(searchParams.get("days") || "30", 10);
     const projectId = searchParams.get("projectId"); 
     
-    // Retrieve and decrypt the user's database-stored GitHub token
-    let token = process.env.GITHUB_TOKEN;
-    const dbUser = await prisma.user.findUnique({
+    const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { githubToken: true }
     });
-    if (dbUser?.githubToken) {
-      token = decrypt(dbUser.githubToken);
+    const token = user?.githubToken ? decrypt(user.githubToken) : null;
+    if (!token) {
+      return NextResponse.json({ error: "GitHub token not configured" }, { status: 401 });
     }
 
     const headers: HeadersInit = {

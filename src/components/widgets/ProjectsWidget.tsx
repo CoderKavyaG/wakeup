@@ -641,12 +641,7 @@ export function ProjectsWidget() {
 
     if (selectedProject?.githubUrl) {
       setCommitsLoading(true);
-      const savedToken = localStorage.getItem("GITHUB_TOKEN");
-      const headers: HeadersInit = {};
-      if (savedToken) {
-        headers["Authorization"] = `Bearer ${savedToken}`;
-      }
-      fetch(`/api/github/commits?projectId=${selectedProject.id}&days=14`, { headers })
+      fetch(`/api/github/commits?projectId=${selectedProject.id}&days=14`)
         .then(res => res.json())
         .then(data => {
           if (Array.isArray(data)) {
@@ -862,16 +857,10 @@ export function ProjectsWidget() {
       const catPrefix = note.category ? `[${note.category.charAt(0).toUpperCase() + note.category.slice(1)}] ` : '';
       const issueTitle = `${catPrefix}${firstLine}`;
 
-      const token = localStorage.getItem("GITHUB_TOKEN");
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-
-      const issueBody = `**Reported via DevOS Brain Dump**\n\n${note.content}\n\n---\n*Auto-created from project note — ${new Date().toLocaleDateString()}*`;
-
       const res = await fetch("/api/github/issues/create", {
         method: "POST",
-        headers,
-        body: JSON.stringify({ repo, title: issueTitle, body: issueBody })
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ repo, title: issueTitle, body: `**Reported via DevOS Brain Dump**\n\n${note.content}\n\n---\n*Auto-created from project note — ${new Date().toLocaleDateString()}*` })
       });
       if (res.ok) {
         const data = await res.json();

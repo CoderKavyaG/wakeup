@@ -88,11 +88,11 @@ function getProjectFaviconUrl(project: Project): string | null {
       if (match) domain = match[1];
     }
   }
-  
+
   if (domain) {
     return `https://icons.duckduckgo.com/ip3/${domain}.ico`;
   }
-  
+
   return null;
 }
 
@@ -191,8 +191,8 @@ function OverviewTab({ project }: { project: Project }) {
           <span className="text-[10px] uppercase tracking-wider text-white/30 font-mono font-semibold">Status</span>
           <div className="flex items-center gap-2 mt-1">
             <span className={`w-2 h-2 rounded-full ${project.status === "active" ? "bg-green-400" :
-                project.status === "planning" ? "bg-blue-400" :
-                  project.status === "completed" ? "bg-purple-400" : "bg-amber-400"
+              project.status === "planning" ? "bg-blue-400" :
+                project.status === "completed" ? "bg-purple-400" : "bg-amber-400"
               }`} />
             <span className="text-sm font-semibold capitalize text-white/80">{project.status}</span>
           </div>
@@ -307,7 +307,7 @@ function IdeaCard({ idea, projectId, onUpdate, onDelete }: IdeaCardProps) {
   };
 
   return (
-    <div 
+    <div
       draggable={!editing}
       onDragStart={(e) => {
         e.dataTransfer.setData("text/plain", idea.id);
@@ -400,7 +400,7 @@ function IdeaCanvasView({ project }: { project: Project }) {
   const [items, setItems] = useState<CanvasItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [isLightMode, setIsLightMode] = useState(false);
-  
+
   // Recording states
   const [recording, setRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
@@ -450,7 +450,7 @@ function IdeaCanvasView({ project }: { project: Project }) {
           .filter(Boolean) as CanvasItem[];
         setItems(parsed);
       }
-    } catch {}
+    } catch { }
     finally { setLoading(false); }
   };
 
@@ -466,7 +466,7 @@ function IdeaCanvasView({ project }: { project: Project }) {
         y: e.clientY - canvasRect.top
       };
     }
-    
+
     if (draggingId) {
       const x = e.clientX - dragStartOffset.current.x;
       const y = e.clientY - dragStartOffset.current.y;
@@ -476,10 +476,10 @@ function IdeaCanvasView({ project }: { project: Project }) {
     } else if (resizingId) {
       const deltaX = e.clientX - resizeStartMouse.current.x;
       const deltaY = e.clientY - resizeStartMouse.current.y;
-      
+
       const newWidth = Math.max(120, resizeStartSize.current.w + deltaX);
       const newHeight = Math.max(100, resizeStartSize.current.h + deltaY);
-      
+
       setItems(prev => prev.map(item =>
         item.id === resizingId ? { ...item, w: newWidth, h: newHeight } : item
       ));
@@ -666,16 +666,16 @@ function IdeaCanvasView({ project }: { project: Project }) {
     return () => window.removeEventListener("paste", handlePaste);
   }, []);
 
-  const convertFileToBase64 = (file: Blob): Promise<string> => {
+  function convertFileToBase64(file: Blob): Promise<string> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
       reader.onload = () => resolve(reader.result as string);
       reader.onerror = error => reject(error);
     });
-  };
+  }
 
-  const getImageDimensions = (base64: string): Promise<{ w: number; h: number }> => {
+  function getImageDimensions(base64: string): Promise<{ w: number; h: number }> {
     return new Promise((resolve) => {
       const img = new window.Image();
       img.src = base64;
@@ -686,7 +686,7 @@ function IdeaCanvasView({ project }: { project: Project }) {
         resolve({ w: 240, h: 180 });
       };
     });
-  };
+  }
 
   const spawnImage = async (base64: string, x: number, y: number, w = 240, h = 180) => {
     const payloadContent = JSON.stringify({ type: "image", x, y, text: "", url: base64, w, h, name: "" });
@@ -786,7 +786,7 @@ function IdeaCanvasView({ project }: { project: Project }) {
     if (!file) return;
 
     const fileType = file.type;
-    
+
     if (fileType.startsWith("image/")) {
       const base64 = await convertFileToBase64(file);
       const dims = await getImageDimensions(base64);
@@ -809,7 +809,7 @@ function IdeaCanvasView({ project }: { project: Project }) {
     } else {
       alert("Unsupported file type! Please upload an image, audio file, or plain text document.");
     }
-    
+
     e.target.value = "";
   };
 
@@ -826,7 +826,7 @@ function IdeaCanvasView({ project }: { project: Project }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          query: `I am brainstorming ideas on a canvas for the project "${project.name}". Here are my current notes: ${textNotes.map((n, i) => `[Note ${i+1}]: ${n}`).join(" | ")}. Suggest 1 highly creative next feature, design choice, or improvement for this project. Keep it under 2 short sentences.`
+          query: `I am brainstorming ideas on a canvas for the project "${project.name}". Here are my current notes: ${textNotes.map((n, i) => `[Note ${i + 1}]: ${n}`).join(" | ")}. Suggest 1 highly creative next feature, design choice, or improvement for this project. Keep it under 2 short sentences.`
         }),
       });
 
@@ -843,7 +843,7 @@ function IdeaCanvasView({ project }: { project: Project }) {
       const tempId = `ai-temp-${Date.now()}`;
       const spawnX = 350;
       const spawnY = 250;
-      
+
       setItems(prev => [...prev, {
         id: tempId,
         type: "text",
@@ -897,7 +897,7 @@ function IdeaCanvasView({ project }: { project: Project }) {
   };
 
   return (
-    <div 
+    <div
       ref={canvasRef}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
@@ -905,8 +905,8 @@ function IdeaCanvasView({ project }: { project: Project }) {
       className={`flex-1 h-full relative select-none overflow-hidden cursor-crosshair transition-colors duration-200 ${isLightMode ? 'bg-[#f8f9fa] text-slate-900' : 'bg-black text-[#E8E9EB]'}`}
       style={{
         backgroundColor: isLightMode ? '#f8f9fa' : '#070709',
-        backgroundImage: isLightMode 
-          ? 'radial-gradient(rgba(0, 0, 0, 0.08) 1px, transparent 1px)' 
+        backgroundImage: isLightMode
+          ? 'radial-gradient(rgba(0, 0, 0, 0.08) 1px, transparent 1px)'
           : 'radial-gradient(rgba(245, 158, 11, 0.15) 1px, transparent 1px)',
         backgroundSize: '24px 24px',
       }}
@@ -943,11 +943,10 @@ function IdeaCanvasView({ project }: { project: Project }) {
           return (
             <div
               key={item.id}
-              className={`absolute group select-none transition-shadow duration-200 z-10 cursor-grab active:cursor-grabbing ${
-                isLightMode 
-                  ? 'hover:shadow-[0_0_25px_rgba(245,158,11,0.1)]' 
+              className={`absolute group select-none transition-shadow duration-200 z-10 cursor-grab active:cursor-grabbing ${isLightMode
+                  ? 'hover:shadow-[0_0_25px_rgba(245,158,11,0.1)]'
                   : 'hover:shadow-[0_0_25px_rgba(245,158,11,0.15)]'
-              }`}
+                }`}
               style={{
                 left: item.x,
                 top: item.y,
@@ -958,12 +957,12 @@ function IdeaCanvasView({ project }: { project: Project }) {
               }}
               onMouseDown={(e) => handleMouseDown(item.id, e)}
             >
-              <img 
-                src={item.url} 
-                alt="Canvas image" 
-                className="w-full h-full object-cover rounded-lg pointer-events-none select-none border border-white/[0.04]" 
+              <img
+                src={item.url}
+                alt="Canvas image"
+                className="w-full h-full object-cover rounded-lg pointer-events-none select-none border border-white/[0.04]"
               />
-              
+
               {/* Delete button (X) top-right */}
               <button
                 onClick={(e) => { e.stopPropagation(); deleteItem(item.id); }}
@@ -991,11 +990,10 @@ function IdeaCanvasView({ project }: { project: Project }) {
         return (
           <div
             key={item.id}
-            className={`absolute group rounded-xl shadow-2xl border p-3 transition-shadow duration-200 select-none flex flex-col ${
-              isLightMode 
-                ? 'bg-white border-slate-200/80 text-slate-800 hover:shadow-[0_0_25px_rgba(245,158,11,0.08)] hover:border-amber-500/30' 
+            className={`absolute group rounded-xl shadow-2xl border p-3 transition-shadow duration-200 select-none flex flex-col ${isLightMode
+                ? 'bg-white border-slate-200/80 text-slate-800 hover:shadow-[0_0_25px_rgba(245,158,11,0.08)] hover:border-amber-500/30'
                 : 'bg-[#121217]/95 border-white/[0.08] text-white hover:shadow-[0_0_25px_rgba(245,158,11,0.15)] hover:border-amber-500/20'
-            }`}
+              }`}
             style={{
               left: item.x,
               top: item.y,
@@ -1006,19 +1004,18 @@ function IdeaCanvasView({ project }: { project: Project }) {
             }}
           >
             {/* Top Handle / Drag Bar */}
-            <div 
+            <div
               onMouseDown={(e) => handleMouseDown(item.id, e)}
               className="flex items-center justify-between cursor-grab active:cursor-grabbing pb-2 mb-2 border-b border-white/[0.04] select-none"
             >
-              <div className={`flex items-center gap-1 transition-colors ${
-                isLightMode ? 'text-slate-400 group-hover:text-amber-500' : 'text-white/40 group-hover:text-amber-400/80'
-              }`}>
+              <div className={`flex items-center gap-1 transition-colors ${isLightMode ? 'text-slate-400 group-hover:text-amber-500' : 'text-white/40 group-hover:text-amber-400/80'
+                }`}>
                 <GripHorizontal className="w-3.5 h-3.5" />
                 <span className="text-[9px] font-mono uppercase tracking-widest font-semibold select-none">
                   {item.type === 'text' ? 'Note' : 'Voice'}
                 </span>
               </div>
-              
+
               <button
                 onClick={(e) => { e.stopPropagation(); deleteItem(item.id); }}
                 className="opacity-0 group-hover:opacity-100 flex items-center justify-center w-4.5 h-4.5 bg-red-950/40 hover:bg-red-900 border border-red-500/20 hover:border-red-500/50 rounded text-red-400 transition-all cursor-pointer shadow-md"
@@ -1033,9 +1030,8 @@ function IdeaCanvasView({ project }: { project: Project }) {
                 <textarea
                   value={item.text}
                   onChange={(e) => handleTextChange(item.id, e.target.value)}
-                  className={`w-full flex-1 bg-transparent border-none outline-none text-xs resize-none focus:ring-0 custom-scrollbar font-medium ${
-                    isLightMode ? 'text-slate-800 placeholder:text-slate-300' : 'text-white placeholder:text-white/20'
-                  }`}
+                  className={`w-full flex-1 bg-transparent border-none outline-none text-xs resize-none focus:ring-0 custom-scrollbar font-medium ${isLightMode ? 'text-slate-800 placeholder:text-slate-300' : 'text-white placeholder:text-white/20'
+                    }`}
                   placeholder="Type notes..."
                 />
               </div>
@@ -1051,9 +1047,8 @@ function IdeaCanvasView({ project }: { project: Project }) {
                       value={item.name || ""}
                       onChange={(e) => handleNameChange(item.id, e.target.value)}
                       placeholder="Voice note name..."
-                      className={`w-full bg-transparent border-b border-transparent hover:border-white/10 focus:border-amber-500/50 outline-none text-[11px] font-bold focus:ring-0 p-0 ${
-                        isLightMode ? 'text-slate-800 placeholder:text-slate-300' : 'text-white/95 placeholder:text-white/40'
-                      }`}
+                      className={`w-full bg-transparent border-b border-transparent hover:border-white/10 focus:border-amber-500/50 outline-none text-[11px] font-bold focus:ring-0 p-0 ${isLightMode ? 'text-slate-800 placeholder:text-slate-300' : 'text-white/95 placeholder:text-white/40'
+                        }`}
                     />
                     <div className={`text-[9px] font-mono mt-0.5 ${isLightMode ? 'text-slate-400' : 'text-white/40'}`}>Press to replay</div>
                   </div>
@@ -1091,11 +1086,11 @@ function IdeaCanvasView({ project }: { project: Project }) {
           className="flex items-center justify-center p-2 rounded-xl bg-white/5 hover:bg-white/10 hover:text-white text-white/70 transition-all cursor-pointer border border-white/5"
           title="Upload Asset (Image, Audio, or Text)"
         >
-          <input 
-            type="file" 
-            accept="image/*,audio/*,text/plain,text/markdown,.md,.txt" 
-            onChange={handleFileUpload} 
-            className="hidden" 
+          <input
+            type="file"
+            accept="image/*,audio/*,text/plain,text/markdown,.md,.txt"
+            onChange={handleFileUpload}
+            className="hidden"
           />
           <PlusCircle className="w-4 h-4" />
         </label>
@@ -1143,7 +1138,7 @@ function VoicePlayButton({ base64Audio, isLightMode }: { base64Audio: string; is
       audioRef.current = new Audio(base64Audio);
       audioRef.current.onended = () => setPlaying(false);
     }
-    
+
     if (playing) {
       audioRef.current.pause();
       setPlaying(false);
@@ -1156,13 +1151,12 @@ function VoicePlayButton({ base64Audio, isLightMode }: { base64Audio: string; is
   return (
     <button
       onClick={togglePlay}
-      className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 border transition-all cursor-pointer ${
-        playing 
-          ? "bg-amber-500 border-amber-400 text-white" 
-          : isLightMode 
+      className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 border transition-all cursor-pointer ${playing
+          ? "bg-amber-500 border-amber-400 text-white"
+          : isLightMode
             ? "bg-amber-500/10 border-amber-500/20 text-amber-600 hover:bg-amber-500/20"
             : "bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20"
-      }`}
+        }`}
     >
       {playing ? (
         <Pause className="w-3.5 h-3.5" />
@@ -1398,11 +1392,10 @@ function IdeasTab({ project }: { project: Project }) {
                 }
                 setDragOverCol(null);
               }}
-              className={`flex flex-col border transition-all duration-200 rounded-xl overflow-hidden ${
-                isOver 
-                  ? 'border-purple-500/50 bg-purple-500/[0.02] shadow-[0_0_15px_rgba(124,92,255,0.05)]' 
+              className={`flex flex-col border transition-all duration-200 rounded-xl overflow-hidden ${isOver
+                  ? 'border-purple-500/50 bg-purple-500/[0.02] shadow-[0_0_15px_rgba(124,92,255,0.05)]'
                   : `${col.borderColor} bg-white/[0.01]`
-              }`}
+                }`}
             >
               {/* Column header */}
               <div className="px-3 pt-3 pb-2 flex-shrink-0">
@@ -1683,8 +1676,8 @@ function MediaVaultTab({ project }: { project: Project }) {
             key={t}
             onClick={() => setFilter(t)}
             className={`text-[10px] px-2.5 py-1 rounded-full transition-all cursor-pointer font-medium ${filter === t
-                ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
-                : 'text-white/30 hover:text-white/50 border border-transparent hover:border-white/10'
+              ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+              : 'text-white/30 hover:text-white/50 border border-transparent hover:border-white/10'
               }`}
           >
             {t === 'all' ? 'All' : t === 'link_preview' ? 'Link Preview' : t.charAt(0).toUpperCase() + t.slice(1)}
@@ -2153,7 +2146,7 @@ function ControlRoomTab({ project }: { project: Project }) {
     <div className="p-5 grid grid-cols-1 lg:grid-cols-12 gap-5 max-w-7xl mx-auto h-full min-h-0 select-none animate-in fade-in duration-300">
       {/* Left Column (col-span-3) - Config & Integrations */}
       <div className="lg:col-span-3 flex flex-col space-y-4 h-full overflow-y-auto custom-scrollbar pr-0.5 min-h-0">
-        
+
         {/* Workspace Connection Hub (when empty) */}
         {!project.folderPath && !project.vercelProjectId && (
           <div className="bg-white/[0.02] border border-white/[0.05] p-5 rounded-2xl space-y-3.5 shadow-sm">
@@ -2282,11 +2275,10 @@ function ControlRoomTab({ project }: { project: Project }) {
                       return (
                         <div key={dep.uid} className="flex items-center justify-between p-1.5 rounded-lg bg-white/[0.01] border border-white/[0.03] text-[10px] text-white/60 hover:bg-white/[0.02] transition-colors">
                           <span className="truncate flex-1 pr-2 font-mono text-white/80">{dep.meta?.githubCommitMessage || dep.name || "Deploy"}</span>
-                          <span className={`text-[7px] font-mono font-bold uppercase tracking-wider px-1.5 py-0.2 rounded ${
-                            isReady ? "bg-green-500/10 text-green-400 border border-green-500/20" :
-                            isError ? "bg-red-500/10 text-red-400 border border-red-500/20" :
-                            "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                          }`}>
+                          <span className={`text-[7px] font-mono font-bold uppercase tracking-wider px-1.5 py-0.2 rounded ${isReady ? "bg-green-500/10 text-green-400 border border-green-500/20" :
+                              isError ? "bg-red-500/10 text-red-400 border border-red-500/20" :
+                                "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                            }`}>
                             {dep.state.toLowerCase()}
                           </span>
                         </div>
@@ -2402,7 +2394,7 @@ function ControlRoomTab({ project }: { project: Project }) {
                   </select>
                 </div>
               </div>
-              
+
               <div className="space-y-1">
                 <span className="text-[8px] text-white/30 font-bold uppercase tracking-wider font-mono">URL</span>
                 <div className="flex gap-1.5">
@@ -2436,7 +2428,7 @@ function ControlRoomTab({ project }: { project: Project }) {
                 <div key={link.id} className="p-2 rounded-lg bg-white/[0.01] border border-white/[0.04] flex items-center justify-between gap-2 group hover:border-white/10 hover:bg-white/[0.02] transition-all">
                   <div className="flex items-center gap-2 min-w-0 flex-1">
                     <span className={`h-1.5 w-1.5 rounded-full ${!link.lastPinged || link.lastStatus === null ? 'bg-white/30' :
-                        (link.lastStatus >= 200 && link.lastStatus < 300) ? 'bg-green-400' : 'bg-red-400'
+                      (link.lastStatus >= 200 && link.lastStatus < 300) ? 'bg-green-400' : 'bg-red-400'
                       } shrink-0`}></span>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1">
@@ -2447,7 +2439,7 @@ function ControlRoomTab({ project }: { project: Project }) {
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                     <a
                       href={link.url}
@@ -2705,12 +2697,7 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
     setReposLoading(true);
     try {
       const username = localStorage.getItem("GITHUB_USERNAME") || "coderkavyag";
-      const token = localStorage.getItem("GITHUB_TOKEN") || "";
-      const headers: HeadersInit = {};
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
-      const res = await fetch(`/api/github?username=${username}`, { headers });
+      const res = await fetch(`/api/github?username=${username}`);
       if (!res.ok) throw new Error("Failed to load GitHub repositories");
       const data = await res.json();
       setGithubRepos(data.repos || data || []);
@@ -2803,7 +2790,7 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ path: data.folderPath })
-      }).catch(() => {});
+      }).catch(() => { });
     } catch (e: any) {
       alert(`Folder picker failed: ${e.message}`);
     } finally {
@@ -2821,12 +2808,12 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ path: targetPath })
       });
-      
+
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.error || "Scan failed");
       }
-      
+
       // Auto-detect fields from scan
       if (data.name) setName(data.name);
       if (data.description) setDescription(data.description);
@@ -2840,7 +2827,7 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ path: data.folderPath || targetPath })
-      }).catch(() => {});
+      }).catch(() => { });
     } catch (e: any) {
       const msg = e.message || "Unknown error";
       if (msg.includes("offline") || msg.includes("503") || msg.includes("Agent")) {
@@ -2973,7 +2960,7 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
 
         <div className="flex-1 overflow-y-auto p-5 scrollbar-thin">
           <form onSubmit={handleSave} className="space-y-4">
-            
+
             {/* MANUAL DETAILS TAB */}
             {(projectToEdit || activeFormTab === "manual") && (
               <div className="space-y-4">
@@ -3097,7 +3084,7 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
                     <div className="grid grid-cols-1 gap-1.5 max-h-[30vh] overflow-y-auto pr-1">
                       {filteredRepos.map(repo => {
                         const isSelected = selectedRepo?.id === repo.id;
-                        const isAlreadyAdded = projects.some(p => 
+                        const isAlreadyAdded = projects.some(p =>
                           (p.githubUrl && (p.githubUrl.toLowerCase() === repo.html_url.toLowerCase() || p.githubUrl.toLowerCase() === `${repo.html_url}.git`.toLowerCase())) ||
                           p.name.toLowerCase() === repo.name.toLowerCase()
                         );
@@ -3114,13 +3101,12 @@ function ProjectFormModal({ isOpen, onClose, projectToEdit, defaultPhase, onSave
                               setGithubUrl(repo.html_url);
                               setType("code");
                             }}
-                            className={`w-full text-left p-3 rounded-lg border transition-all flex flex-col gap-1 ${
-                              isAlreadyAdded
+                            className={`w-full text-left p-3 rounded-lg border transition-all flex flex-col gap-1 ${isAlreadyAdded
                                 ? "bg-white/[0.01] border-white/[0.03] text-white/20 cursor-not-allowed opacity-50"
                                 : isSelected
-                                ? "bg-purple-500/10 border-purple-500/40 text-purple-300 font-medium cursor-pointer"
-                                : "bg-white/[0.01] border-white/[0.05] hover:bg-white/[0.03] text-white/70 cursor-pointer"
-                            }`}
+                                  ? "bg-purple-500/10 border-purple-500/40 text-purple-300 font-medium cursor-pointer"
+                                  : "bg-white/[0.01] border-white/[0.05] hover:bg-white/[0.03] text-white/70 cursor-pointer"
+                              }`}
                           >
                             <div className="flex items-center justify-between">
                               <span className="text-xs font-semibold">{repo.name}</span>
@@ -3383,6 +3369,53 @@ export function ProjectOS() {
     ? ((selectedProject.phase === "idea" && selectedProject.type !== "idea") ? "in_development" : selectedProject.phase)
     : null;
 
+  const syncCuratedList = async (phase: string, newList: string[]) => {
+    localStorage.setItem(`devos_curated_${phase}`, JSON.stringify(newList));
+    if (phase === "launched") setCuratedLaunched(newList);
+    else if (phase === "in_development") setCuratedInDev(newList);
+    else if (phase === "sketching") setCuratedSketching(newList);
+    else if (phase === "idea") setCuratedIdea(newList);
+
+    const getStoredList = (ph: string) => {
+      if (ph === phase) return newList;
+      const stored = localStorage.getItem(`devos_curated_${ph}`);
+      if (stored) {
+        try { return JSON.parse(stored) as string[]; } catch { }
+      }
+      return ph === "launched" ? curatedLaunched :
+        ph === "in_development" ? curatedInDev :
+          ph === "sketching" ? curatedSketching : curatedIdea;
+    };
+
+    const launched = getStoredList("launched");
+    const inDev = getStoredList("in_development");
+    const sketching = getStoredList("sketching");
+    const idea = getStoredList("idea");
+
+    const orderedIds = [...launched, ...inDev, ...sketching, ...idea];
+
+    try {
+      const res = await fetch("/api/projects/reorder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderedIds })
+      });
+      if (res.ok) {
+        localStorage.removeItem(`devos_curated_launched`);
+        localStorage.removeItem(`devos_curated_in_development`);
+        localStorage.removeItem(`devos_curated_sketching`);
+        localStorage.removeItem(`devos_curated_idea`);
+        setCuratedLaunched([]);
+        setCuratedInDev([]);
+        setCuratedSketching([]);
+        setCuratedIdea([]);
+        await useProjectStore.getState().fetchProjects();
+      }
+    } catch (err) {
+      console.error("Failed to sync project order:", err);
+    }
+  };
+
   const handleHideProject = (projectId: string, phase: string) => {
     const key = `devos_curated_${phase}`;
     const stored = localStorage.getItem(key);
@@ -3390,8 +3423,7 @@ export function ProjectOS() {
       try {
         let list = JSON.parse(stored) as string[];
         list = list.filter(id => id !== projectId);
-        localStorage.setItem(key, JSON.stringify(list));
-        loadCurationLists();
+        syncCuratedList(phase, list);
       } catch { }
     }
   };
@@ -3399,7 +3431,7 @@ export function ProjectOS() {
   const handleDeleteConfirm = async (id: string) => {
     try {
       await deleteProject(id);
-      
+
       // Clean up curated lists from localStorage
       ["launched", "in_development", "sketching", "idea"].forEach(phaseId => {
         const key = `devos_curated_${phaseId}`;
@@ -3411,11 +3443,11 @@ export function ProjectOS() {
               list = list.filter(item => item !== id);
               localStorage.setItem(key, JSON.stringify(list));
             }
-          } catch {}
+          } catch { }
         }
       });
       loadCurationLists();
-      
+
       if (selectedProjectId === id) {
         selectProject(null);
       }
@@ -3443,27 +3475,27 @@ export function ProjectOS() {
       // Remove from old curation list
       const oldKey = `devos_curated_${oldPhase}`;
       const oldStored = localStorage.getItem(oldKey);
+      let oldList: string[] = [];
       if (oldStored) {
         try {
-          let list = JSON.parse(oldStored) as string[];
-          list = list.filter(id => id !== project.id);
-          localStorage.setItem(oldKey, JSON.stringify(list));
+          oldList = JSON.parse(oldStored) as string[];
+          oldList = oldList.filter(id => id !== project.id);
         } catch { }
       }
 
       // Add to new curation list
       const newKey = `devos_curated_${newPhase}`;
       const newStored = localStorage.getItem(newKey);
-      let list: string[] = [];
+      let newList: string[] = [];
       if (newStored) {
-        try { list = JSON.parse(newStored); } catch { }
+        try { newList = JSON.parse(newStored); } catch { }
       }
-      if (!list.includes(project.id)) {
-        list.push(project.id);
-        localStorage.setItem(newKey, JSON.stringify(list));
+      if (!newList.includes(project.id)) {
+        newList.push(project.id);
       }
 
-      loadCurationLists();
+      localStorage.setItem(oldKey, JSON.stringify(oldList));
+      await syncCuratedList(newPhase, newList);
     } catch (err) {
       console.error(err);
     }
@@ -3532,7 +3564,7 @@ export function ProjectOS() {
   useEffect(() => {
     if (typeof window === "undefined" || !isOpen) return;
     let modified = false;
-    
+
     // Get all currently curated IDs
     const currentCuratedIds = new Set([
       ...curatedLaunched,
@@ -3548,7 +3580,7 @@ export function ProjectOS() {
         const stored = localStorage.getItem(key);
         let list: string[] = [];
         if (stored) {
-          try { list = JSON.parse(stored); } catch {}
+          try { list = JSON.parse(stored); } catch { }
         }
         if (!list.includes(p.id)) {
           list.push(p.id);
@@ -3700,27 +3732,27 @@ export function ProjectOS() {
       // Remove from old curation list
       const oldKey = `devos_curated_${oldPhase}`;
       const oldStored = localStorage.getItem(oldKey);
+      let oldList: string[] = [];
       if (oldStored) {
         try {
-          let list = JSON.parse(oldStored) as string[];
-          list = list.filter(id => id !== project.id);
-          localStorage.setItem(oldKey, JSON.stringify(list));
+          oldList = JSON.parse(oldStored) as string[];
+          oldList = oldList.filter(id => id !== project.id);
         } catch { }
       }
 
       // Add to new curation list
       const newKey = `devos_curated_${newPhase}`;
       const newStored = localStorage.getItem(newKey);
-      let list: string[] = [];
+      let newList: string[] = [];
       if (newStored) {
-        try { list = JSON.parse(newStored); } catch { }
+        try { newList = JSON.parse(newStored); } catch { }
       }
-      if (!list.includes(project.id)) {
-        list.push(project.id);
-        localStorage.setItem(newKey, JSON.stringify(list));
+      if (!newList.includes(project.id)) {
+        newList.push(project.id);
       }
 
-      loadCurationLists();
+      localStorage.setItem(oldKey, JSON.stringify(oldList));
+      await syncCuratedList(newPhase, newList);
     } catch (err) {
       console.error(err);
     }
@@ -4058,8 +4090,8 @@ export function ProjectOS() {
                     }
                   }}
                   className={`h-9 px-4 rounded-xl border flex items-center gap-2 text-xs transition-all select-none
-                    ${isDraggingOverTrash || isHtmlDragOver 
-                      ? 'bg-red-500/15 border-red-500/40 text-red-200 scale-105 shadow-[0_0_15px_rgba(239,68,68,0.15)] animate-pulse' 
+                    ${isDraggingOverTrash || isHtmlDragOver
+                      ? 'bg-red-500/15 border-red-500/40 text-red-200 scale-105 shadow-[0_0_15px_rgba(239,68,68,0.15)] animate-pulse'
                       : 'border-red-500/10 bg-red-950/[0.02] text-red-400/60 hover:bg-red-950/5 hover:border-red-500/20'
                     }`}
                 >
@@ -4150,7 +4182,7 @@ export function ProjectOS() {
                                 }
                               }}
                             />
-                            
+
                             {/* Idea Projects Scrollable List */}
                             <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
                               {filteredList.map(p => (
@@ -4177,7 +4209,7 @@ export function ProjectOS() {
                                       </p>
                                     )}
                                   </div>
-                                  
+
                                   {/* Delete Button */}
                                   <button
                                     onClick={(e) => {
@@ -4299,8 +4331,7 @@ export function ProjectOS() {
                                 updatedList = updatedList.filter(id => id !== p.id);
                               }
 
-                              localStorage.setItem(`devos_curated_${activePhase}`, JSON.stringify(updatedList));
-                              loadCurationLists();
+                              await syncCuratedList(activePhase, updatedList);
                             }}
                             className="w-4 h-4 rounded border-white/20 bg-black/40 text-purple-500 focus:ring-purple-500 focus:ring-offset-0 cursor-pointer"
                           />
@@ -4377,11 +4408,11 @@ export function ProjectOS() {
                 <AlertCircle className="w-5 h-5 shrink-0" />
                 <h3 className="text-sm font-semibold text-white">Delete Confirmation</h3>
               </div>
-              
+
               <p className="text-xs text-white/60 leading-relaxed">
                 Are you sure you want to permanently delete <strong className="text-white font-semibold font-mono">"{deleteConfirmName}"</strong>? This will remove all its ideas, tasks, and connection metadata.
               </p>
-              
+
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   onClick={() => {

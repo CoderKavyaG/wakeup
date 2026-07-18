@@ -146,6 +146,89 @@ export function CockpitCommand() {
 
   const suggestions = buildSuggestions(projects, tasks);
 
+  const resetState = () => {
+    setInput("");
+    setMode("command");
+    setStreamedAnswer("");
+    setAnswerDone(false);
+    setIsStreaming(false);
+    setSearchResults([]);
+    setConfirmation(null);
+    setLastQuery("");
+    setFeedbackRating(null);
+  };
+
+  const closeOverlay = () => {
+    abortRef.current?.abort();
+    setIsOpen(false);
+    resetState();
+  };
+
+  function isQuestion(val: string) {
+    return (
+      val.endsWith("?") ||
+      /^(what|which|how|when|why|who|give|show|tell|list|summarize|help|explain)/i.test(val)
+    );
+  }
+
+  const runLocalSearch = useCallback(
+    (q: string) => {
+      const lower = q.toLowerCase();
+      const results: SearchResult[] = [];
+
+      projects.forEach((p) => {
+        if (p.name.toLowerCase().includes(lower) || p.description?.toLowerCase().includes(lower)) {
+          results.push({
+            id: `proj-${p.id}`,
+            type: "project",
+            title: p.name,
+            subtitle: `${p.status}${p.tags.length ? " · " + p.tags.slice(0, 2).join(", ") : ""}`,
+            action: () => p.githubUrl && window.open(p.githubUrl, "_blank"),
+          });
+        }
+      });
+
+      tasks.forEach((t) => {
+        if (t.title.toLowerCase().includes(lower)) {
+          results.push({
+            id: `task-${t.id}`,
+            type: "task",
+            title: t.title,
+            subtitle: t.completed ? "Completed" : `Priority: ${t.priority}`,
+          });
+        }
+      });
+
+      notes.forEach((n) => {
+        if (n.content.toLowerCase().includes(lower)) {
+          results.push({
+            id: `note-${n.id}`,
+            type: "note",
+            title: n.content.substring(0, 60) + (n.content.length > 60 ? "…" : ""),
+            subtitle: "Click to copy",
+            action: () => navigator.clipboard.writeText(n.content),
+          });
+        }
+      });
+
+      urls.forEach((u) => {
+        if (u.label.toLowerCase().includes(lower) || u.url.toLowerCase().includes(lower)) {
+          results.push({
+            id: `url-${u.id}`,
+            type: "url",
+            title: u.label,
+            subtitle: u.url,
+            action: () => window.open(u.url, "_blank"),
+          });
+        }
+      });
+
+      setSearchResults(results.slice(0, 10));
+      setSelectedIndex(0);
+    },
+    [projects, tasks, notes, urls]
+  );
+
   // ── Open/close keyboard shortcut ──────────────
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -204,71 +287,6 @@ export function CockpitCommand() {
     }
   }, [input]);
 
-  function isQuestion(val: string) {
-    return (
-      val.endsWith("?") ||
-      /^(what|which|how|when|why|who|give|show|tell|list|summarize|help|explain)/i.test(val)
-    );
-  }
-
-  // ── Local search across all stores ───────────
-  const runLocalSearch = useCallback(
-    (q: string) => {
-      const lower = q.toLowerCase();
-      const results: SearchResult[] = [];
-
-      projects.forEach((p) => {
-        if (p.name.toLowerCase().includes(lower) || p.description?.toLowerCase().includes(lower)) {
-          results.push({
-            id: `proj-${p.id}`,
-            type: "project",
-            title: p.name,
-            subtitle: `${p.status}${p.tags.length ? " · " + p.tags.slice(0, 2).join(", ") : ""}`,
-            action: () => p.githubUrl && window.open(p.githubUrl, "_blank"),
-          });
-        }
-      });
-
-      tasks.forEach((t) => {
-        if (t.title.toLowerCase().includes(lower)) {
-          results.push({
-            id: `task-${t.id}`,
-            type: "task",
-            title: t.title,
-            subtitle: t.completed ? "Completed" : `Priority: ${t.priority}`,
-          });
-        }
-      });
-
-      notes.forEach((n) => {
-        if (n.content.toLowerCase().includes(lower)) {
-          results.push({
-            id: `note-${n.id}`,
-            type: "note",
-            title: n.content.substring(0, 60) + (n.content.length > 60 ? "…" : ""),
-            subtitle: "Click to copy",
-            action: () => navigator.clipboard.writeText(n.content),
-          });
-        }
-      });
-
-      urls.forEach((u) => {
-        if (u.label.toLowerCase().includes(lower) || u.url.toLowerCase().includes(lower)) {
-          results.push({
-            id: `url-${u.id}`,
-            type: "url",
-            title: u.label,
-            subtitle: u.url,
-            action: () => window.open(u.url, "_blank"),
-          });
-        }
-      });
-
-      setSearchResults(results.slice(0, 10));
-      setSelectedIndex(0);
-    },
-    [projects, tasks, notes, urls]
-  );
 
   // ── AI streaming call ─────────────────────────
   const askCockpit = async (query: string, screenshot?: string) => {
@@ -356,8 +374,8 @@ export function CockpitCommand() {
     if (lower.startsWith("task:")) {
       const title = val.slice(5).trim();
       if (title) {
-        addTask({ 
-          title, 
+        addTask({
+          title,
           priority: "medium"
         });
         setConfirmation(`✓ Task created: "${title}"`);
@@ -558,23 +576,6 @@ export function CockpitCommand() {
     }
   };
 
-  const resetState = () => {
-    setInput("");
-    setMode("command");
-    setStreamedAnswer("");
-    setAnswerDone(false);
-    setIsStreaming(false);
-    setSearchResults([]);
-    setConfirmation(null);
-    setLastQuery("");
-    setFeedbackRating(null);
-  };
-
-  const closeOverlay = () => {
-    abortRef.current?.abort();
-    setIsOpen(false);
-    resetState();
-  };
 
   // ── Icon helpers ──────────────────────────────
   const typeIcon = (type: SearchResult["type"]) => {
@@ -700,22 +701,20 @@ export function CockpitCommand() {
                         <button
                           onClick={() => handleFeedback("up")}
                           disabled={feedbackRating !== null}
-                          className={`p-1 rounded transition-colors cursor-pointer ${
-                            feedbackRating === "up"
+                          className={`p-1 rounded transition-colors cursor-pointer ${feedbackRating === "up"
                               ? "bg-green-500/20 text-green-400"
                               : "hover:bg-green-500/10 text-muted-foreground hover:text-green-400"
-                          } disabled:opacity-50`}
+                            } disabled:opacity-50`}
                         >
                           <ThumbsUp className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => handleFeedback("down")}
                           disabled={feedbackRating !== null}
-                          className={`p-1 rounded transition-colors cursor-pointer ${
-                            feedbackRating === "down"
+                          className={`p-1 rounded transition-colors cursor-pointer ${feedbackRating === "down"
                               ? "bg-red-500/20 text-red-400"
                               : "hover:bg-red-500/10 text-muted-foreground hover:text-red-400"
-                          } disabled:opacity-50`}
+                            } disabled:opacity-50`}
                         >
                           <ThumbsDown className="w-3.5 h-3.5" />
                         </button>
@@ -752,11 +751,10 @@ export function CockpitCommand() {
                             addWidget(w.type as any);
                             closeOverlay();
                           }}
-                          className={`flex items-start gap-3 p-3 rounded-xl border text-left transition-all ${
-                            selectedIndex === i
+                          className={`flex items-start gap-3 p-3 rounded-xl border text-left transition-all ${selectedIndex === i
                               ? "bg-primary/10 border-primary/30 ring-1 ring-primary/50"
                               : "bg-[#0f0f11]/50 border-white/5 hover:bg-white/5 hover:border-white/10"
-                          }`}
+                            }`}
                         >
                           <div className="mt-0.5 shrink-0">{w.icon}</div>
                           <div className="flex-1 min-w-0">
@@ -837,11 +835,10 @@ export function CockpitCommand() {
                           closeOverlay();
                         }}
                         onMouseEnter={() => setSelectedIndex(i)}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
-                          selectedIndex === i
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${selectedIndex === i
                             ? "bg-primary/10 border border-primary/20"
                             : "border border-transparent hover:bg-white/5"
-                        }`}
+                          }`}
                       >
                         <span className="shrink-0">{typeIcon(r.type)}</span>
                         <div className="flex-1 min-w-0">

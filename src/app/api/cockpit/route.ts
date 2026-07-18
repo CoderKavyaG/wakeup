@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { decrypt } from "@/lib/encryption";
 import { agentFetch } from "@/lib/agentFetch";
+import { checkRateLimit } from "@/lib/ratelimit";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +41,12 @@ export async function POST(request: Request) {
       return Response.json({ error: "unauthorized" }, { status: 401 });
     }
     const userId = session.user.id;
+
+    const { allowed } = checkRateLimit(`cockpit:${userId}`, 20, 60_000);
+    if (!allowed) {
+      return Response.json({ error: "Too many requests" }, { status: 429 });
+    }
+
     const userName = session.user.name || "Kavya";
 
     const user = await prisma.user.findUnique({

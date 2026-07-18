@@ -20,6 +20,7 @@ model Project {
   liveUrl              String?
   folderPath           String?
   feedback             Json     @default("[]")
+  sortOrder            Int      @default(0)
   
   // Project Intelligence & Developer Memory Fields
   summary              String?  @db.Text
@@ -195,6 +196,7 @@ model User {
   avatar        String?
   vercelToken   String?   // Vercel API Integration Token
   githubToken   String?   // Encrypted GitHub Personal Access Token
+  githubUsername String?  // GitHub username associated with the account
   groqApiKey    String?   // Encrypted Groq API Key
   openrouterApiKey String? // Encrypted OpenRouter API Key
   createdAt     DateTime  @default(now())

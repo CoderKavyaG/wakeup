@@ -4,6 +4,7 @@ import cp from 'child_process';
 import os from 'os';
 import fs from 'fs';
 import path from 'path';
+import { agentFetch } from "@/lib/agentFetch";
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -25,7 +26,7 @@ export async function POST(req: Request) {
     } catch (e) {}
 
     // Attempt to kill existing agent gracefully if endpoint exists
-    await fetch(`http://127.0.0.1:${activePort}/kill`, { method: "POST" }).catch(() => {});
+    await agentFetch("/restart", { method: "POST" }).catch(() => {});
     
     // 1. Kill any process listening on the active port (the agent)
     const isWin = os.platform() === 'win32';

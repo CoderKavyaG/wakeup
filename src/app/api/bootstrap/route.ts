@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { decrypt } from "@/lib/encryption";
+import { safeQuery } from "@/lib/db-safe";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
@@ -12,50 +13,76 @@ export async function GET() {
     const userId = session.user.id;
     const layoutId = `global-layout-${userId}`;
 
+    // One-time migration for existing users
+    const migrateToken = request.headers.get("x-github-token-migrate");
+    if (migrateToken) {
+      const userCheck = await safeQuery(
+        () => prisma.user.findUnique({
+          where: { id: userId },
+          select: { githubToken: true }
+        })
+      );
+      if (userCheck && !userCheck.githubToken) {
+        const migrateUsername = request.headers.get("x-github-username-migrate") || "coderkavyag";
+        const { encrypt } = await import("@/lib/encryption");
+        await safeQuery(
+          () => prisma.user.update({
+            where: { id: userId },
+            data: {
+              githubToken: encrypt(migrateToken),
+              githubUsername: migrateUsername
+            }
+          })
+        );
+      }
+    }
+
     const now = new Date();
     const staleCutoff = new Date(Date.now() - 14 * 86400000);
 
-    const [projects, tasks, notes, urls, layoutState, telegramLink, ideas] = await Promise.all([
-      prisma.project.findMany({
-        where: { userId },
-        include: {
-          links: true,
-          commits: { orderBy: { date: "desc" }, take: 3 },
-        },
-        orderBy: { updatedAt: "desc" },
-      }),
-      prisma.task.findMany({
-        where: { userId },
-        orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
-      }),
-      prisma.note.findMany({
-        where: {
-          userId,
-          NOT: {
-            source: {
-              in: ["cockpit_helpful", "cockpit_unhelpful"]
+    const [projects, tasks, notes, urls, layoutState, telegramLink, ideas] = await safeQuery(
+      () => Promise.all([
+        prisma.project.findMany({
+          where: { userId },
+          include: {
+            links: true,
+            commits: { orderBy: { date: "desc" }, take: 3 },
+          },
+          orderBy: { sortOrder: "asc" },
+        }),
+        prisma.task.findMany({
+          where: { userId },
+          orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
+        }),
+        prisma.note.findMany({
+          where: {
+            userId,
+            NOT: {
+              source: {
+                in: ["cockpit_helpful", "cockpit_unhelpful"]
+              }
             }
-          }
-        },
-        orderBy: { createdAt: "desc" },
-        take: 50,
-      }),
-      prisma.url.findMany({
-        where: { userId },
-        orderBy: { createdAt: "asc" },
-      }),
-      prisma.layoutState.findUnique({
-        where: { id: layoutId },
-      }),
-      prisma.telegramLink.findUnique({
-        where: { userId }
-      }),
-      prisma.idea.findMany({
-        where: { userId },
-        include: { project: { select: { id: true, name: true } } },
-        orderBy: [{ starred: "desc" }, { createdAt: "desc" }],
-      })
-    ]);
+          },
+          orderBy: { createdAt: "desc" },
+          take: 50,
+        }),
+        prisma.url.findMany({
+          where: { userId },
+          orderBy: { createdAt: "asc" },
+        }),
+        prisma.layoutState.findUnique({
+          where: { id: layoutId },
+        }),
+        prisma.telegramLink.findUnique({
+          where: { userId }
+        }),
+        prisma.idea.findMany({
+          where: { userId },
+          include: { project: { select: { id: true, name: true } } },
+          orderBy: [{ starred: "desc" }, { createdAt: "desc" }],
+        })
+      ])
+    );
 
     let finalLayoutState = layoutState;
     if (layoutState) {

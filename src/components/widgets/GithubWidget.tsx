@@ -56,14 +56,26 @@ export function GithubWidget() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [hasServerToken, setHasServerToken] = useState(false);
+
   useEffect(() => {
-    const savedToken = localStorage.getItem("GITHUB_TOKEN");
-    if (savedToken) setToken(savedToken);
-    const savedUsername = localStorage.getItem("GITHUB_USERNAME");
-    if (savedUsername) {
-      setUsername(savedUsername);
-      setInputUsername(savedUsername);
-    }
+    const loadUserStatus = async () => {
+      try {
+        const res = await fetch("/api/user/me");
+        if (res.ok) {
+          const data = await res.json();
+          setHasServerToken(data.hasGithubToken);
+          if (data.githubUsername) {
+            setUsername(data.githubUsername);
+            setInputUsername(data.githubUsername);
+            localStorage.setItem("GITHUB_USERNAME", data.githubUsername);
+          }
+        }
+      } catch (err) {
+        console.error("Error loading user profile status:", err);
+      }
+    };
+    loadUserStatus();
   }, []);
 
   const getRelativeTime = (dateStr: string) => {
@@ -78,18 +90,12 @@ export function GithubWidget() {
     return `${days}d ago`;
   };
 
-  const fetchGithubData = async (user: string, overrideToken?: string) => {
+  const fetchGithubData = async (user: string) => {
     if (!user) return;
     setLoading(true);
     setError(null);
     try {
-      const activeToken = overrideToken !== undefined ? overrideToken : token;
-      const headers: HeadersInit = {};
-      if (activeToken) {
-        headers["Authorization"] = `Bearer ${activeToken}`;
-      }
-
-      const res = await fetch(`/api/github?username=${user}`, { headers });
+      const res = await fetch(`/api/github?username=${user}`);
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData.error || "Failed to load GitHub data from DevOS backend");
@@ -122,15 +128,51 @@ export function GithubWidget() {
     }
   };
 
-  const handleSaveSettings = () => {
-    if (token) {
-      localStorage.setItem("GITHUB_TOKEN", token);
-    } else {
-      localStorage.removeItem("GITHUB_TOKEN");
+  const handleSaveSettings = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      if (token) {
+        const res = await fetch("/api/auth/github-token", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token, username }),
+        });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || "Failed to save token to database");
+        }
+        setHasServerToken(true);
+        setToken(""); // Clear plaintext local state token
+      }
+      localStorage.setItem("GITHUB_USERNAME", username);
+      setShowSettings(false);
+      fetchGithubData(username);
+    } catch (err: any) {
+      setError(err.message || "Failed to save token");
+    } finally {
+      setLoading(false);
     }
-    localStorage.setItem("GITHUB_USERNAME", username);
-    setShowSettings(false);
-    fetchGithubData(username, token);
+  };
+
+  const handleDeleteToken = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await fetch("/api/auth/github-token", { method: "DELETE" });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "Failed to disconnect token");
+      }
+      setHasServerToken(false);
+      setToken("");
+      setShowSettings(false);
+      fetchGithubData(username);
+    } catch (err: any) {
+      setError(err.message || "Failed to disconnect token");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -173,12 +215,15 @@ export function GithubWidget() {
               type="password"
               value={token}
               onChange={(e) => setToken(e.target.value)}
-              placeholder="ghp_..."
+              placeholder={hasServerToken ? "•••••••••••••••• (Configured)" : "ghp_..."}
               className="h-7 text-xs flex-1 bg-white/[0.03] border-white/[0.08] text-white placeholder:text-white/20"
             />
             <Button size="sm" onClick={handleSaveSettings} className="h-7 text-xs bg-white text-black hover:bg-white/90">Save</Button>
+            {hasServerToken && (
+              <Button size="sm" variant="destructive" onClick={handleDeleteToken} className="h-7 text-xs bg-red-500 hover:bg-red-600 text-white">Disconnect</Button>
+            )}
           </div>
-          <p className="text-[9px] text-white/30">Stored in local browser storage. Required for accurate commits & streaks.</p>
+          <p className="text-[9px] text-white/30">Stored securely in your encrypted database. Required for commits & streaks.</p>
         </div>
       )}
 

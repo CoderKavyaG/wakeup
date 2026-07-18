@@ -20,7 +20,7 @@ export async function GET(request: Request) {
         userId,
         ...(workspace ? { workspace } : {})
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: { sortOrder: "asc" },
     });
 
     return NextResponse.json(projects);

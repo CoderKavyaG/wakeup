@@ -46,13 +46,17 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const { content, projectId, category } = body;
+    const input = (content || "").trim();
 
-    if (!content || content.trim() === "") {
+    if (!input) {
       return NextResponse.json({ error: "Content is required" }, { status: 400 });
+    }
+    if (input.length > 2000) {
+      return NextResponse.json({ error: "Input too long (max 2000 chars)" }, { status: 400 });
     }
 
     const note = await prisma.note.create({
-      data: { content, projectId, category, userId },
+      data: { content: input, projectId, category, userId },
     });
 
     return NextResponse.json(note);

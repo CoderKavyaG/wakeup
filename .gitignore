@@ -55,6 +55,7 @@ devos-agent/active-port.json
 devos-agent/workspaces.json
 devos-agent/certs/local.key
 devos-agent/certs/local.crt
+devos-agent/.agent-secret
 .agents/
 
 

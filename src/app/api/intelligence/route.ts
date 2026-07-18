@@ -4,6 +4,8 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { decrypt } from "@/lib/encryption";
+import { checkRateLimit } from "@/lib/ratelimit";
+import { safeQuery } from "@/lib/db-safe";
 
 export const dynamic = "force-dynamic";
 
@@ -15,28 +17,35 @@ export async function POST(request: Request) {
     }
     const userId = session.user.id;
 
+    const { allowed } = checkRateLimit(`intelligence:${userId}`, 5, 3_600_000);
+    if (!allowed) {
+      return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+    }
+
     // 1. DATA PULL
-    const [dbProjects, dbTasks, notes, commits] = await Promise.all([
-      prisma.project.findMany({ where: { userId }, include: { links: true }, take: 20 }),
-      prisma.task.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } }),
-      prisma.note.findMany({
-        where: {
-          userId,
-          NOT: {
-            source: {
-              in: ["cockpit_helpful", "cockpit_unhelpful"]
+    const [dbProjects, dbTasks, notes, commits] = await safeQuery(
+      () => Promise.all([
+        prisma.project.findMany({ where: { userId }, include: { links: true }, take: 20 }),
+        prisma.task.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } }),
+        prisma.note.findMany({
+          where: {
+            userId,
+            NOT: {
+              source: {
+                in: ["cockpit_helpful", "cockpit_unhelpful"]
+              }
             }
-          }
-        },
-        orderBy: { createdAt: 'desc' },
-        take: 10
-      }),
-      prisma.commit.findMany({
-        where: { project: { userId }, date: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } },
-        orderBy: { date: 'desc' },
-        take: 50
-      })
-    ]);
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 10
+        }),
+        prisma.commit.findMany({
+          where: { project: { userId }, date: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } },
+          orderBy: { date: 'desc' },
+          take: 50
+        })
+      ])
+    );
 
     // Map DB fields to projects structure
     const projects = dbProjects.map(p => ({
@@ -188,16 +197,18 @@ export async function GET() {
     }
     const userId = session.user.id;
 
-    const insights = await prisma.aIInsight.findMany({
-      where: {
-        userId,
-        read: false,
-        expiresAt: { gt: new Date() }
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    });
+    const insights = await safeQuery(
+      () => prisma.aIInsight.findMany({
+        where: {
+          userId,
+          read: false,
+          expiresAt: { gt: new Date() }
+        },
+        orderBy: {
+          createdAt: 'desc'
+        }
+      })
+    );
     return NextResponse.json(insights);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Intelligence fetch error";

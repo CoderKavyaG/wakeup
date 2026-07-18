@@ -17,28 +17,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    let token: string | null | undefined = process.env.GITHUB_TOKEN;
-
-    const authHeader = request.headers.get("Authorization");
-    const headerToken = authHeader ? authHeader.replace("Bearer ", "").replace("token ", "") : null;
-    if (headerToken) {
-      token = headerToken;
-    } else {
-      try {
-        const userRecord = await prisma.user.findUnique({
-          where: { id: userId },
-          select: { githubToken: true }
-        });
-        if (userRecord?.githubToken) {
-          token = decrypt(userRecord.githubToken);
-        }
-      } catch (e) {
-        console.error("Failed to read github token from db:", e);
-      }
-    }
-
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { githubToken: true }
+    });
+    const token = user?.githubToken ? decrypt(user.githubToken) : null;
     if (!token) {
-      return NextResponse.json({ error: "No GITHUB_TOKEN configured in environment or passed in request" }, { status: 500 });
+      return NextResponse.json({ error: "GitHub token not configured" }, { status: 401 });
     }
 
     const res = await fetch(`https://api.github.com/repos/${repo}/issues`, {

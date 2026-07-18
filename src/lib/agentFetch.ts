@@ -9,6 +9,15 @@ export interface AgentResponse {
   text: () => Promise<string>;
 }
 
+function getAgentSecret(): string | null {
+  try {
+    const secretPath = path.join(process.cwd(), "devos-agent", ".agent-secret");
+    return fs.readFileSync(secretPath, "utf-8").trim();
+  } catch {
+    return null;
+  }
+}
+
 export function agentFetch(
   actionPath: string,
   options: {
@@ -37,8 +46,10 @@ export function agentFetch(
     }`;
     const url = new URL(urlStr);
 
+    const secret = getAgentSecret();
     const mergedHeaders: Record<string, string> = {
       Accept: "application/json",
+      "x-devos-agent-secret": secret || "",
       ...(options.headers || {}),
     };
 

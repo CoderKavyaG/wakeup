@@ -6,6 +6,11 @@ const path = require('path');
 const { exec: originalExec } = require('child_process');
 const os = require('os');
 const net = require('net');
+const crypto = require('crypto');
+
+const AGENT_SECRET = crypto.randomBytes(32).toString('hex');
+const SECRET_PATH = path.join(__dirname, '.agent-secret');
+fs.writeFileSync(SECRET_PATH, AGENT_SECRET, { mode: 0o600 }); // owner read-only
 
 // Wrapper to always hide the console window on Windows
 const exec = (command, options, callback) => {
@@ -21,6 +26,15 @@ const exec = (command, options, callback) => {
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Middleware: verify every incoming request
+app.use((req, res, next) => {
+  const provided = req.headers['x-devos-agent-secret'];
+  if (provided !== AGENT_SECRET) {
+    return res.status(403).json({ error: 'forbidden' });
+  }
+  next();
+});
 
 const PORT = 3131;
 

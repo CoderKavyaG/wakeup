@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
+import { decrypt } from "@/lib/encryption";
 
 function normalizeGithubUrl(url: string | null | undefined): string | null {
   if (!url) return null;
@@ -55,10 +56,18 @@ export async function POST(request: Request) {
     }
 
     // 1. Fetch Repository Details
-    const headers: HeadersInit = {};
-    if (process.env.GITHUB_TOKEN) {
-      headers["Authorization"] = `token ${process.env.GITHUB_TOKEN}`;
+    const dbUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { githubToken: true }
+    });
+    const token = dbUser?.githubToken ? decrypt(dbUser.githubToken) : null;
+    if (!token) {
+      return NextResponse.json({ error: "GitHub token not configured" }, { status: 401 });
     }
+
+    const headers: HeadersInit = {
+      "Authorization": `token ${token}`
+    };
 
     const repoRes = await fetch(`https://api.github.com/repos/${username}/${repoName}`, { headers });
     if (!repoRes.ok) {

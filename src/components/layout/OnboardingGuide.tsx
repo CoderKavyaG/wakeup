@@ -32,6 +32,13 @@ export function OnboardingGuide() {
   useEffect(() => {
     if (!loaded) return;
 
+    if (typeof window !== "undefined") {
+      if (localStorage.getItem("wakeup_onboarded") === "true") {
+        localStorage.setItem("devos_onboarded", "true");
+        localStorage.removeItem("wakeup_onboarded");
+      }
+    }
+
     const onboarded = localStorage.getItem("devos_onboarded");
     const hasNoData = projects.length === 0 && tasks.length === 0;
 

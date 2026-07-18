@@ -1,6 +1,8 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+import { checkRateLimit } from "@/lib/ratelimit";
+
 export const dynamic = "force-dynamic";
 
 function escapeHtml(text: string): string {
@@ -70,6 +72,12 @@ export async function POST(req: NextRequest) {
         chatId,
         "❌ This Telegram account isn't linked to a DevOS account. Send your linkage code (DEVOS-...) or link it in DevOS → Settings."
       );
+      return Response.json({ ok: true });
+    }
+
+    const { allowed } = checkRateLimit(`capture:${userId}`, 30, 60_000);
+    if (!allowed) {
+      await sendTelegramMessage(chatId, "⚠️ Too many requests. Please wait a minute.");
       return Response.json({ ok: true });
     }
 

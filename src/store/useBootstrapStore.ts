@@ -57,15 +57,63 @@ export const useBootstrapStore = create<BootstrapState>((set, get) => ({
     set({ loading: true, error: null });
 
     try {
+      // Curation migration for existing users
+      if (typeof window !== "undefined") {
+        const phases = ["launched", "in_development", "sketching", "idea"];
+        let hasMigrationData = false;
+        const migrationOrderedIds: string[] = [];
+
+        phases.forEach(phase => {
+          const stored = localStorage.getItem(`devos_curated_${phase}`);
+          if (stored) {
+            hasMigrationData = true;
+            try {
+              const list = JSON.parse(stored) as string[];
+              migrationOrderedIds.push(...list);
+            } catch {}
+          }
+        });
+
+        if (hasMigrationData && migrationOrderedIds.length > 0) {
+          try {
+            await fetch("/api/projects/reorder", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ orderedIds: migrationOrderedIds })
+            });
+          } catch (err) {
+            console.error("Curation migration failed:", err);
+          }
+          phases.forEach(phase => {
+            localStorage.removeItem(`devos_curated_${phase}`);
+          });
+        }
+      }
+
+      const localToken = typeof window !== "undefined" ? localStorage.getItem("GITHUB_TOKEN") : null;
+      const localUsername = typeof window !== "undefined" ? localStorage.getItem("GITHUB_USERNAME") : null;
+      
+      const headers: Record<string, string> = {};
+      if (localToken) {
+        headers["x-github-token-migrate"] = localToken;
+      }
+      if (localUsername) {
+        headers["x-github-username-migrate"] = localUsername;
+      }
+
       // Single parallel DB call — replaces fetchTasks, fetchNotes, fetchProjects, fetchUrls
       const [bootstrapRes] = await Promise.all([
-        fetch("/api/bootstrap"),
+        fetch("/api/bootstrap", { headers }),
         // Layout has complex merge logic — keep using its own fetch
         useLayoutStore.getState().fetchLayout(),
       ]);
 
       if (!bootstrapRes.ok) throw new Error("Bootstrap failed");
       const data = await bootstrapRes.json();
+
+      if (localToken) {
+        localStorage.removeItem("GITHUB_TOKEN");
+      }
 
       // Hydrate all stores at once — no waterfalls, no race conditions
       useProjectStore.getState().setProjects(data.projects ?? []);
