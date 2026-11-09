@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="glow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F59E0B" />
+      <stop offset="100%" stop-color="#EA580C" />
+    </linearGradient>
+  </defs>
+
+  <!-- Dark Cockpit rounded background tile -->
+  <rect width="64" height="64" rx="14" fill="#0A0A0F" />
+  <rect x="0.5" y="0.5" width="63" height="63" rx="13.5" fill="none" stroke="#27272A" stroke-width="1" />
+
+  <!-- Accent glow ring -->
+  <rect x="2" y="2" width="60" height="60" rx="12" fill="none" stroke="url(#glow)" stroke-width="1.5" stroke-opacity="0.4" />
+
+  <!-- Mascot / Character Mark -->
+  <g>
+    <!-- Hair cap -->
+    <path d="M18 24 c0 -8 8 -11 14 -11 s14 3 14 11 v6 H18 V24 z" fill="#EA580C" />
+    
+    <!-- Face plate -->
+    <rect x="21" y="22" width="22" height="20" rx="10" fill="#FED7AA" />
+    
+    <!-- Cyber eyes -->
+    <circle cx="28" cy="30" r="2.2" fill="#2563EB" />
+    <circle cx="36" cy="30" r="2.2" fill="#2563EB" />
+    <circle cx="29" cy="29" r="0.8" fill="#FFFFFF" />
+    <circle cx="37" cy="29" r="0.8" fill="#FFFFFF" />
+
+    <!-- Cheeks blush -->
+    <circle cx="24" cy="34" r="1.8" fill="#F43F5E" opacity="0.5" />
+    <circle cx="40" cy="34" r="1.8" fill="#F43F5E" opacity="0.5" />
+
+    <!-- Confident smile -->
+    <path d="M28 36 q4 2.5 8 0" stroke="#78350F" stroke-width="1.6" stroke-linecap="round" fill="none" />
+
+    <!-- Hair front fringe -->
+    <path d="M19 22 c3 -3 9 -4 13 -1.5 s10 1 13 3 v-3 c0 -7 -6 -9 -14 -9 S19 14 19 20 v2 z" fill="#C2410C" />
+
+    <!-- Collar / Dev jacket -->
+    <path d="M20 42 c0 0 3 5 12 5 s12 -5 12 -5 v8 H20 V42 z" fill="#0D9488" />
+    <!-- Center zipper accent -->
+    <line x1="32" y1="42" x2="32" y2="49" stroke="#F59E0B" stroke-width="1.5" stroke-linecap="round" />
+  </g>
+</svg>
