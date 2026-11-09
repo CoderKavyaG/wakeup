@@ -2167,29 +2167,29 @@ function ControlRoomTab({ project }: { project: Project }) {
 
         {/* Vercel Token Configuration (when no token) */}
         {!vercel?.hasToken && (
-          <div className="bg-[#121217]/40 border border-white/[0.06] backdrop-blur-sm p-4 rounded-2xl flex flex-col space-y-3 shadow-sm animate-in fade-in duration-200">
+          <div className="bg-[#121217]/60 border border-white/[0.08] backdrop-blur-md p-4 rounded-2xl flex flex-col space-y-3 shadow-sm animate-in fade-in duration-200">
             <div className="flex items-center gap-1.5 text-purple-400">
               <Globe className="w-3.5 h-3.5" />
               <h4 className="text-[10px] uppercase font-mono tracking-widest font-bold">Vercel Integration</h4>
             </div>
-            <p className="text-[11px] text-white/50 leading-relaxed">
+            <p className="text-[11px] text-white/50 leading-relaxed font-sans">
               Connect your Vercel account to view deployments, active links, and traffic analytics.
             </p>
             <div className="space-y-2.5 pt-1">
               <div className="space-y-1">
-                <span className="text-[8px] text-white/30 font-bold uppercase tracking-wider font-mono block">Vercel API Token</span>
+                <span className="text-[9px] text-white/30 font-mono font-bold uppercase tracking-widest block">Vercel API Token</span>
                 <input
                   type="password"
                   placeholder="Enter token (e.g. sec_...)"
                   value={tokenInput}
                   onChange={e => setTokenInput(e.target.value)}
-                  className="w-full h-8 bg-white/[0.02] border border-white/[0.08] rounded-xl text-xs text-white px-2 focus:outline-none focus:border-purple-500/40 font-mono transition-all"
+                  className="w-full h-8 bg-white/[0.02] border border-white/[0.08] rounded-xl text-xs text-white px-2.5 focus:outline-none focus:border-purple-500/40 font-mono transition-all"
                 />
               </div>
               <button
                 onClick={handleConnectVercel}
                 disabled={configuringToken || !tokenInput.trim()}
-                className="w-full py-1.5 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 hover:text-purple-300 transition-all text-xs font-semibold border border-purple-500/20 cursor-pointer text-center disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-2 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 hover:text-purple-200 transition-all text-[11px] font-mono font-bold uppercase tracking-wider border border-purple-500/20 hover:border-purple-500/30 cursor-pointer text-center disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
               >
                 {configuringToken ? "Connecting..." : "Configure Vercel Token"}
               </button>
@@ -2199,12 +2199,12 @@ function ControlRoomTab({ project }: { project: Project }) {
         
         {/* Workspace Connection Hub (when empty) */}
         {!project.folderPath && !project.vercelProjectId && (
-          <div className="bg-white/[0.02] border border-white/[0.05] p-5 rounded-2xl space-y-3.5 shadow-sm">
+          <div className="bg-white/[0.02] border border-white/[0.06] p-4 rounded-2xl space-y-3 shadow-sm">
             <div className="flex items-center gap-1.5 text-amber-400">
-              <AlertCircle className="w-4 h-4" />
+              <AlertCircle className="w-3.5 h-3.5" />
               <h4 className="text-[10px] uppercase font-mono tracking-widest font-bold">Workspace Connection</h4>
             </div>
-            <p className="text-[11px] text-white/50 leading-relaxed">
+            <p className="text-[11px] text-white/50 leading-relaxed font-sans">
               This project is currently local-only. Configure your workspace directories or deploy on Vercel to unlock stats, automated commits, and deployment tracking.
             </p>
             <div className="space-y-2 pt-1">
@@ -2212,7 +2212,7 @@ function ControlRoomTab({ project }: { project: Project }) {
                 onClick={() => {
                   alert("Click the Gear icon ⚙️ in the top header to configure local workspace path or GitHub repositories.");
                 }}
-                className="w-full py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-all text-xs font-semibold border border-white/10 cursor-pointer text-center"
+                className="w-full py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-all text-[10px] font-mono font-bold uppercase tracking-wider border border-white/10 hover:border-white/20 cursor-pointer text-center"
               >
                 Configure Settings
               </button>
