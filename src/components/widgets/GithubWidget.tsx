@@ -53,6 +53,7 @@ export function GithubWidget() {
   const [repos, setRepos] = useState<Repository[]>([]);
   const [commits, setCommits] = useState<Commit[]>([]);
   const [stats, setStats] = useState<GithubStats | null>(null);
+  const [tokenStatus, setTokenStatus] = useState<"valid" | "expired" | "not_configured">("valid");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -105,6 +106,9 @@ export function GithubWidget() {
       setRepos(data.repos || []);
       setCommits(data.commits || []);
       setStats(data.stats || null);
+      if (data.tokenStatus) {
+        setTokenStatus(data.tokenStatus);
+      }
     } catch (err: any) {
       setError(err.message || "An error occurred");
       setStats(null);
@@ -224,6 +228,23 @@ export function GithubWidget() {
             )}
           </div>
           <p className="text-[9px] text-white/30">Stored securely in your encrypted database. Required for commits & streaks.</p>
+        </div>
+      )}
+
+      {tokenStatus === "expired" && (
+        <div className="mb-3 p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-center justify-between shrink-0">
+          <div className="flex items-center space-x-2">
+            <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+            <p className="text-[10px] text-amber-300 font-medium">GitHub token expired. Showing public data.</p>
+          </div>
+          <Button 
+            size="sm" 
+            variant="ghost" 
+            onClick={() => setShowSettings(true)}
+            className="h-6 text-[10px] text-amber-300 hover:text-white hover:bg-amber-500/20 px-2 py-0"
+          >
+            Update Token
+          </Button>
         </div>
       )}
 

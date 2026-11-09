@@ -4,7 +4,7 @@ const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 12;
 const KEY_LENGTH = 32;
 
-const getEncryptionKey = (): Buffer => {
+const getEncryptionKey = (salt = "wakeup-salt"): Buffer => {
   const secret = process.env.ENCRYPTION_KEY || process.env.AUTH_SECRET;
   if (!secret) {
     if (process.env.NODE_ENV === "production") {
@@ -14,13 +14,13 @@ const getEncryptionKey = (): Buffer => {
   }
   const effectiveSecret = secret || "default_super_secret_wakeup_key_32_bytes";
   // Derives a key of 32 bytes using a fixed salt and PBKDF2
-  return crypto.pbkdf2Sync(effectiveSecret, "wakeup-salt", 100000, KEY_LENGTH, "sha256");
+  return crypto.pbkdf2Sync(effectiveSecret, salt, 100000, KEY_LENGTH, "sha256");
 };
 
 export function encrypt(text: string): string {
   if (!text) return "";
   const iv = crypto.randomBytes(IV_LENGTH);
-  const key = getEncryptionKey();
+  const key = getEncryptionKey("wakeup-salt");
   const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
   
   let encrypted = cipher.update(text, "utf8", "hex");
@@ -33,23 +33,33 @@ export function encrypt(text: string): string {
 
 export function decrypt(encryptedText: string): string {
   if (!encryptedText) return "";
+  const parts = encryptedText.split(":");
+  if (parts.length !== 3) return "";
+  
+  const iv = Buffer.from(parts[0], "hex");
+  const authTag = Buffer.from(parts[1], "hex");
+  const encrypted = parts[2];
+
+  // Try current salt ('wakeup-salt') first
   try {
-    const parts = encryptedText.split(":");
-    if (parts.length !== 3) return "";
-    
-    const iv = Buffer.from(parts[0], "hex");
-    const authTag = Buffer.from(parts[1], "hex");
-    const encrypted = parts[2];
-    
-    const key = getEncryptionKey();
+    const key = getEncryptionKey("wakeup-salt");
     const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
     decipher.setAuthTag(authTag);
-    
     let decrypted = decipher.update(encrypted, "hex", "utf8");
     decrypted += decipher.final("utf8");
     return decrypted;
-  } catch (err) {
-    console.error("Failed to decrypt token:", err);
-    return "";
+  } catch (_currentErr) {
+    // Fallback to legacy salt ('devos-salt') from before the rebrand
+    try {
+      const legacyKey = getEncryptionKey("devos-salt");
+      const decipher = crypto.createDecipheriv(ALGORITHM, legacyKey, iv);
+      decipher.setAuthTag(authTag);
+      let decrypted = decipher.update(encrypted, "hex", "utf8");
+      decrypted += decipher.final("utf8");
+      return decrypted;
+    } catch (_legacyErr) {
+      console.error("Failed to decrypt token with both wakeup-salt and devos-salt");
+      return "";
+    }
   }
 }

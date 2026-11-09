@@ -31,10 +31,8 @@ export async function GET(request: Request) {
       where: { id: userId },
       select: { githubToken: true }
     });
-    const token = user?.githubToken ? decrypt(user.githubToken) : null;
-    if (!token) {
-      return NextResponse.json({ error: "GitHub token not configured" }, { status: 401 });
-    }
+    let token = user?.githubToken ? decrypt(user.githubToken) : null;
+    let tokenStatus: "valid" | "expired" | "not_configured" = token ? "valid" : "not_configured";
     
     // 1. Check cache first
     const cacheId = `github-cache-${username}-${userId}`;
@@ -44,39 +42,64 @@ export async function GET(request: Request) {
 
     if (existingCache) {
       const cacheAge = Date.now() - new Date(existingCache.updatedAt).getTime();
-      // If we don't have a token, we HAVE to rely on cache
-      if (cacheAge < CACHE_TTL_MS || !token) {
-        return NextResponse.json(existingCache.data);
+      // If within TTL, return fresh cache
+      if (cacheAge < CACHE_TTL_MS) {
+        return NextResponse.json({
+          ...(existingCache.data as object),
+          tokenStatus: token ? "valid" : "not_configured"
+        });
       }
     }
 
-    const headers: HeadersInit = {
+    let headers: HeadersInit = {
       "Accept": "application/vnd.github.v3+json",
+      "User-Agent": "Wakeup-OS"
     };
     if (token) {
       headers["Authorization"] = `bearer ${token}`;
     }
 
-    // 2. Fetch Repositories (Fetch user/repos if authenticated to get private repos, fall back to users/username/repos)
-    // We paginate to retrieve all repositories up to 5 pages (500 repos)
+    // 2. Fetch Repositories
+    // If token is invalid/expired (401), we automatically fallback to public repos and flag tokenStatus="expired"
     let reposData: any[] = [];
     let page = 1;
     let hasMore = true;
     while (hasMore && page <= 5) {
-      const url = token 
+      let url = token 
         ? `https://api.github.com/user/repos?sort=pushed&per_page=100&page=${page}`
         : `https://api.github.com/users/${username}/repos?sort=pushed&per_page=100&page=${page}`;
 
-      const reposRes = await fetch(url, {
+      let reposRes = await fetch(url, {
         headers,
         next: { revalidate: 60 }
       });
       
+      // If token expired / rejected (401 / 403), fallback immediately to public endpoints!
+      if (token && (reposRes.status === 401 || reposRes.status === 403)) {
+        console.warn(`[GitHub API] Token for user ${username} returned ${reposRes.status}. Falling back to public API.`);
+        token = null;
+        tokenStatus = "expired";
+        headers = {
+          "Accept": "application/vnd.github.v3+json",
+          "User-Agent": "Wakeup-OS"
+        };
+        page = 1;
+        reposData = [];
+        url = `https://api.github.com/users/${username}/repos?sort=pushed&per_page=100&page=1`;
+        reposRes = await fetch(url, { headers });
+      }
+
       if (!reposRes.ok) {
         if (reposData.length > 0) {
           break;
         }
-        if (existingCache) return NextResponse.json(existingCache.data);
+        if (existingCache) {
+          return NextResponse.json({
+            ...(existingCache.data as object),
+            tokenStatus,
+            warning: "GitHub rate limit or connection issue. Showing cached data."
+          });
+        }
         throw new Error(`GitHub API returned status ${reposRes.status}`);
       }
 
@@ -262,6 +285,7 @@ export async function GET(request: Request) {
 
     const payload = {
       username,
+      tokenStatus,
       repos: processedRepos,
       commits,
       stats: {
