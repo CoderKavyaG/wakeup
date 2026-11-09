@@ -2174,12 +2174,12 @@ function ControlRoomTab({ project }: { project: Project }) {
                 <h4 className="text-[10px] uppercase font-mono tracking-widest font-bold">Vercel Integration</h4>
               </div>
               <a
-                href="https://vercel.com/account/tokens"
+                href="https://vercel.com/account/settings/tokens#tokens"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-[9px] font-mono text-purple-400 hover:text-purple-300 hover:underline flex items-center gap-1 transition-colors"
               >
-                <span>Tokens</span>
+                <span>vercel.com/tokens</span>
                 <ExternalLink className="w-2.5 h-2.5" />
               </a>
             </div>
@@ -2213,15 +2213,19 @@ function ControlRoomTab({ project }: { project: Project }) {
               <div className="text-[9px] font-bold text-white/60 uppercase tracking-wider">How to get a token:</div>
               <div className="flex items-start gap-1">
                 <span className="text-purple-400 font-bold shrink-0">1.</span>
-                <span>Open <a href="https://vercel.com/account/tokens" target="_blank" rel="noopener noreferrer" className="text-white/70 underline hover:text-white">vercel.com/account/tokens</a></span>
+                <span>Open <a href="https://vercel.com/account/settings/tokens#tokens" target="_blank" rel="noopener noreferrer" className="text-white/70 underline hover:text-white">vercel.com/account/settings/tokens#tokens</a></span>
               </div>
               <div className="flex items-start gap-1">
                 <span className="text-purple-400 font-bold shrink-0">2.</span>
-                <span>Click <strong>Create Token</strong> with Full Account or Project scope</span>
+                <span>Click <strong>Create Token</strong> → Scope: <strong>Full Account</strong></span>
               </div>
               <div className="flex items-start gap-1">
                 <span className="text-purple-400 font-bold shrink-0">3.</span>
-                <span>Paste above & connect.</span>
+                <span>Expiration: Select <strong>No Expiration</strong> (or your preferred date)</span>
+              </div>
+              <div className="flex items-start gap-1">
+                <span className="text-purple-400 font-bold shrink-0">4.</span>
+                <span>Click <strong>Create</strong> and paste here.</span>
               </div>
             </div>
           </div>

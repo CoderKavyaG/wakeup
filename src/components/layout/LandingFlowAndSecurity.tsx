@@ -108,7 +108,7 @@ export function LandingFlowAndSecurity() {
       {/* Clouds Background for Onboarding Section */}
       <div className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden">
         <img
-          src="https://i.ibb.co/fVj7Nrcx/88130983-f36a-4f49-93a4-94313b8ff460.png"
+          src="/light-cloud-bg.png"
           alt="Clouds background"
           className="w-full h-full object-cover opacity-50"
         />

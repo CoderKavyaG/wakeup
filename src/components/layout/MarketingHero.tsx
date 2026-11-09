@@ -35,7 +35,7 @@ export function MarketingHero() {
       {/* Light Cloud Background Asset covering the Hero */}
       <div className="absolute top-0 left-0 right-0 h-[115vh] pointer-events-none select-none z-0 overflow-hidden">
         <img
-          src="https://i.ibb.co/fVj7Nrcx/88130983-f36a-4f49-93a4-94313b8ff460.png"
+          src="/light-cloud-bg.png"
           alt="Light clouds background"
           className="w-full h-full object-cover opacity-80"
         />

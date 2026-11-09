@@ -261,15 +261,19 @@ export function GithubWidget() {
             <div className="text-[9px] font-bold text-white/60 uppercase tracking-wider">Quick Setup (Classic Token):</div>
             <div className="flex items-start gap-1.5">
               <span className="text-amber-400 font-bold shrink-0">1.</span>
-              <span>Go to <a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer" className="text-white/70 underline hover:text-white">github.com/settings/tokens</a> → <strong>Generate new token (classic)</strong></span>
+              <span>Click <a href="https://github.com/settings/tokens/new?description=Wakeup%20Developer%20OS&scopes=repo,read:user,user:email" target="_blank" rel="noopener noreferrer" className="text-white/70 underline hover:text-white">Generate token</a> (opens pre-filled token page)</span>
             </div>
             <div className="flex items-start gap-1.5">
               <span className="text-amber-400 font-bold shrink-0">2.</span>
-              <span>Check scope <code className="text-amber-300 bg-amber-400/10 px-1 py-0.5 rounded">repo</code> (for private repos & commits) and <code className="text-amber-300 bg-amber-400/10 px-1 py-0.5 rounded">read:user</code></span>
+              <span>Under <strong>Expiration</strong>, select <strong>No expiration</strong> (or your chosen duration)</span>
             </div>
             <div className="flex items-start gap-1.5">
               <span className="text-amber-400 font-bold shrink-0">3.</span>
-              <span>Paste above & click <strong>SAVE</strong>. Encrypted with AES-256 in your database.</span>
+              <span>Ensure <code className="text-amber-300 bg-amber-400/10 px-1 py-0.5 rounded">repo</code> & <code className="text-amber-300 bg-amber-400/10 px-1 py-0.5 rounded">read:user</code> scopes are checked</span>
+            </div>
+            <div className="flex items-start gap-1.5">
+              <span className="text-amber-400 font-bold shrink-0">4.</span>
+              <span>Click <strong>Generate token</strong> at the bottom of the page, paste here & click <strong>SAVE</strong>.</span>
             </div>
           </div>
         </div>

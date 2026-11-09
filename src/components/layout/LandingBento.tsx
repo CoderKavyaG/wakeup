@@ -41,7 +41,7 @@ export function LandingBento() {
         "Runs entirely local on localhost"
       ],
       ctaText: "Explore Machine Control",
-      imageSrc: "https://i.ibb.co/cSpPS9JD/Screenshot-2026-07-17-214812.png",
+      imageSrc: "/widget-machine.png",
       mascotTip: "Chief: Loopback binds only to 127.0.0.1. No external exposure."
     },
     {
@@ -58,7 +58,7 @@ export function LandingBento() {
         "Live local and remote event feeds"
       ],
       ctaText: "Configure GitHub Feed",
-      imageSrc: "https://i.ibb.co/PvJVjV9X/Screenshot-2026-07-17-214738.png",
+      imageSrc: "/widget-github.png",
       mascotTip: "Chief: Keep that green streak burning! Direct API hooks."
     },
     {
@@ -75,7 +75,7 @@ export function LandingBento() {
         "Cognitive load reduction"
       ],
       ctaText: "Try Focus Panel",
-      imageSrc: "https://i.ibb.co/b8vY0tg/Screenshot-2026-07-17-214715.png",
+      imageSrc: "/widget-focus.png",
       mascotTip: "Chief: Dump raw thoughts, my local classifier handles it."
     },
     {
@@ -92,7 +92,7 @@ export function LandingBento() {
         "Physics-based card layouts & animations"
       ],
       ctaText: "Launch Project OS",
-      imageSrc: "https://i.ibb.co/rKyHYjPK/Screenshot-2026-07-17-215132.png",
+      imageSrc: "/widget-project-os.png",
       mascotTip: "Chief: Tap into localized Kanban lists to guide tasks."
     },
     {
@@ -109,7 +109,7 @@ export function LandingBento() {
         "Direct task list export"
       ],
       ctaText: "Open Sandbox Canvas",
-      imageSrc: "https://i.ibb.co/nqLnDbDn/Screenshot-2026-07-17-215220.png",
+      imageSrc: "/widget-sandbox.png",
       mascotTip: "Chief: Draw diagrams on the canvas, then export to tasks."
     },
     {
@@ -126,7 +126,7 @@ export function LandingBento() {
         "Local config validation rules"
       ],
       ctaText: "Configure Project Widget",
-      imageSrc: "https://i.ibb.co/SD9fg9Bg/Screenshot-2026-07-17-214744.png",
+      imageSrc: "/widget-project.png",
       mascotTip: "Chief: Open directories directly in VS Code from this widget."
     }
   ];

@@ -1796,26 +1796,53 @@ export function ProjectsWidget() {
               />
             </div>
             <div className="space-y-2">
-              <label className="text-xs font-semibold text-muted-foreground">GitHub Personal Access Token</label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-mono font-semibold text-white/70 uppercase tracking-wider">GitHub Token (PAT)</label>
+                <a
+                  href="https://github.com/settings/tokens/new?description=Wakeup%20Developer%20OS&scopes=repo,read:user,user:email"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[10px] font-mono text-amber-400 hover:text-amber-300 hover:underline flex items-center gap-1"
+                >
+                  <span>Generate token</span>
+                  <ExternalLink className="w-2.5 h-2.5" />
+                </a>
+              </div>
               <Input 
                 type="password"
                 value={githubTokenInput} 
                 onChange={e => setGithubTokenInput(e.target.value)} 
-                className="bg-transparent border-white/10 focus-visible:ring-primary/30" 
-                placeholder="ghp_..." 
+                className="bg-white/[0.02] border-white/10 text-xs font-mono focus-visible:ring-primary/30" 
+                placeholder="Paste ghp_..." 
               />
-              <p className="text-[10px] text-muted-foreground">Used for commit feeds and issue tracking.</p>
+              <div className="p-2 bg-white/[0.02] border border-white/[0.04] rounded-lg text-[9px] font-mono text-white/40 space-y-1">
+                <div><strong>Steps:</strong> 1. Click <a href="https://github.com/settings/tokens/new?description=Wakeup%20Developer%20OS&scopes=repo,read:user,user:email" target="_blank" rel="noopener noreferrer" className="text-amber-300 underline">Generate token</a> 2. Set <strong>Expiration: No expiration</strong> 3. Ensure <code className="text-amber-300 bg-amber-400/10 px-1 py-0.5 rounded">repo</code> & <code className="text-amber-300 bg-amber-400/10 px-1 py-0.5 rounded">read:user</code> are checked 4. Click <strong>Generate token</strong> at bottom.</div>
+              </div>
             </div>
+
             <div className="space-y-2">
-              <label className="text-xs font-semibold text-muted-foreground">Vercel Integration Token</label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-mono font-semibold text-white/70 uppercase tracking-wider">Vercel Token</label>
+                <a
+                  href="https://vercel.com/account/settings/tokens#tokens"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[10px] font-mono text-purple-400 hover:text-purple-300 hover:underline flex items-center gap-1"
+                >
+                  <span>vercel.com/tokens</span>
+                  <ExternalLink className="w-2.5 h-2.5" />
+                </a>
+              </div>
               <Input 
                 type="password"
                 value={vercelTokenInput} 
                 onChange={e => setVercelTokenInput(e.target.value)} 
-                className="bg-transparent border-white/10 focus-visible:ring-primary/30" 
-                placeholder={vercel?.hasToken ? "configured (leave unchanged, or clear to disconnect)" : "ve_..."} 
+                className="bg-white/[0.02] border-white/10 text-xs font-mono focus-visible:ring-primary/30" 
+                placeholder={vercel?.hasToken ? "configured (leave unchanged, or clear to disconnect)" : "Paste sec_... or vcp_..."} 
               />
-              <p className="text-[10px] text-muted-foreground">Used for analytics sparklines, deployments, and automated health checks.</p>
+              <div className="p-2 bg-white/[0.02] border border-white/[0.04] rounded-lg text-[9px] font-mono text-white/40 space-y-1">
+                <div><strong>Steps:</strong> 1. Open <a href="https://vercel.com/account/settings/tokens#tokens" target="_blank" rel="noopener noreferrer" className="text-purple-300 underline">vercel.com/account/settings/tokens#tokens</a> 2. Click <strong>Create Token</strong> 3. Set <strong>Scope: Full Account</strong> 4. Set <strong>Expiration: No Expiration</strong> (or custom date) 5. Click <strong>Create</strong> and paste here.</div>
+              </div>
             </div>
             
             <div className="border-t border-white/5 pt-4 space-y-2">
@@ -1848,30 +1875,51 @@ export function ProjectsWidget() {
             </div>
 
             <div className="border-t border-white/5 pt-4 space-y-2">
-              <label className="text-xs font-semibold text-muted-foreground flex items-center justify-between">
+              <label className="text-xs font-mono font-semibold text-white/70 flex items-center justify-between uppercase tracking-wider">
                 <span>Onboarding Guide Mascot</span>
               </label>
               <div className="flex items-center justify-between bg-white/[0.01] border border-white/[0.04] rounded-lg p-3">
-                <span className="text-[10px] text-white/40">Reset Devy the mascot to show up on the dashboard.</span>
+                <span className="text-[10px] font-mono text-white/40">
+                  {showMascot ? "Devy the mascot is currently visible on the dashboard." : "Devy the mascot is currently hidden."}
+                </span>
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="h-6 text-[9px] uppercase tracking-wider font-bold border-white/10 hover:bg-white/5 bg-transparent"
+                  className={`h-7 px-2.5 text-[9px] font-mono uppercase tracking-wider font-bold border transition-all cursor-pointer ${
+                    showMascot 
+                      ? "border-rose-500/30 text-rose-400 hover:bg-rose-500/10 hover:text-rose-300" 
+                      : "border-amber-500/30 text-amber-400 hover:bg-amber-500/10 hover:text-amber-300"
+                  }`}
                   onClick={() => {
-                    setShowMascot(true);
-                    localStorage.removeItem("wakeup_hide_mascot");
+                    const nextState = !showMascot;
+                    setShowMascot(nextState);
+                    if (nextState) {
+                      localStorage.removeItem("wakeup_hide_mascot");
+                    } else {
+                      localStorage.setItem("wakeup_hide_mascot", "true");
+                    }
                   }}
                 >
-                  Reveal Mascot
+                  {showMascot ? "Hide Mascot" : "Reveal Mascot"}
                 </Button>
               </div>
             </div>
 
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsSettingsOpen(false)} className="border-white/10 bg-transparent">Cancel</Button>
-            <Button onClick={handleSaveSettings} disabled={savingSettings} className="bg-primary text-primary-foreground hover:bg-primary/90">
+          <DialogFooter className="gap-2 sm:gap-0 pt-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setIsSettingsOpen(false)} 
+              className="border-white/10 bg-white/5 hover:bg-white/10 text-white/70 text-xs font-mono font-bold uppercase tracking-wider h-8"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSaveSettings} 
+              disabled={savingSettings} 
+              className="bg-primary text-primary-foreground hover:bg-primary/90 text-xs font-mono font-bold uppercase tracking-wider h-8 px-4"
+            >
               {savingSettings ? "Saving..." : "Save Config"}
             </Button>
           </DialogFooter>
