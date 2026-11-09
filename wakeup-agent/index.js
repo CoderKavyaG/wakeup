@@ -27,13 +27,22 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Middleware: verify every incoming request
+// Middleware: verify incoming request
 app.use((req, res, next) => {
+  // Allow health/stats ping without secret for port discovery and liveliness probes
+  if (req.path === '/stats' || req.path === '/ping') {
+    return next();
+  }
   const provided = req.headers['x-wakeup-agent-secret'];
   if (provided !== AGENT_SECRET) {
     return res.status(403).json({ error: 'forbidden' });
   }
   next();
+});
+
+// GET /ping - lightweight liveness check
+app.get('/ping', (req, res) => {
+  res.json({ ok: true, version: '1.0.0', port: PORT });
 });
 
 const PORT = 3131;

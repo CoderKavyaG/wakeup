@@ -187,9 +187,28 @@ export function MachineControlWidget() {
           startingPort = data.port;
         }
       } catch (e) {}
+
+      // On localhost, verify connection directly through our internal Next.js proxy
+      try {
+        const res = await fetch("/api/machine/stats");
+        if (res.ok) {
+          const statsData = await res.json();
+          setStats(statsData);
+          setAgentPort(startingPort);
+          localStorage.setItem("WAKEUP_AGENT_PORT", startingPort.toString());
+          setAgentOffline(false);
+          return startingPort;
+        } else {
+          setAgentOffline(true);
+          return null;
+        }
+      } catch (e) {
+        setAgentOffline(true);
+        return null;
+      }
     }
 
-    // Scan startingPort and surrounding ports (3131 to 3135) to find active agent
+    // For remote hosts (e.g., wakeup.sh), scan local.wakeup.com ports
     const candidatePorts = [startingPort];
     for (let p = 3131; p <= 3135; p++) {
       if (!candidatePorts.includes(p)) candidatePorts.push(p);
@@ -199,7 +218,7 @@ export function MachineControlWidget() {
       const controller = new AbortController();
       const id = setTimeout(() => controller.abort(), 750);
       try {
-        const res = await fetch(`https://local.wakeup.com:${port}/stats`, {
+        const res = await fetch(`https://local.wakeup.com:${port}/ping`, {
           signal: controller.signal,
           mode: "cors"
         });
@@ -219,9 +238,10 @@ export function MachineControlWidget() {
       console.log("[MachineControl] Detected agent running on port:", activePort);
       return activePort;
     } catch (e) {
-      // Default fallback
+      // Offline fallback
       setAgentPort(startingPort);
       localStorage.setItem("WAKEUP_AGENT_PORT", startingPort.toString());
+      setAgentOffline(true);
       return null;
     }
   };
@@ -240,7 +260,7 @@ export function MachineControlWidget() {
     
     let saved = localStorage.getItem("WAKEUP_WORKSPACE");
     if (!saved) {
-      saved = "C:\\Users\\Kavya\\Projects\\wakeup";
+      saved = "d:\\projects\\wakeup";
       localStorage.setItem("WAKEUP_WORKSPACE", saved);
     }
     setWorkspacePath(saved);
@@ -1390,7 +1410,7 @@ export function MachineControlWidget() {
                                 onClick={async (e) => {
                                   e.stopPropagation();
                                   try {
-                                    await fetch(`/api/machine/open`, {
+                                    await fetch(getAgentUrl(`/open`), {
                                       method: "POST",
                                       headers: { "Content-Type": "application/json" },
                                       body: JSON.stringify({ path: repo.path, app: "vscode" })
@@ -1408,7 +1428,7 @@ export function MachineControlWidget() {
                                 onClick={async (e) => {
                                   e.stopPropagation();
                                   try {
-                                    await fetch(`/api/machine/open`, {
+                                    await fetch(getAgentUrl(`/open`), {
                                       method: "POST",
                                       headers: { "Content-Type": "application/json" },
                                       body: JSON.stringify({ path: repo.path })
