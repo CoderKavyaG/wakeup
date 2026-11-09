@@ -1908,7 +1908,12 @@ function BrainDumpTab({ project }: { project: Project }) {
 // ── 6. Control Room Tab ──
 function ControlRoomTab({ project }: { project: Project }) {
   const vercel = useBootstrapStore(s => s.vercel);
+  const setVercelToken = useBootstrapStore(s => s.setVercelToken);
+  const removeVercelToken = useBootstrapStore(s => s.removeVercelToken);
   const updateProject = useProjectStore(s => s.updateProject);
+
+  const [tokenInput, setTokenInput] = useState("");
+  const [configuringToken, setConfiguringToken] = useState(false);
 
   const [deployments, setDeployments] = useState<any[]>([]);
   const [deploymentsLoading, setDeploymentsLoading] = useState(false);
@@ -2142,11 +2147,56 @@ function ControlRoomTab({ project }: { project: Project }) {
     } catch (e) { }
   };
 
+  const handleConnectVercel = async () => {
+    if (!tokenInput.trim()) return;
+    setConfiguringToken(true);
+    try {
+      await setVercelToken(tokenInput.trim());
+      setTokenInput("");
+    } catch (err: any) {
+      alert(err.message || "Failed to configure Vercel token");
+    } finally {
+      setConfiguringToken(false);
+    }
+  };
+
   return (
     <div className="p-5 grid grid-cols-1 lg:grid-cols-12 gap-5 max-w-7xl mx-auto h-full min-h-0 select-none animate-in fade-in duration-300">
       {/* Left Column (col-span-3) - Config & Integrations */}
       <div className="lg:col-span-3 flex flex-col space-y-4 h-full overflow-y-auto custom-scrollbar pr-0.5 min-h-0">
 
+        {/* Vercel Token Configuration (when no token) */}
+        {!vercel?.hasToken && (
+          <div className="bg-[#121217]/40 border border-white/[0.06] backdrop-blur-sm p-4 rounded-2xl flex flex-col space-y-3 shadow-sm animate-in fade-in duration-200">
+            <div className="flex items-center gap-1.5 text-purple-400">
+              <Globe className="w-3.5 h-3.5" />
+              <h4 className="text-[10px] uppercase font-mono tracking-widest font-bold">Vercel Integration</h4>
+            </div>
+            <p className="text-[11px] text-white/50 leading-relaxed">
+              Connect your Vercel account to view deployments, active links, and traffic analytics.
+            </p>
+            <div className="space-y-2.5 pt-1">
+              <div className="space-y-1">
+                <span className="text-[8px] text-white/30 font-bold uppercase tracking-wider font-mono block">Vercel API Token</span>
+                <input
+                  type="password"
+                  placeholder="Enter token (e.g. sec_...)"
+                  value={tokenInput}
+                  onChange={e => setTokenInput(e.target.value)}
+                  className="w-full h-8 bg-white/[0.02] border border-white/[0.08] rounded-xl text-xs text-white px-2 focus:outline-none focus:border-purple-500/40 font-mono transition-all"
+                />
+              </div>
+              <button
+                onClick={handleConnectVercel}
+                disabled={configuringToken || !tokenInput.trim()}
+                className="w-full py-1.5 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 hover:text-purple-300 transition-all text-xs font-semibold border border-purple-500/20 cursor-pointer text-center disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {configuringToken ? "Connecting..." : "Configure Vercel Token"}
+              </button>
+            </div>
+          </div>
+        )}
+        
         {/* Workspace Connection Hub (when empty) */}
         {!project.folderPath && !project.vercelProjectId && (
           <div className="bg-white/[0.02] border border-white/[0.05] p-5 rounded-2xl space-y-3.5 shadow-sm">
@@ -2220,6 +2270,21 @@ function ControlRoomTab({ project }: { project: Project }) {
                 <Globe className="w-3.5 h-3.5 text-amber-400" />
                 <h4 className="text-[10px] uppercase font-mono tracking-widest text-white/40 font-bold">Vercel Analytics</h4>
               </div>
+              <button
+                onClick={async () => {
+                  if (confirm("Are you sure you want to unlink this project from Vercel? This will remove deployment metrics and analytics for this project.")) {
+                    try {
+                      await updateProject(project.id, { vercelProjectId: "" });
+                    } catch (e) {
+                      alert("Failed to unlink project");
+                    }
+                  }
+                }}
+                className="text-[9px] font-mono font-semibold uppercase px-1.5 py-0.5 rounded bg-white/5 border border-white/10 hover:bg-white/10 hover:text-red-400 text-white/50 transition-all cursor-pointer"
+                title="Unlink from Vercel project"
+              >
+                Unlink
+              </button>
             </div>
 
             <div className="space-y-3">
@@ -2301,6 +2366,11 @@ function ControlRoomTab({ project }: { project: Project }) {
             <p className="text-[10px] text-white/50 leading-normal">
               Connect a Vercel project to load traffic metrics.
             </p>
+            {(!vercel?.projects || vercel.projects.length === 0) && (
+              <p className="text-[9px] text-amber-500/80 font-mono leading-relaxed bg-amber-500/5 border border-amber-500/10 p-2 rounded-lg">
+                ⚠️ No projects found on this Vercel account. Ensure your token has access to the correct scope/team.
+              </p>
+            )}
             <select
               onChange={e => mapVercelProject(e.target.value)}
               className="w-full h-8 bg-white/[0.02] border border-white/[0.08] rounded-xl text-xs text-white px-2 focus:outline-none focus:border-amber-500/40 cursor-pointer font-semibold transition-all"
@@ -2310,6 +2380,20 @@ function ControlRoomTab({ project }: { project: Project }) {
                 <option key={vp.id} value={vp.id} className="bg-[#0f0f11]">{vp.name}</option>
               ))}
             </select>
+            <button
+              onClick={async () => {
+                if (confirm("Are you sure you want to disconnect Vercel? This will clear the configured token and local cache.")) {
+                  try {
+                    await removeVercelToken();
+                  } catch (err: any) {
+                    alert(err.message || "Failed to disconnect");
+                  }
+                }
+              }}
+              className="w-full py-1 text-[10px] uppercase font-mono tracking-wider font-semibold rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 transition-all border border-red-500/10 cursor-pointer text-center mt-1"
+            >
+              Disconnect Vercel
+            </button>
           </div>
         )}
 
@@ -3365,9 +3449,7 @@ export function ProjectOS() {
   const [isHtmlDragOver, setIsHtmlDragOver] = useState(false);
 
   const selectedProject = projects.find(p => p.id === selectedProjectId) || null;
-  const selectedProjectResolvedPhase = selectedProject
-    ? ((selectedProject.phase === "idea" && selectedProject.type !== "idea") ? "in_development" : selectedProject.phase)
-    : null;
+  const selectedProjectResolvedPhase = selectedProject ? selectedProject.phase : null;
 
   const syncCuratedList = async (phase: string, newList: string[]) => {
     localStorage.setItem(`wakeup_curated_${phase}`, JSON.stringify(newList));
@@ -3423,7 +3505,16 @@ export function ProjectOS() {
       try {
         let list = JSON.parse(stored) as string[];
         list = list.filter(id => id !== projectId);
-        syncCuratedList(phase, list);
+        localStorage.setItem(key, JSON.stringify(list));
+        
+        // Add to hidden list
+        const hiddenStored = localStorage.getItem("wakeup_curated_hidden");
+        let hiddenList = hiddenStored ? JSON.parse(hiddenStored) : [];
+        if (!hiddenList.includes(projectId)) {
+          hiddenList.push(projectId);
+          localStorage.setItem("wakeup_curated_hidden", JSON.stringify(hiddenList));
+        }
+        loadCurationLists();
       } catch { }
     }
   };
@@ -3446,11 +3537,22 @@ export function ProjectOS() {
           } catch { }
         }
       });
-      loadCurationLists();
 
-      if (selectedProjectId === id) {
-        selectProject(null);
+      // Clean up hidden list
+      const hiddenStored = localStorage.getItem("devos_curated_hidden");
+      if (hiddenStored) {
+        try {
+          let hiddenList = JSON.parse(hiddenStored) as string[];
+          if (hiddenList.includes(id)) {
+            hiddenList = hiddenList.filter(item => item !== id);
+            localStorage.setItem("devos_curated_hidden", JSON.stringify(hiddenList));
+          }
+        } catch {}
       }
+
+      loadCurationLists();
+      
+      selectProject(null); // Unconditionally redirect to main Command Center Dashboard on deletion
       setDeleteConfirmId(null);
       setDeleteConfirmName("");
     } catch (err: any) {
@@ -3495,7 +3597,18 @@ export function ProjectOS() {
       }
 
       localStorage.setItem(oldKey, JSON.stringify(oldList));
-      await syncCuratedList(newPhase, newList);
+      
+      // Remove from hidden list if it was previously hidden
+      const hiddenStored = localStorage.getItem("wakeup_curated_hidden");
+      if (hiddenStored) {
+        try {
+          let hiddenList = JSON.parse(hiddenStored) as string[];
+          hiddenList = hiddenList.filter(id => id !== project.id);
+          localStorage.setItem("wakeup_curated_hidden", JSON.stringify(hiddenList));
+        } catch { }
+      }
+
+      loadCurationLists();
     } catch (err) {
       console.error(err);
     }
@@ -3573,9 +3686,18 @@ export function ProjectOS() {
       ...curatedIdea
     ]);
 
+    const hiddenStored = localStorage.getItem("devos_curated_hidden");
+    const hiddenIds = new Set(hiddenStored ? JSON.parse(hiddenStored) : []);
+
     projects.forEach(p => {
-      if (!currentCuratedIds.has(p.id)) {
-        const resolvedPhase = (p.phase === "idea" && p.type !== "idea") ? "in_development" : p.phase;
+      if (!currentCuratedIds.has(p.id) && !hiddenIds.has(p.id)) {
+        const resolvedPhase = p.phase;
+        
+        // Skip code projects that are in the "idea" phase so they don't auto-curate onto the Idea board
+        if (resolvedPhase === "idea" && p.type !== "idea") {
+          return;
+        }
+
         const key = `wakeup_curated_${resolvedPhase}`;
         const stored = localStorage.getItem(key);
         let list: string[] = [];
@@ -3600,7 +3722,7 @@ export function ProjectOS() {
     if (typeof window === "undefined") return;
     let modified = false;
     projects.forEach(p => {
-      const resolvedPhase = (p.phase === "idea" && p.type !== "idea") ? "in_development" : p.phase;
+      const resolvedPhase = p.phase;
       // Find if this project is currently curated in a phase that doesn't match its DB phase
       PHASES.forEach(phaseObj => {
         if (resolvedPhase !== phaseObj.id) {
@@ -3615,13 +3737,23 @@ export function ProjectOS() {
                 localStorage.setItem(key, JSON.stringify(list));
                 modified = true;
 
-                // Add to correct phase list
-                const correctKey = `wakeup_curated_${resolvedPhase}`;
-                const correctStored = localStorage.getItem(correctKey);
-                let correctList = correctStored ? JSON.parse(correctStored) : [];
-                if (!correctList.includes(p.id)) {
-                  correctList.push(p.id);
-                  localStorage.setItem(correctKey, JSON.stringify(correctList));
+                // Add to correct phase list if it isn't hidden
+                const hiddenStored = localStorage.getItem("wakeup_curated_hidden");
+                const hiddenIds = new Set(hiddenStored ? JSON.parse(hiddenStored) : []);
+
+                if (!hiddenIds.has(p.id)) {
+                  // Skip code projects in "idea" phase
+                  if (resolvedPhase === "idea" && p.type !== "idea") {
+                    return;
+                  }
+                  const correctKey = `wakeup_curated_${resolvedPhase}`;
+                  const correctStored = localStorage.getItem(correctKey);
+                  let correctList = correctStored ? JSON.parse(correctStored) : [];
+                  if (!correctList.includes(p.id)) {
+                    correctList.push(p.id);
+                    localStorage.setItem(correctKey, JSON.stringify(correctList));
+                  }
+                }
                 }
               }
             } catch { }
@@ -3655,13 +3787,11 @@ export function ProjectOS() {
   // Curated lists
   const launchedProjects = projects.filter(p => p.phase === "launched" && curatedLaunched.includes(p.id));
   const inDevProjects = projects.filter(p => {
-    const resolvedPhase = (p.phase === "idea" && p.type !== "idea") ? "in_development" : p.phase;
-    return resolvedPhase === "in_development" && curatedInDev.includes(p.id);
+    return p.phase === "in_development" && curatedInDev.includes(p.id);
   });
   const sketchingProjects = projects.filter(p => p.phase === "sketching" && curatedSketching.includes(p.id));
   const ideaProjects = projects.filter(p => {
-    const resolvedPhase = (p.phase === "idea" && p.type !== "idea") ? "in_development" : p.phase;
-    return resolvedPhase === "idea" && curatedIdea.includes(p.id);
+    return p.phase === "idea" && p.type === "idea" && curatedIdea.includes(p.id);
   });
 
   // Curated list for the currently active phase tab (for left rail sidebar list)
@@ -3687,15 +3817,9 @@ export function ProjectOS() {
   // Stats calculation by phase (all DB projects, not curated only, to match totals)
   const stats = {
     launched: projects.filter(p => p.phase === "launched").length,
-    in_development: projects.filter(p => {
-      const resolvedPhase = (p.phase === "idea" && p.type !== "idea") ? "in_development" : p.phase;
-      return resolvedPhase === "in_development";
-    }).length,
+    in_development: projects.filter(p => p.phase === "in_development").length,
     sketching: projects.filter(p => p.phase === "sketching").length,
-    idea: projects.filter(p => {
-      const resolvedPhase = (p.phase === "idea" && p.type !== "idea") ? "in_development" : p.phase;
-      return resolvedPhase === "idea";
-    }).length,
+    idea: projects.filter(p => p.phase === "idea" && p.type === "idea").length,
   };
 
   // Dashboard general stats based on all curated projects across all columns
@@ -4168,7 +4292,7 @@ export function ProjectOS() {
                                   const val = e.currentTarget.value.trim();
                                   e.currentTarget.value = "";
                                   try {
-                                    await addProject({
+                                    const saved = await addProject({
                                       name: val,
                                       phase: "idea",
                                       type: "idea",
@@ -4176,6 +4300,27 @@ export function ProjectOS() {
                                       description: "",
                                       tags: [],
                                     });
+                                    if (saved) {
+                                      const key = "devos_curated_idea";
+                                      const stored = localStorage.getItem(key);
+                                      let list = stored ? JSON.parse(stored) : [];
+                                      if (!list.includes(saved.id)) {
+                                        list.push(saved.id);
+                                        localStorage.setItem(key, JSON.stringify(list));
+                                      }
+                                      
+                                      // Remove from hidden list if present
+                                      const hiddenStored = localStorage.getItem("devos_curated_hidden");
+                                      if (hiddenStored) {
+                                        try {
+                                          let hiddenList = JSON.parse(hiddenStored) as string[];
+                                          hiddenList = hiddenList.filter(id => id !== saved.id);
+                                          localStorage.setItem("devos_curated_hidden", JSON.stringify(hiddenList));
+                                        } catch {}
+                                      }
+
+                                      loadCurationLists();
+                                    }
                                   } catch (err) {
                                     console.error(err);
                                   }
@@ -4315,6 +4460,15 @@ export function ProjectOS() {
                                 if (!updatedList.includes(p.id)) {
                                   updatedList.push(p.id);
                                 }
+                                // Remove from hidden list
+                                const hiddenStored = localStorage.getItem("devos_curated_hidden");
+                                if (hiddenStored) {
+                                  try {
+                                    let hiddenList = JSON.parse(hiddenStored) as string[];
+                                    hiddenList = hiddenList.filter(id => id !== p.id);
+                                    localStorage.setItem("devos_curated_hidden", JSON.stringify(hiddenList));
+                                  } catch {}
+                                }
                                 if (p.phase !== activePhase) {
                                   try {
                                     await fetch(`/api/projects/${p.id}`, {
@@ -4329,6 +4483,13 @@ export function ProjectOS() {
                                 }
                               } else {
                                 updatedList = updatedList.filter(id => id !== p.id);
+                                // Add to hidden list
+                                const hiddenStored = localStorage.getItem("devos_curated_hidden");
+                                let hiddenList = hiddenStored ? JSON.parse(hiddenStored) : [];
+                                if (!hiddenList.includes(p.id)) {
+                                  hiddenList.push(p.id);
+                                  localStorage.setItem("devos_curated_hidden", JSON.stringify(hiddenList));
+                                }
                               }
 
                               await syncCuratedList(activePhase, updatedList);
@@ -4385,6 +4546,17 @@ export function ProjectOS() {
               list.push(newProj.id);
               localStorage.setItem(key, JSON.stringify(list));
             }
+            
+            // Remove from hidden list if present
+            const hiddenStored = localStorage.getItem("devos_curated_hidden");
+            if (hiddenStored) {
+              try {
+                let hiddenList = JSON.parse(hiddenStored) as string[];
+                hiddenList = hiddenList.filter(id => id !== newProj.id);
+                localStorage.setItem("devos_curated_hidden", JSON.stringify(hiddenList));
+              } catch {}
+            }
+
             loadCurationLists();
             selectProject(null);
           }}
