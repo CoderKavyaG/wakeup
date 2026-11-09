@@ -212,17 +212,29 @@ export function GithubWidget() {
       </div>
 
       {showSettings && (
-        <div className="mb-3 p-3 bg-[#121217]/60 border border-white/[0.08] rounded-xl shrink-0 flex flex-col gap-2.5 backdrop-blur-sm">
+        <div className="mb-3 p-3.5 bg-[#121217]/80 border border-white/[0.08] rounded-xl shrink-0 flex flex-col gap-3 backdrop-blur-md">
           <div className="flex items-center justify-between">
-            <span className="text-[9px] font-mono font-bold text-white/40 uppercase tracking-widest">GitHub Access Token (PAT)</span>
-            <span className="text-[9px] font-mono text-white/20">AES-256</span>
+            <span className="text-[10px] font-mono font-bold text-white/50 uppercase tracking-widest flex items-center gap-1.5">
+              <span>GitHub Access Token</span>
+              <span className="text-[8px] font-mono px-1 py-0.2 rounded bg-white/5 text-white/30 border border-white/5">PAT</span>
+            </span>
+            <a
+              href="https://github.com/settings/tokens/new?description=Wakeup%20Developer%20OS&scopes=repo,read:user,user:email"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[10px] font-mono text-amber-400/80 hover:text-amber-300 hover:underline flex items-center gap-1 transition-colors"
+            >
+              <span>Generate token</span>
+              <ExternalLink className="w-2.5 h-2.5" />
+            </a>
           </div>
+
           <div className="flex gap-2">
             <Input
               type="password"
               value={token}
               onChange={(e) => setToken(e.target.value)}
-              placeholder={hasServerToken ? "•••••••••••••••• (Configured)" : "ghp_..."}
+              placeholder={hasServerToken ? "•••••••••••••••• (Configured)" : "Paste ghp_..."}
               className="h-8 text-xs font-mono flex-1 bg-white/[0.02] border-white/[0.08] text-white placeholder:text-white/20 rounded-lg focus-visible:border-amber-500/40"
             />
             <Button 
@@ -243,7 +255,23 @@ export function GithubWidget() {
               </Button>
             )}
           </div>
-          <p className="text-[9px] font-mono text-white/30 leading-relaxed">Encrypted in PostgreSQL. Unlocks private repos, commit timelines & contribution streaks.</p>
+
+          {/* Quick steps guide */}
+          <div className="p-2.5 bg-white/[0.02] border border-white/[0.04] rounded-lg flex flex-col gap-1.5 text-[9px] font-mono text-white/40 leading-relaxed">
+            <div className="text-[9px] font-bold text-white/60 uppercase tracking-wider">Quick Setup (Classic Token):</div>
+            <div className="flex items-start gap-1.5">
+              <span className="text-amber-400 font-bold shrink-0">1.</span>
+              <span>Go to <a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer" className="text-white/70 underline hover:text-white">github.com/settings/tokens</a> → <strong>Generate new token (classic)</strong></span>
+            </div>
+            <div className="flex items-start gap-1.5">
+              <span className="text-amber-400 font-bold shrink-0">2.</span>
+              <span>Check scope <code className="text-amber-300 bg-amber-400/10 px-1 py-0.5 rounded">repo</code> (for private repos & commits) and <code className="text-amber-300 bg-amber-400/10 px-1 py-0.5 rounded">read:user</code></span>
+            </div>
+            <div className="flex items-start gap-1.5">
+              <span className="text-amber-400 font-bold shrink-0">3.</span>
+              <span>Paste above & click <strong>SAVE</strong>. Encrypted with AES-256 in your database.</span>
+            </div>
+          </div>
         </div>
       )}
 

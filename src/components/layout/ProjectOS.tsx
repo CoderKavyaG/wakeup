@@ -2168,19 +2168,32 @@ function ControlRoomTab({ project }: { project: Project }) {
         {/* Vercel Token Configuration (when no token) */}
         {!vercel?.hasToken && (
           <div className="bg-[#121217]/60 border border-white/[0.08] backdrop-blur-md p-4 rounded-2xl flex flex-col space-y-3 shadow-sm animate-in fade-in duration-200">
-            <div className="flex items-center gap-1.5 text-purple-400">
-              <Globe className="w-3.5 h-3.5" />
-              <h4 className="text-[10px] uppercase font-mono tracking-widest font-bold">Vercel Integration</h4>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-purple-400">
+                <Globe className="w-3.5 h-3.5" />
+                <h4 className="text-[10px] uppercase font-mono tracking-widest font-bold">Vercel Integration</h4>
+              </div>
+              <a
+                href="https://vercel.com/account/tokens"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[9px] font-mono text-purple-400 hover:text-purple-300 hover:underline flex items-center gap-1 transition-colors"
+              >
+                <span>Tokens</span>
+                <ExternalLink className="w-2.5 h-2.5" />
+              </a>
             </div>
+
             <p className="text-[11px] text-white/50 leading-relaxed font-sans">
               Connect your Vercel account to view deployments, active links, and traffic analytics.
             </p>
+
             <div className="space-y-2.5 pt-1">
               <div className="space-y-1">
                 <span className="text-[9px] text-white/30 font-mono font-bold uppercase tracking-widest block">Vercel API Token</span>
                 <input
                   type="password"
-                  placeholder="Enter token (e.g. sec_...)"
+                  placeholder="Paste sec_... or vcp_..."
                   value={tokenInput}
                   onChange={e => setTokenInput(e.target.value)}
                   className="w-full h-8 bg-white/[0.02] border border-white/[0.08] rounded-xl text-xs text-white px-2.5 focus:outline-none focus:border-purple-500/40 font-mono transition-all"
@@ -2193,6 +2206,23 @@ function ControlRoomTab({ project }: { project: Project }) {
               >
                 {configuringToken ? "Connecting..." : "Configure Vercel Token"}
               </button>
+            </div>
+
+            {/* Quick steps guide */}
+            <div className="p-2.5 bg-white/[0.02] border border-white/[0.04] rounded-xl flex flex-col gap-1 text-[9px] font-mono text-white/40 leading-relaxed">
+              <div className="text-[9px] font-bold text-white/60 uppercase tracking-wider">How to get a token:</div>
+              <div className="flex items-start gap-1">
+                <span className="text-purple-400 font-bold shrink-0">1.</span>
+                <span>Open <a href="https://vercel.com/account/tokens" target="_blank" rel="noopener noreferrer" className="text-white/70 underline hover:text-white">vercel.com/account/tokens</a></span>
+              </div>
+              <div className="flex items-start gap-1">
+                <span className="text-purple-400 font-bold shrink-0">2.</span>
+                <span>Click <strong>Create Token</strong> with Full Account or Project scope</span>
+              </div>
+              <div className="flex items-start gap-1">
+                <span className="text-purple-400 font-bold shrink-0">3.</span>
+                <span>Paste above & connect.</span>
+              </div>
             </div>
           </div>
         )}
