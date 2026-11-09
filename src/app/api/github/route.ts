@@ -22,6 +22,11 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const username = searchParams.get("username") || "coderkavyag";
     
+    // Validate GitHub username pattern to prevent injection
+    if (!/^[a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38}$/.test(username)) {
+      return NextResponse.json({ error: "Invalid GitHub username format" }, { status: 400 });
+    }
+    
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { githubToken: true }
@@ -158,10 +163,10 @@ export async function GET(request: Request) {
       percentage: totalLangs > 0 ? Math.round((count / totalLangs) * 100) : 0
     })).sort((a, b) => b.percentage - a.percentage);
 
-    // 4. GraphQL Query for Contributions Calendar
+    // 4. GraphQL Query for Contributions Calendar (Parameterized variables)
     const graphQuery = `
-      query {
-        user(login: "${username}") {
+      query($login: String!) {
+        user(login: $login) {
           contributionsCollection {
             contributionCalendar {
               totalContributions
@@ -180,7 +185,7 @@ export async function GET(request: Request) {
     const graphRes = await fetch("https://api.github.com/graphql", {
       method: "POST",
       headers,
-      body: JSON.stringify({ query: graphQuery })
+      body: JSON.stringify({ query: graphQuery, variables: { login: username } })
     });
 
     let currentStreak = 0;

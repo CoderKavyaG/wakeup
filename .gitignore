@@ -51,6 +51,11 @@ README.md
 # uploads
 /public/uploads/
 
+wakeup-agent/active-port.json
+wakeup-agent/workspaces.json
+wakeup-agent/certs/local.key
+wakeup-agent/certs/local.crt
+wakeup-agent/.agent-secret
 devos-agent/active-port.json
 devos-agent/workspaces.json
 devos-agent/certs/local.key

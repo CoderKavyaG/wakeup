@@ -7,7 +7,7 @@ mkdir -p "$AGENT_DIR/certs"
 
 echo -e "\033[0;36m📥 Downloading DevOS Agent components...\033[0m"
 
-BASE_URL="https://raw.githubusercontent.com/CoderKavyaG/wakeup/main/devos-agent"
+BASE_URL="https://raw.githubusercontent.com/CoderKavyaG/wakeup/main/wakeup-agent"
 
 curl -fsSL "$BASE_URL/index.js" -o "$AGENT_DIR/index.js"
 curl -fsSL "$BASE_URL/picker.ps1" -o "$AGENT_DIR/picker.ps1"

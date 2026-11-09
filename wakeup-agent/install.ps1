@@ -13,7 +13,7 @@ if (!(Test-Path $CertsDir)) {
 
 Write-Host "📥 Downloading DevOS Agent components..." -ForegroundColor Cyan
 
-$baseUrl = "https://raw.githubusercontent.com/CoderKavyaG/wakeup/main/devos-agent"
+$baseUrl = "https://raw.githubusercontent.com/CoderKavyaG/wakeup/main/wakeup-agent"
 
 Invoke-WebRequest -Uri "$baseUrl/index.js" -OutFile "$AgentDir\index.js" -UseBasicParsing
 Invoke-WebRequest -Uri "$baseUrl/picker.ps1" -OutFile "$AgentDir\picker.ps1" -UseBasicParsing

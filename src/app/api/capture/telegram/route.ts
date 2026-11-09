@@ -42,12 +42,11 @@ export async function POST(req: NextRequest) {
     const chatId = message.chat.id;
     const text = message.text.trim();
 
-    if (text.startsWith("WAKEUP-") || text.startsWith("WAKEUP-")) {
-      const isWakeup = text.startsWith("WAKEUP-");
-      const prefix = isWakeup ? "WAKEUP-" : "WAKEUP-";
+    if (text.startsWith("WAKEUP-") || text.startsWith("DEVOS-")) {
+      const prefix = text.startsWith("WAKEUP-") ? "WAKEUP-" : "DEVOS-";
       const shortId = text.replace(prefix, "").trim();
       let user = null;
-      if (shortId.length >= 8) {
+      if (shortId.length >= 10 && /^[a-zA-Z0-9]+$/.test(shortId)) {
         user = await prisma.user.findFirst({
           where: { id: { startsWith: shortId } },
         });

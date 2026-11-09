@@ -172,14 +172,19 @@ app.post('/open', (req, res) => {
   const { path: targetPath, app: appToOpen } = req.body;
   if (!targetPath) return res.status(400).json({ error: 'Missing path' });
 
+  if (!fs.existsSync(targetPath)) {
+    return res.status(400).json({ error: 'Target path does not exist' });
+  }
+
+  const safePath = path.resolve(targetPath).replace(/"/g, '');
   let cmd = '';
   const isWin = os.platform() === 'win32';
 
   if (appToOpen === 'vscode') {
-    cmd = `code "${targetPath}"`;
+    cmd = `code "${safePath}"`;
   } else {
     // default open folder
-    cmd = isWin ? `explorer "${targetPath}"` : `open "${targetPath}"`;
+    cmd = isWin ? `explorer "${safePath}"` : `open "${safePath}"`;
   }
 
   exec(cmd, (error) => {
@@ -196,16 +201,25 @@ app.post('/launch', (req, res) => {
   const isWin = os.platform() === 'win32';
 
   if (url) {
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        return res.status(400).json({ error: 'Only HTTP and HTTPS URLs are permitted' });
+      }
+    } catch {
+      return res.status(400).json({ error: 'Invalid URL format' });
+    }
+    const safeUrl = url.replace(/"/g, '');
     if (browser === 'chrome') {
-      cmd = isWin ? `start chrome "${url}"` : `open -a "Google Chrome" "${url}"`;
+      cmd = isWin ? `start chrome "${safeUrl}"` : `open -a "Google Chrome" "${safeUrl}"`;
     } else if (browser === 'brave') {
       cmd = isWin 
-        ? `if exist "%LOCALAPPDATA%\\BraveSoftware\\Brave-Browser\\Application\\brave.exe" (start "" "%LOCALAPPDATA%\\BraveSoftware\\Brave-Browser\\Application\\brave.exe" "${url}") else (start brave "${url}")`
-        : `open -a "Brave Browser" "${url}"`;
+        ? `if exist "%LOCALAPPDATA%\\BraveSoftware\\Brave-Browser\\Application\\brave.exe" (start "" "%LOCALAPPDATA%\\BraveSoftware\\Brave-Browser\\Application\\brave.exe" "${safeUrl}") else (start brave "${safeUrl}")`
+        : `open -a "Brave Browser" "${safeUrl}"`;
     } else if (browser === 'edge') {
-      cmd = isWin ? `start msedge "${url}"` : `open -a "Microsoft Edge" "${url}"`;
+      cmd = isWin ? `start msedge "${safeUrl}"` : `open -a "Microsoft Edge" "${safeUrl}"`;
     } else {
-      cmd = isWin ? `start "" "${url}"` : `open "${url}"`;
+      cmd = isWin ? `start "" "${safeUrl}"` : `open "${safeUrl}"`;
     }
   } else {
     // Basic examples of custom launchers
@@ -759,10 +773,14 @@ app.post('/generate-context', async (req, res) => {
   try {
     const scanned = await scanForContext(targetPath);
     
-    // Call the Next.js API endpoint to run LLM generation
+    // Call the Next.js API endpoint to run LLM generation with agent secret
+    const secret = fs.existsSync(SECRET_PATH) ? fs.readFileSync(SECRET_PATH, 'utf8').trim() : AGENT_SECRET;
     const response = await fetch('http://localhost:3000/api/projects/generate-context', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-wakeup-agent-secret': secret
+      },
       body: JSON.stringify({ scanned })
     });
 

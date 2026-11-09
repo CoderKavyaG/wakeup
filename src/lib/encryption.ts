@@ -5,9 +5,16 @@ const IV_LENGTH = 12;
 const KEY_LENGTH = 32;
 
 const getEncryptionKey = (): Buffer => {
-  const secret = process.env.ENCRYPTION_KEY || process.env.AUTH_SECRET || "default_super_secret_wakeup_key_32_bytes";
+  const secret = process.env.ENCRYPTION_KEY || process.env.AUTH_SECRET;
+  if (!secret) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("ENCRYPTION_KEY or AUTH_SECRET must be defined in production.");
+    }
+    console.warn("⚠️ [SECURITY] ENCRYPTION_KEY not set. Using dev fallback key.");
+  }
+  const effectiveSecret = secret || "default_super_secret_wakeup_key_32_bytes";
   // Derives a key of 32 bytes using a fixed salt and PBKDF2
-  return crypto.pbkdf2Sync(secret, "wakeup-salt", 100000, KEY_LENGTH, "sha256");
+  return crypto.pbkdf2Sync(effectiveSecret, "wakeup-salt", 100000, KEY_LENGTH, "sha256");
 };
 
 export function encrypt(text: string): string {

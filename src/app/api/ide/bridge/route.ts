@@ -23,11 +23,13 @@ export async function POST(request: Request) {
     const body: IDECommand = await request.json();
     const { command, context } = body;
 
-    // Verify IDE bridge is enabled (optional: API key validation)
+    // Verify IDE bridge is enabled with a configured token
     const ideToken = request.headers.get("x-ide-token");
-    if (ideToken !== process.env.IDE_BRIDGE_TOKEN && process.env.IDE_BRIDGE_TOKEN) {
+    const configuredToken = process.env.IDE_BRIDGE_TOKEN;
+
+    if (!configuredToken || !ideToken || ideToken !== configuredToken) {
       return NextResponse.json(
-        { success: false, message: "Unauthorized" },
+        { success: false, message: "Unauthorized. Configured x-ide-token required." },
         { status: 401 }
       );
     }

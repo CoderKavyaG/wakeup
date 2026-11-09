@@ -4,14 +4,34 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { decrypt } from "@/lib/encryption";
+import fs from "fs";
+import path from "path";
 
 export async function POST(req: Request) {
   try {
     const session = await auth();
-    if (!session?.user?.id) {
+    let userId = session?.user?.id;
+
+    if (!userId) {
+      // Verify internal loopback agent secret
+      const agentSecretHeader = req.headers.get("x-wakeup-agent-secret");
+      let storedSecret = null;
+      try {
+        const secretPath = path.join(process.cwd(), "wakeup-agent", ".agent-secret");
+        if (fs.existsSync(secretPath)) {
+          storedSecret = fs.readFileSync(secretPath, "utf-8").trim();
+        }
+      } catch {}
+
+      if (storedSecret && agentSecretHeader === storedSecret) {
+        const owner = await prisma.user.findFirst({ orderBy: { createdAt: "asc" } });
+        userId = owner?.id;
+      }
+    }
+
+    if (!userId) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
-    const userId = session.user.id;
 
     const { scanned } = await req.json();
     if (!scanned) {
